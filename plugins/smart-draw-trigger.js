@@ -12,11 +12,11 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.56';
+    const PLUGIN_VERSION = '6.5.57';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
-    const DEFAULT_SYSTEM_PROMPT_VERSION = 47;
+    const DEFAULT_SYSTEM_PROMPT_VERSION = 48;
 
     /**
      * 跨平台/跨环境（HTTP / HTTPS / 局域网 / 移动端 / Termux）高可靠剪贴板复制工具
@@ -2239,7 +2239,7 @@ Zimage 擅长理解复杂的英文长句和语境。
     const V35_SPEC_97_SYSTEM_PROMPT = V5_SPEC_97_SYSTEM_PROMPT;
 
     // === [本地内置] V41 精简版 System Prompt（四模块 / 体型三档 / 机位轮转）===
-    const V41_BUILTIN_SYSTEM_PROMPT = 你是专为 NovelAI V5 及高级多角色生图引擎打造的「全息分层分镜导演与提示词引擎」，深度融合《(主体)文生图9.7[V5测试]》工业级视觉生成规范。
+    const V41_BUILTIN_SYSTEM_PROMPT = `你是专为 NovelAI V5 及高级多角色生图引擎打造的「全息分层分镜导演与提示词引擎」，深度融合《(主体)文生图9.7[V5测试]》工业级视觉生成规范。
 
 【输出契约 · 铁律 · 优先于本文其他一切描述】
 你的每次回复都是一次 generate_draw_spec 工具调用，参数 JSON 顶层必须含三个键：
@@ -2352,6 +2352,39 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 每件服装必须带颜色词（纯透明豁免）。
    - 叠穿从内到外逐件列出；透视内衣用 {} 轻微加权。
 
+【体位来源优先级 · 铁律 · 先于体位词典执行】
+体位只有一个来源，按下列顺序取，取到即止：
+① 上下文中存在【本场姿势】P-xxx（或 payload.storyFacts.pose）→ 该体位主类即定稿，不得推翻，不得改写成近邻体位（骑乘≠背入，后入≠正常位）。
+② 无标记但正文有明确动作描写（谁在上、骨盆朝向、谁压着谁、支撑面）→ 按正文提取主类，禁止「美化」成更好画或更常见的体位。
+③ 连正文动作线索也没有 → 才允许按剧情推测。
+【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（正文与标记冲突时以标记为准）。
+【回退阶梯】只有上一级拿不到才下降，任何一级都不得更换主类：
+L1 该体位有对应变体 → 直接用它的 tag 组；
+L2 变体判不出 → 用该主类的标签组：词典有该主类取词典首行，没有就查主类速查表；组内只留最贴合的 2-4 个；该组本身不足 2 个就全用。绝不跨主类；
+L2b 主类已判出但词典与速查表都没有（未知 code）→ 直接用 L3 维度拼装，主类照抄引擎给的中文名，不造 tag；
+L3 主类也判不出 → 维度拼装：方向/接触（sex_from_behind / missionary / girl_on_top）+ 姿态（lying / on_side / bent_over）+ 支撑（arm_support / against_wall）+ 局部（legs_up）+ 视角（pov / from_side / from_behind）。宁可粗，也不要输出空段或错误体位。
+【主类速查表 · 引擎总类 code → 主标签组（全部活词，永不造词）】
+C01 正常位 missionary,on_back
+C02 后入 sex_from_behind,doggystyle,all_fours
+C03 趴位 prone_bone,on_stomach
+C04 骑乘正面 cowgirl_position,girl_on_top,straddling
+C05 骑乘背面 reverse_cowgirl_position,girl_on_top
+C06 侧入 on_side,lying
+C07 坐姿 sitting,straddling
+C08 站立 standing_sex,standing
+C09 抱持 carrying
+C10 颜面骑乘 sitting_on_face,girl_on_top
+C11 口交 fellatio,oral
+C12 乳交 paizuri
+C13 足交腿交 footjob,thigh_sex
+C14 手交 handjob,masturbation
+C15 肛交 anal,anus
+C16 多人 group_sex,threesome
+C17 束缚 bondage,restrained
+C18 高杠杆 mating_press,top-down_bottom-up
+【永不造词】只输出体位词典、主类速查表或上列维度表里出现过的 tag；低热 tag（画作数 <3000，如 mutual_masturbation 1,177；阈值取自矩阵 thresholds.heatOk=3000）只作点睛不作主体，底模无此词（如 suspended_sex）一律走 L3。回退时直接给 tag 组，不写解释文字。
+【边界】本铁律与速查表只锁体位主类；变体、机位、视角细节仍从正文取，不得因锁主类而牺牲变体。
+
 3.【体位词典 · 必须写死英文标签】
    先判定剧情里谁在上、谁在前，再把 Danbooru 体位标签写进 scene 并同步角色 action，禁止只写 sex / intimate interaction 让底模自由发挥：
    - 骑乘 / 女上（女方在上，男仰卧或坐）：cowgirl position, girl on top, straddling, sitting on penis。
@@ -2361,8 +2394,8 @@ Zimage 擅长理解复杂的英文长句和语境。
      女方 action：arched back, 1.4::hips pushed back::, looking back；机位：from behind / from_side / bird's-eye。
    - 正常位（男上女下）：missionary, on back, legs up, facing each other；机位：from above / from_side。
    - 侧入（两人侧躺）：lying on side, on side, from behind；机位：from_side。
-   - 站立（靠墙或被抱起）：standing sex, against wall, lifted, carrying；机位：from below / from_side。
-   - 口交：fellatio, oral, kneeling, looking up；机位：from above。乳交：paizuri；腿交：thigh sex, intercrural；69：sixty-nine。
+   - 站立（靠墙或被抱起）：standing sex, against wall, carrying；机位：from below / from_side。
+   - 口交：fellatio, oral, kneeling, looking up；机位：from above。乳交：paizuri；腿交：thigh sex；69：sixty-nine。
    【互斥铁律】cowgirl 与 doggystyle / prone bone / on all fours 不得同时出现。女上戏里女方只要出现 on all fours、arched back、hips pushed back 任意一个，本条即判错。
    【坐标一致性】在上者 y 小（0.2~0.4），在下者 y 大（0.55~0.8）；骑乘时女方 center 的 y 必须小于男方。
 
@@ -2378,7 +2411,7 @@ Zimage 擅长理解复杂的英文长句和语境。
 ══ 模块三：连贯性、可见性与反冲突 (Consistency) ══
 1.【L0~L2】L0 角色一致性（外貌+气质+着装签名）；L1 场景一致性（环境+细节+光影）；L2 瞬时信息（路人/临时物品/动作/表情，当场填写）。
    持久状态（sweat, blush, 战损, cum 残留, 衣物移位, 湿衣）不自动复原，逐图渐进；仅明确触发（擦干/整理/换衣/第二天）才清零。
-2.【反冲突】语义去重（保留 white shirt 删 shirt）；矛盾词互斥（blindfold ↔ eyes；bra ↔ topless；panties ↔ bottomless；clothes ↔ nude；standing ↔ sitting；cowgirl ↔ prone bone）。
+2.【反冲突】语义去重（保留 white shirt 删 shirt）；矛盾词互斥（blindfold ↔ eyes；bra ↔ nude；panties ↔ bottomless；clothes ↔ nude；standing ↔ sitting；cowgirl ↔ prone bone）。
    冲突下放：全场不能有的进 Scene UC；通用词会误伤个别角色时（如全裸角色的 clothes, dressed）必须下放该角色的 Char UC。只排真实有风险的词。
 3.【可见性隔离表】
    特写 close-up → 移除颈以下着装与动作，Char UC 补 feet, shoes, legs, lower body
@@ -2393,7 +2426,7 @@ Zimage 擅长理解复杂的英文长句和语境。
 
 ══ 模块四：分级与 JSON 契约 (Rating & Contract) ══
 1.【分级】Q1 有裸体？Q2 有性器官露出？Q3 有性行为？
-   Safe：Scene 标 SFW，UC 含 nude, completely nude；露点风险追加 nipples, pussy, penis, topless, bottomless。
+   Safe：Scene 标 SFW，UC 含 nude, completely nude；露点风险追加 nipples, pussy, penis, nude, bottomless。
    R：Scene 标 SFW，UC 含 nipples, pussy, penis, genitals, uncensored, explicit, penetration。
    X：Scene 标 NSFW，UC 含 censored, mosaic；全裸追加 clothes, dressed；半脱不排衣着词。
 2.【7 步推演】reason 极简记录：①画面主题 ②锚点继承 ③分级 ④空间分层 ⑤机位与高差 ⑥可见性清理 ⑦自检。
@@ -2401,7 +2434,7 @@ Zimage 擅长理解复杂的英文长句和语境。
 
 ══ 精简示例（格式模板，内容不照抄）══
 [示例1 · SFW 单人 POV]
-{"shouldDraw":true,"reason":"①递情书瞬间 ②L0复用 ③Safe ④双层无直接接触 ⑤主观POV cowboy shot, from above ⑥鞋脚下放UC ⑦自检","segments":[{"label":"细雨递信","anchor":{"text":"她小心翼翼递过那封信，微红着脸不敢抬头"},"scene":"Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, not daring to look up. Character occupying around 65% of the image height. Background: the school gate receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, front three-quarter view, 0.6::diffused light, blue-grey ambient light::, shade;","negative":"nude, completely nude, nipples, pussy, penis, topless, bottomless, boy, male, camera","characters":[{"name":"Mira (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::brown hair::, brown eyes, flat chest, blunt bangs, fair skin, black round-frame glasses","outfit":"blue serafuku, white sailor collar, blue neckerchief, blue knee-length pleated skirt, white knee socks, wet clothes","action":"standing, leaning forward, 1.3::left hand holding transparent umbrella over shoulder::, 1.4::right hand extended, holding a white envelope with a pink heart seal::, looking down, shy, full face blush, parted lips","center":{"x":0.5,"y":0.5},"uc":"feet, shoes, full body, large breasts, looking at viewer, wide shot"}]}]}
+{"shouldDraw":true,"reason":"①递情书瞬间 ②L0复用 ③Safe ④双层无直接接触 ⑤主观POV cowboy shot, from above ⑥鞋脚下放UC ⑦自检","segments":[{"label":"细雨递信","anchor":{"text":"她小心翼翼递过那封信，微红着脸不敢抬头"},"scene":"Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, not daring to look up. Character occupying around 65% of the image height. Background: the school gate receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, front three-quarter view, 0.6::diffused light, blue-grey ambient light::, shade;","negative":"nude, completely nude, nipples, pussy, penis, bottomless, boy, male, camera","characters":[{"name":"Mira (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::brown hair::, brown eyes, flat chest, blunt bangs, fair skin, black round-frame glasses","outfit":"blue serafuku, white sailor collar, blue neckerchief, blue knee-length pleated skirt, white knee socks, wet clothes","action":"standing, leaning forward, 1.3::left hand holding transparent umbrella over shoulder::, 1.4::right hand extended, holding a white envelope with a pink heart seal::, looking down, shy, full face blush, parted lips","center":{"x":0.5,"y":0.5},"uc":"feet, shoes, full body, large breasts, looking at viewer, wide shot"}]}]}
 
 [示例2 · NSFW 第三人称双人 · 首镜客观机位]
 {"shouldDraw":true,"reason":"①背入体位 ②L0复用 ③X级 ④三层 ⑤首镜取C上帝视角非侧面 ⑥可见性隔离 ⑦自检","segments":[{"label":"全景·背后","anchor":{"text":"他从身后搂住她的腰，把她压向床沿"},"scene":"Scene: NSFW, sex from behind, {1boy, 1girl}, couple. Foreground: the rumpled bedsheet edge, strongly out of focus. Middle ground: a boy kneeling behind a girl bent over the bed, both fully in frame, her hands gripping the sheet. Character occupying around 70% of the image height. Background: dim room, single warm lamp. Foreground sheet, Middle ground couple, Background room. bird's-eye view, full body, depth of field, rim light;","negative":"censored, mosaic, solo, solo focus, close-up, from_side","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"on all fours, arched back, 1.4::hips pushed back::, looking back, flushed sweaty face, mouth open","center":{"x":0.5,"y":0.55},"uc":"face hidden, front view, extra limbs"},{"name":"Partner (original)","base":"boy, japanese, short_hair, 1.2::black hair::, dark eyes, slim, flat_chest, no abs, delicate_face, narrow shoulders, fair skin","outfit":"nude","action":"kneeling behind her, 1.4::both hands on her waist::, leaning forward","center":{"x":0.5,"y":0.33},"uc":"female body, extra limbs"}]}]}
@@ -3177,7 +3210,7 @@ Zimage 擅长理解复杂的英文长句和语境。
             // Auto-upgrade prompt to latest V40 full-featured optimized preset for users on legacy defaults or previous baseline
             // [本地内置] 旧档位 / 自定义 / 空值 一律收敛到内置 V41，避免残留的自定义文本覆盖内置预设
             const SDT_LEGACY_PRESET_KEYS = ['consistent', 'v25_hybrid', 'v26_hybrid', 'v27_universal', 'v28_worldbook_91', 'v30_worldbook_93', 'v32_worldbook_97', 'v34_worldbook_97', 'v36_worldbook_97', 'v40_lean', 'v40_worldbook_97_opt', 'v35_worldbook_97', 'custom'];
-            if (!store.systemPromptPreset || SDT_LEGACY_PRESET_KEYS.includes(store.systemPromptPreset)) {
+            if (!store.systemPromptPreset || store.systemPromptPreset === 'v41_local' || SDT_LEGACY_PRESET_KEYS.includes(store.systemPromptPreset)) {
                 store.systemPromptPreset = 'v41_local';
                 store.systemPrompt = V41_BUILTIN_SYSTEM_PROMPT;
                 store.customSystemPrompt = '';
@@ -12271,6 +12304,215 @@ SCHEMA:
         }
     }
 
+    // === [阶段1·桥接] 姿势引擎（local 变量）→ storyFacts 事实卡片 ===
+    // 变量真身：chat_metadata.variables['姿势引擎']['状态']。ST-Prompt-Template 用 lodash _.set 写点号路径，
+    // 所以是真嵌套对象；扁平键 variables['姿势引擎.状态'] 恒为 undefined（两种形态都读，见 pickVar）。
+    const POSE_ENGINE_KEY = '姿势引擎';
+
+    /**
+     * 取 ST 聊天级变量容器。每次调用都现取：chat_metadata 会被 ST 整体重新赋值，绝不能缓存引用。
+     * 降级链：L0 RBQ.api.getContext() → L1 globalThis.SillyTavern.getContext() → L2 null（静默降级）。
+     */
+    function readPoseEngineVars() {
+        let ctx = null;
+        try {
+            ctx = (RBQ && RBQ.api && typeof RBQ.api.getContext === 'function') ? RBQ.api.getContext() : null;
+        } catch (e) {
+            ctx = null;
+        }
+        if (!ctx) {
+            try {
+                ctx = (typeof globalThis !== 'undefined' && globalThis.SillyTavern && globalThis.SillyTavern.getContext)
+                    ? globalThis.SillyTavern.getContext() : null;
+            } catch (e) {
+                ctx = null;
+            }
+        }
+        try {
+            const vars = ctx && ctx.chatMetadata && ctx.chatMetadata.variables;
+            if (!vars || typeof vars !== 'object') return null;
+            return vars;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /** 扁平键 → 点号下钻 双读（不赌存储形态；lodash _.set 落成嵌套，历史数据可能是扁平键） */
+    function pickVar(vars, key) {
+        if (!vars || typeof vars !== 'object') return undefined;
+        if (Object.prototype.hasOwnProperty.call(vars, key)) return vars[key];
+        let cur = vars;
+        const segs = String(key).split('.');
+        for (let i = 0; i < segs.length; i++) {
+            if (cur === null || typeof cur !== 'object') return undefined;
+            cur = cur[segs[i]];
+        }
+        return cur;
+    }
+
+    /** 返回姿势引擎容器（lodash 嵌套形态为主形态）；任何异常返回 null，绝不抛出 */
+    function readPoseEngine() {
+        try {
+            const vars = readPoseEngineVars();
+            if (!vars) return null;
+            const container = pickVar(vars, POSE_ENGINE_KEY);
+            if (container && typeof container === 'object') {
+                return {
+                    state: container['状态'] !== undefined ? container['状态'] : pickVar(vars, '姿势引擎.状态'),
+                    scene: container['场景'] !== undefined ? container['场景'] : pickVar(vars, '姿势引擎.场景'),
+                    dress: container['着装'] !== undefined ? container['着装'] : pickVar(vars, '姿势引擎.着装'),
+                    sock: container['袜履'] !== undefined ? container['袜履'] : pickVar(vars, '姿势引擎.袜履'),
+                    arousal: container['兴奋度'] !== undefined ? container['兴奋度'] : pickVar(vars, '姿势引擎.兴奋度'),
+                    session: container['场次'] !== undefined ? container['场次'] : pickVar(vars, '姿势引擎.场次'),
+                };
+            }
+            return {
+                state: pickVar(vars, '姿势引擎.状态'), scene: pickVar(vars, '姿势引擎.场景'),
+                dress: pickVar(vars, '姿势引擎.着装'), sock: pickVar(vars, '姿势引擎.袜履'),
+                arousal: pickVar(vars, '姿势引擎.兴奋度'), session: pickVar(vars, '姿势引擎.场次'),
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /** 状态容错：对象原样返回；JSON 字符串尝试解析；旧式文本原样返回交给 parseLegacyPoseText */
+    function coercePoseState(raw) {
+        if (typeof raw !== 'string') return raw;
+        const text = raw.trim();
+        if (!text) return null;
+        if (text.charAt(0) === '{' || text.charAt(0) === '[') {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return text;
+            }
+        }
+        return text;
+    }
+
+    /** 旧式文本兜底：「P-075 骑乘（总类 C11 骑乘）」→ 中文名 */
+    function parseLegacyPoseText(text, id) {
+        try {
+            const upper = String(text).toUpperCase();
+            const rest = String(text).slice(upper.indexOf(String(id).toUpperCase()) + String(id).length);
+            const head = rest.split(/[（(\[【|，,;；\s]/).filter(Boolean)[0];
+            return head ? head.trim() : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * 引擎状态 → 体位三元组；任何一步失败返回 null。
+     * 兼容三种形态：对象 { 当前: [P-xxx, 'C0x', 中文名], … } / 该对象的 JSON 字符串 / 旧式文本。
+     */
+    function parsePoseTriple(state) {
+        if (!state) return null;
+        if (typeof state === 'object') {
+            const cur = Array.isArray(state['当前']) ? state['当前'] : null;
+            if (!cur || cur.length === 0) return null;
+            const id = typeof cur[0] === 'string' ? cur[0].trim() : '';
+            if (!/^P-\d+/i.test(id)) return null;
+            return {
+                id: id.toUpperCase(),
+                className: typeof cur[1] === 'string' && cur[1].trim() ? cur[1].trim() : null,
+                name: typeof cur[2] === 'string' && cur[2].trim() ? cur[2].trim() : null,
+                state: state,
+            };
+        }
+        if (typeof state !== 'string') return null;
+        const idMatch = state.match(/P-\d+/i);
+        if (!idMatch) return null;
+        const clsMatch = state.match(/C\d{2,}/i);
+        return {
+            id: idMatch[0].toUpperCase(),
+            className: clsMatch ? clsMatch[0].toUpperCase() : null,
+            name: parseLegacyPoseText(state, idMatch[0]),
+            state: null,
+        };
+    }
+
+    /**
+     * buildStoryFacts(messageId, store, deps?) → storyFacts | null
+     * 纯函数（deps.readEngine 注入 IO），无副作用、不写 store、不发请求。
+     * 返回 null → 调用方不写 storyFacts 字段（payload 与改造前字节级一致）。
+     */
+    function buildStoryFacts(messageId, store, deps = {}) {
+        try {
+            const readEngine = (deps && typeof deps.readEngine === 'function') ? deps.readEngine : readPoseEngine;
+            const engine = readEngine();
+            if (!engine) return null;
+            const triple = parsePoseTriple(coercePoseState(engine.state));
+            if (!triple) return null;                       // 引擎未掷骰 → 视为无变量
+            const rawState = (triple.state && typeof triple.state === 'object') ? triple.state : null;
+            return {
+                pose: {
+                    id: triple.id,
+                    className: triple.className,
+                    name: triple.name,
+                    raw: {
+                        场次: rawState && rawState['场次'] !== undefined ? rawState['场次'] : null,
+                        剩余: rawState && rawState['剩余'] !== undefined ? rawState['剩余'] : null,
+                        越界: rawState && rawState['越界'] !== undefined ? rawState['越界'] : null,
+                        换牌: rawState && rawState['换牌'] !== undefined ? rawState['换牌'] : null,
+                        已用数量: rawState && Array.isArray(rawState['已用']) ? rawState['已用'].length : 0,
+                    },
+                },
+                scene: engine.scene !== undefined && engine.scene !== null ? engine.scene : null,
+                dress: engine.dress !== undefined && engine.dress !== null ? engine.dress : null,
+                sock: engine.sock !== undefined && engine.sock !== null ? engine.sock : null,
+                arousal: engine.arousal !== undefined && engine.arousal !== null ? engine.arousal : null,
+                session: engine.session !== undefined && engine.session !== null ? engine.session : null,
+                source: 'chat_metadata.variables',           // 供日志/回归定位
+            };
+        } catch (e) {
+            return null;                                    // 任何异常静默降级，绝不打断请求构造
+        }
+    }
+
+    /**
+     * 把【体位锁定】段落拼到 system prompt 末尾。
+     * S3 契约：storyFacts 为 null → 恒等返回入参（字符串），保证零差异。
+     */
+    function applyPoseDirective(systemPrompt, storyFacts) {
+        const base = typeof systemPrompt === 'string' ? systemPrompt : '';
+        try {
+            if (!storyFacts || !storyFacts.pose || !storyFacts.pose.id) return base;
+            const pose = storyFacts.pose;
+            const poseClass = pose.className ? String(pose.className) : '未标注';
+            const poseName = pose.name ? String(pose.name) : '未标注';
+            const scene = storyFacts.scene !== null && storyFacts.scene !== undefined ? String(storyFacts.scene) : '未标注';
+            const session = storyFacts.session !== null && storyFacts.session !== undefined ? String(storyFacts.session) : '未标注';
+            let dress = '未标注';
+            if (storyFacts.dress && typeof storyFacts.dress === 'object' && storyFacts.dress['档位'] !== undefined && storyFacts.dress['档位'] !== null) {
+                dress = 'D' + String(storyFacts.dress['档位']);
+            } else if (typeof storyFacts.dress === 'string' && storyFacts.dress) {
+                dress = storyFacts.dress;
+            }
+            const block = [
+                '【体位锁定】本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
+                '① storyFacts.pose 存在 → 主类定稿，不得换类，不得改写成近邻体位（骑乘≠背入，后入≠正常位）；',
+                '② 缺失但正文有明确动作描写 → 按正文提取主类，禁止「美化」成更好画/更常见的体位；',
+                '③ 两者皆无 → 才允许按剧情推测。',
+                '【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（标记与正文冲突时以标记为准）。',
+                '本轮：' + pose.id + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress
+            ].join('\n');
+            return base ? (base + '\n\n' + block) : block;
+        } catch (e) {
+            return base;
+        }
+    }
+
+    // 测试 seam（S4）：仅在显式开启 __RBQ_SDT_TEST__ 时把桥接纯函数挂到 RBQ.api 供 harness 断言，生产不暴露
+    try {
+        if (typeof window !== 'undefined' && window.__RBQ_SDT_TEST__ === true && RBQ && RBQ.api) {
+            RBQ.api.__sdtTest = { readPoseEngine: readPoseEngine, buildStoryFacts: buildStoryFacts, applyPoseDirective: applyPoseDirective };
+        }
+    } catch (e) {
+        // 测试挂载失败不影响插件主体
+    }
+
     function buildRequestPayload(messageId, trigger, { skipLorebook = false, promptSnapshot = null } = {}) {
         const liveStore = getStore();
         const layeredSnapshot = promptSnapshot || (liveStore.enhancedContext === 'v_manga_layered_v1'
@@ -12362,6 +12604,10 @@ SCHEMA:
                 ]
             },
         };
+
+        // [阶段1·桥接] 姿势引擎命中才写 storyFacts：无变量不新增任何键，payload 与改造前字节级一致
+        const storyFacts = buildStoryFacts(messageId, store);
+        if (storyFacts) payload.storyFacts = storyFacts;
 
         if (lorebook.length > 0) {
             if (store.lorebookBase64) {
@@ -13604,7 +13850,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         const toolRule = !promptBundle && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
 
         // Keep system directives together at the start of the request.
-        const fullSystemPrompt = [systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n');
+        // [阶段1·桥接] 体位锁定段落套在组装点：layered manga 的 instructionText 在 getSystemPromptWithPresets 提前 return，套这里才能全通道覆盖
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
 
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, payload, store, promptBundle);
         let messages = standardRequest?.messages;
@@ -18428,6 +18675,10 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 },
             };
 
+            // [阶段1·桥接] 手动补画不走 buildRequestPayload，这里补同款注入（无变量不写键）
+            const manualStoryFacts = buildStoryFacts(-1, store);
+            if (manualStoryFacts) manualPayload.storyFacts = manualStoryFacts;
+
             if (!layeredSnapshot && store.injectPresetsToTagger) {
                 const presetsStore = RBQ.api.getSettings()?.['_promptPresets'];
                 const activePreset = presetsStore?.activeId ? presetsStore.presets?.find(p => p.id === presetsStore.activeId) : null;
@@ -18480,7 +18731,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const systemPrompt = promptBundle ? promptBundle.instructionText : getSystemPromptWithPresets(store, !!manualPayload.characterCardInfo);
             const ecSysPrompt = promptBundle ? '' : getEnhancedContextSystemPrompt(getRequestEnhancedContext(store));
             const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
-            const fullSystemPrompt = [systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n');
+            // [阶段1·桥接] 手动补画通道同样带体位锁定段落
+            const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
             const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
             let messages = standardRequest?.messages;
             let requestTool = standardRequest?.tool;
@@ -20018,6 +20270,10 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             },
         };
 
+        // [阶段1·桥接] 生图测试路径同样注入体位事实（无变量不写键）
+        const manualStoryFacts = buildStoryFacts(-1, store);
+        if (manualStoryFacts) manualPayload.storyFacts = manualStoryFacts;
+
         if (isMangaRequest(store)) Object.assign(manualPayload, collectMangaReferenceData(description, layeredSnapshot?.storeSnapshot));
         else {
             const cardInfo = collectCharacterCardInfo(description, []);
@@ -20065,7 +20321,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 : '仅输出符合 schema 格式的纯 JSON，绝对禁止在 JSON 外输出任何分析文字或 Markdown 代码块标记（如 ```json ）。'}`;
 
         const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
-        const fullSystemPrompt = [systemPrompt, toolRule].filter(Boolean).join('\n\n');
+        // [阶段1·桥接] 生图测试通道同样带体位锁定段落
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
         let messages = standardRequest?.messages;
         let requestTool = standardRequest?.tool;
