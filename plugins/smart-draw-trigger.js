@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.58';
+    const PLUGIN_VERSION = '6.5.59';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14479,7 +14479,35 @@ function sdtDiag() {
                     markers: store.markers || '',
                     lorebookEnabled: !!store.lorebookEnabled,
                     lorebookBudget: store.lorebookBudget,
-                    characterMemoryEnabled: !!store.characterMemoryEnabled
+                    characterMemoryEnabled: !!store.characterMemoryEnabled,
+                    // 6.5.59：姿势引擎变量是否真的在 chatMetadata 里（这是桥接能不能工作的前提）
+                    poseVar: (function () {
+                        try {
+                            const ctx = (typeof window !== 'undefined' && window.SillyTavern && typeof window.SillyTavern.getContext === 'function')
+                                ? window.SillyTavern.getContext() : null;
+                            const vars = (ctx && ctx.chatMetadata && ctx.chatMetadata.variables) || null;
+                            if (!vars) return { found: false, reason: 'noVariables' };
+                            const keys = Object.keys(vars);
+                            const engine = vars['姿势引擎'];
+                            const flat = vars['姿势引擎.状态'];
+                            const st = (engine && engine['状态']) || null;
+                            const cur = st && st['当前'];
+                            const used = st && st['已用'];
+                            return {
+                                found: !!(engine || flat !== undefined),
+                                shape: flat !== undefined ? 'flat' : (engine ? 'nested' : 'none'),
+                                keys: keys.slice(0, 20),
+                                state: st ? {
+                                    场次: st['场次'], 剩余: st['剩余'],
+                                    越界: st['越界'], 换牌: st['换牌'],
+                                    已用条数: Array.isArray(used) ? used.length : null
+                                } : null,
+                                current: Array.isArray(cur) ? cur.slice(0, 4) : (cur || null)
+                            };
+                        } catch (e) { return { found: false, reason: String((e && e.message) || e) }; }
+                    })(),
+                    // 6.5.59：上一次 tagger 实际拼出的 prompt 上下文（桥接/世界书自证）
+                    lastTagger: (typeof window !== 'undefined' && window.__SDT_DIAG_CTX) || null
                 },
                 count: records.length,
                 records
@@ -14500,6 +14528,26 @@ function sdtDiag() {
     } catch (e) { /* ignore */ }
 })();
 /* ===== [END LOCAL PATCH] ===== */
+
+/** 6.5.59：把「桥接 + 世界书」的自证位压成短字段，挂到 tagger-ok / tagger-fail 上。
+ *  没有这份上下文时（比如旧存档直接失败在请求前），返回 { diagCtx: null } 而不是抛错。 */
+function sdtDiagTaggerBits() {
+    try {
+        const dc = (typeof window !== 'undefined' && window.__SDT_DIAG_CTX) || null;
+        if (!dc) return { diagCtx: null };
+        const pose = (dc.storyFacts && dc.storyFacts.pose) || null;
+        return {
+            storyFacts: dc.storyFacts || null,
+            poseId: (pose && pose.id) || '',
+            poseClass: (pose && pose.className) || '',
+            poseName: (pose && pose.name) || '',
+            poseLock: !!dc.poseLockInPrompt,
+            systemPromptLen: dc.systemPromptLen || 0,
+            lorebook: dc.lorebook || null,
+            lorebookSources: dc.sources || []
+        };
+    } catch (e) { return { diagCtx: null }; }
+}
 
 function sdtIsRetryableError(err, signal) {
     if (signal && signal.aborted) return false;
@@ -14594,6 +14642,7 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
                             chain: models,
                             elapsedMs: Date.now() - sdtDiagT0,
                             isToolCall: !!(result && result.isToolCall),
+                            ...sdtDiagTaggerBits(),
                             toolName: (result && result.toolName) || '',
                             reasoning: String((result && result.reasoning) || '').slice(0, 8000),
                             rawReply: String((result && result.rawReply) || '').slice(0, 4000),
@@ -14668,6 +14717,7 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
             channels: channels.map(function (item) { return { id: item.id, name: item.name, model: item.model, toolSupport: item.toolSupport }; }),
             elapsedMs: Date.now() - sdtDiagT0,
             budgetHit: budgetHit,
+            ...sdtDiagTaggerBits(),
             attempts: attemptLog,
             channelVerdicts: channelLog,
             message: String(head + '\n' + body + channelSection).slice(0, 6000),
@@ -14707,6 +14757,32 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         // Keep system directives together at the start of the request.
         // [阶段1·桥接] 体位锁定段落套在组装点：layered manga 的 instructionText 在 getSystemPromptWithPresets 提前 return，套这里才能全通道覆盖
         const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
+
+        // [6.5.59 诊断自证] 把「桥接是否真的生效 / 世界书是否真的进了 prompt」落进诊断包：
+        // 之前的 dump 只有模型回包，无法回答「姿势变量读到了吗」「世界书命中几条」「是不是把 EJS 源码塞进了 prompt」。
+        try {
+            const lbList = Array.isArray(rawLorebooks) ? rawLorebooks : [];
+            const lbChars = lbList.reduce((n, e) => n + String((e && e.content) || '').length, 0);
+            const lbEjs = lbList.filter(e => /<%|%>/.test(String((e && e.content) || '')));
+            window.__SDT_DIAG_CTX = {
+                storyFacts: (payload && payload.storyFacts) || null,
+                poseLockInPrompt: /【体位锁定】/.test(String(fullSystemPrompt || '')),
+                systemPromptLen: String(fullSystemPrompt || '').length,
+                promptBundle: !!promptBundle,
+                toolMode: !!(store && store.toolCallMode),
+                lorebook: {
+                    enabled: !!(store && store.lorebookEnabled),
+                    budget: store && store.lorebookBudget,
+                    activated: lbList.length,
+                    chars: lbChars,
+                    ejsEntries: lbEjs.map(e => ({ uid: e.uid, source: e.sourceName || '', len: String((e && e.content) || '').length })),
+                    titles: lbList.slice(0, 40).map(e => String((e && e.comment) || '').slice(0, 32)),
+                },
+                sources: (Array.isArray(store && store.lorebookSources) ? store.lorebookSources : []).map(s => ({
+                    name: s && s.name, enabled: !(s && s.enabled === false), entryCount: (s && s.entryCount) || 0,
+                })),
+            };
+        } catch (e) { /* 诊断失败绝不影响请求 */ }
 
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, payload, store, promptBundle);
         let messages = standardRequest?.messages;
