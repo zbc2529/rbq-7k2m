@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.54';
+    const PLUGIN_VERSION = '6.5.55';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -13333,7 +13333,102 @@ SCHEMA:
         }
     }
 
-    async function callOpenAiCompatible(messageId, trigger, { signal, retryWithoutLorebook = false, promptSnapshot = null, forceJsonMode = false } = {}) {
+    /* ===== [LOCAL PATCH 6.5.55] 失败重试 + 渠道自动降级 ===== */
+const SDT_FALLBACK_MODELS = [
+    '[pg]gemini-3.1-pro-preview-high',
+    '[aistudio]gemini-3.1-pro-preview',
+    '[pla]gemini-3.1-pro-preview',
+    '[anti]gemini-3.8-flash',
+    '[pg]gemini-3.8-flash-high',
+    '[aistudio]gemini-3.8-flash',
+];
+const SDT_RETRY_PER_MODEL = 2;
+const SDT_RETRY_BUDGET_MS = 300000;
+
+function sdtIsRetryableError(err, signal) {
+    if (signal && signal.aborted) return false;
+    if (!err) return true;
+    if (err.name === 'AbortError') return false;
+    const code = String(err.code || '');
+    if (/^MANGA_/.test(code)) return false;
+    const msg = String(err.message || err);
+    if (/HTTP\s*(401|403)\b/.test(msg)) return false;
+    if (/Invalid token|无效的令牌|Unauthorized|Forbidden|请先填写/i.test(msg)) return false;
+    return true;
+}
+
+function sdtBuildModelChain(store) {
+    const primary = String((store.openaiModelCustom || '').trim() || store.openaiModel || '').trim();
+    const chain = [];
+    const push = (m) => { const v = String(m || '').trim(); if (v && !chain.includes(v)) chain.push(v); };
+    push(primary);
+    const enabled = store.modelFallbackEnabled !== false;
+    if (enabled && /blqs\.cc/i.test(String(store.openaiBaseUrl || ''))) {
+        SDT_FALLBACK_MODELS.forEach(push);
+        String(store.modelFallbackList || '').split(/[\n,]+/).forEach(push);
+    }
+    return chain;
+}
+
+async function callOpenAiCompatible(messageId, trigger, opts = {}) {
+    const o = opts || {};
+    if (o.__noFallback) return await callOpenAiCompatibleOnce(messageId, trigger, o);
+    const store = o.storeSnapshot || getStore();
+    const chain = sdtBuildModelChain(store);
+    const startedAt = Date.now();
+    const report = [];
+    let lastErr = null;
+    let budgetHit = false;
+    for (let ci = 0; ci < chain.length; ci++) {
+        const model = chain[ci];
+        const attempts = ci === 0 ? (SDT_RETRY_PER_MODEL + 1) : SDT_RETRY_PER_MODEL;
+        for (let a = 1; a <= attempts; a++) {
+            if (Date.now() - startedAt > SDT_RETRY_BUDGET_MS) { budgetHit = true; break; }
+            if (a > 1) {
+                console.warn(`[${PLUGIN_NAME}] 重试 ${model} (第 ${a} 次 / 共 ${attempts} 次)`);
+                if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') {
+                    toastr.info(`请求失败，正在重试 ${model}（${a}/${attempts}）`, PLUGIN_NAME);
+                }
+            }
+            try {
+                const result = await callOpenAiCompatibleOnce(messageId, trigger, Object.assign({}, o, { modelOverride: model }));
+                if (ci > 0 || a > 1) {
+                    console.info(`[${PLUGIN_NAME}] 已由 ${model} 成功返回`);
+                    if (typeof toastr !== 'undefined' && typeof toastr.success === 'function') {
+                        toastr.success(`已由 ${model} 成功返回`, PLUGIN_NAME);
+                    }
+                }
+                return result;
+            } catch (err) {
+                lastErr = err;
+                const brief = String(err && err.message || err).replace(/\s+/g, ' ').slice(0, 220);
+                report.push(`${model} 第${a}次: ${brief}`);
+                console.warn(`[${PLUGIN_NAME}] ${model} 第${a}次失败: ${brief}`);
+                if (!sdtIsRetryableError(err, o.signal)) throw err;
+            }
+        }
+        if (budgetHit) break;
+        if (ci < chain.length - 1) {
+            console.warn(`[${PLUGIN_NAME}] ${model} 连续失败，切换到 ${chain[ci + 1]}`);
+            if (typeof toastr !== 'undefined' && typeof toastr.warning === 'function') {
+                toastr.warning(`${model} 连续失败，切换到 ${chain[ci + 1]}`, PLUGIN_NAME);
+            }
+        }
+    }
+    const secs = Math.round((Date.now() - startedAt) / 1000);
+    const head = budgetHit
+        ? `tagger API 全部渠道失败：已用满 ${Math.round(SDT_RETRY_BUDGET_MS / 1000)}s 重试预算（${report.length} 次尝试 / ${chain.length} 个模型，耗时 ${secs}s）`
+        : `tagger API 全部渠道失败（${report.length} 次尝试 / ${chain.length} 个模型，耗时 ${secs}s）`;
+    const body = report.map((r, i) => `  ${i + 1}. ${r}`).join('\n');
+    const err = new Error(head + '\n' + body);
+    err.code = 'SDT_ALL_MODELS_FAILED';
+    err.rawOutput = report.join('\n\n');
+    err.retryError = lastErr;
+    throw err;
+}
+/* ===== [END LOCAL PATCH] ===== */
+
+async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook = false, promptSnapshot = null, forceJsonMode = false, modelOverride = '' } = {}) {
         const liveStore = getStore();
         let layeredSnapshot = promptSnapshot || (liveStore.enhancedContext === 'v_manga_layered_v1'
             ? captureLayeredMangaPromptSnapshot(liveStore) : null);
@@ -13345,7 +13440,7 @@ SCHEMA:
         const store = forceJsonMode ? { ...baseStore, toolCallMode: false } : baseStore;
         const url = normalizeBaseUrl(store.openaiBaseUrl);
         if (!url) throw new Error('请先填写 OpenAI 兼容接口 Base URL');
-        const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
+        const modelName = modelOverride || (store.openaiModelCustom || '').trim() || store.openaiModel;
         if (!modelName) throw new Error('请先填写模型名称');
         checkUrlSafety(url);
         const { payload, rawLorebooks, requestContext, promptBundle } = buildRequestPayload(messageId, trigger, { skipLorebook: retryWithoutLorebook, promptSnapshot: layeredSnapshot });
@@ -13427,7 +13522,7 @@ SCHEMA:
                 console.warn(`[${PLUGIN_NAME}] ⚠️ HTTP ${response.status} 命中 Google 前置输入审核，正在自动剥离世界书发起纯净正文自愈重试...`);
                 toastr.warning('世界书触发 Google 敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                 assertMangaRequestContext(requestContext);
-                return await callOpenAiCompatible(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode });
+                return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
             }
             throw new Error(`tagger API 请求失败: HTTP ${response.status} ${errText}`);
         }
@@ -13455,8 +13550,8 @@ SCHEMA:
             console.warn(`[${PLUGIN_NAME}] ⚠️ 模型未返回工具调用参数${finishReason ? ` (finish_reason: ${finishReason})` : ''}，自动去掉 tools 改用普通 JSON 模式重试一次`);
             if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') toastr.info('模型没按工具调用返回，已自动改用普通模式重试', PLUGIN_NAME);
             try {
-                return { result: await callOpenAiCompatible(messageId, trigger, {
-                    signal, retryWithoutLorebook, promptSnapshot: promptSnapshot || layeredSnapshot, forceJsonMode: true }) };
+                return { result: await callOpenAiCompatibleOnce(messageId, trigger, {
+                    signal, retryWithoutLorebook, promptSnapshot: promptSnapshot || layeredSnapshot, forceJsonMode: true, modelOverride }) };
             } catch (retryErr) {
                 if (retryErr?.name === 'AbortError' || signal?.aborted
                     || /^(?:SDT_TOOL_RESPONSE_BLOCKED|SDT_TOOL_RESPONSE_TRUNCATED|SDT_RELAY_ERROR_TEXT)$/.test(String(retryErr?.code || ''))
@@ -13521,7 +13616,7 @@ SCHEMA:
                             console.warn(`[${PLUGIN_NAME}] ⚠️ 检测到触发 Google 官方前置输入审核熔断 (${safetyDetail})。判定为世界书/角色卡中存在受限词，正在自动剥离世界书发起纯净正文自愈重试...`);
                             toastr.warning('世界书触发 Google 敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                             assertMangaRequestContext(requestContext);
-                            return await callOpenAiCompatible(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode });
+                            return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
                         }
 
                         const err = new Error(`大模型/中转代理触发了官方前置内容安全审查拦截 (${safetyDetail})。大模型拒绝生成内容并终止了工具调用。`);
@@ -13643,7 +13738,7 @@ SCHEMA:
                     console.warn(`[${PLUGIN_NAME}] ⚠️ 非流式检测到触发内容审查拦截 (${safetyDetail})，正在自动剥离世界书发起自愈重试...`);
                     toastr.warning('世界书触发敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                     assertMangaRequestContext(requestContext);
-                    return await callOpenAiCompatible(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode });
+                    return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
                 }
                 const err = new Error(`大模型/中转代理触发了官方前置内容安全审查拦截 (${safetyDetail})。大模型拒绝生成内容并终止了工具调用。`);
                 err.code = 'SDT_TOOL_RESPONSE_BLOCKED';

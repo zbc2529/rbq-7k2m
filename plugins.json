@@ -2,9 +2,9 @@
   {
     "id": "rbq-smart-draw-trigger",
     "name": "智能生图触发器 (Smart Draw Trigger)",
-    "description": "基于 LLM 深度分镜理解的多角色自动绘图触发器，支持 2D 连续坐标触控调节、分镜 Tag 可视化调整、NAI V4.5/V5 连续坐标生成与多角色精确构图控制。 ｜本地内置 V41 提示词（v41_local 档位，六档性别×体型：正太／男娘／少年／幼态／少女／成熟）+ shouldDraw 数字容错补丁。",
-    "version": "6.5.54",
+    "description": "基于 LLM 深度分镜理解的多角色自动绘图触发器，支持 2D 连续坐标触控调节、分镜 Tag 可视化调整、NAI V4.5/V5 连续坐标生成与多角色精确构图控制。 ｜本地内置 V41 提示词（v41_local 档位，六档性别×体型：正太／男娘／少年／幼态／少女／成熟）+ shouldDraw 数字容错补丁。 · 失败自动重试2次+渠道自动降级",
+    "version": "6.5.55",
     "author": "TTWP-09",
-    "main": "plugins/smart-draw-trigger.js?v=6.5.54"
+    "main": "plugins/smart-draw-trigger.js?v=6.5.55"
   }
 ]
