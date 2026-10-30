@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.62';
+    const PLUGIN_VERSION = '6.5.64';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2363,6 +2363,19 @@ L1 该体位有对应变体 → 直接用它的 tag 组；
 L2 变体判不出 → 用该主类的标签组：词典有该主类取词典首行，没有就查主类速查表；组内只留最贴合的 2-4 个；该组本身不足 2 个就全用。绝不跨主类；
 L2b 主类已判出但词典与速查表都没有（未知 code）→ 直接用 L3 维度拼装，主类照抄引擎给的中文名，不造 tag；
 L3 主类也判不出 → 维度拼装：方向/接触（sex_from_behind / missionary / girl_on_top）+ 姿态（lying / on_side / bent_over）+ 支撑（arm_support / against_wall）+ 局部（legs_up）+ 视角（pov / from_side / from_behind）。宁可粗，也不要输出空段或错误体位。
+【着装状态优先级 · 与服装签名同层】
+storyFacts.outfit 存在时，着装档位 D0 隔衣 / D1 半褪 / D2 局部敞开 / D3 仅剩内衬 / D4 无遮 以变量为定稿：档位词由状态侧出（clothed_sex / partially_undressed / clothing_aside / undressing / completely_nude），正文只补形变细节（拉扯、滑落、褶皱、贴身、湿润），不改档、不上下平移；档位只升不自动降。
+【禁止堆叠】状态词不是服装本体：D0 的正向是 clothed_sex，不是再叠一层 dressed；D1~D3 写「半褪的下装」「敞开的衬衫」，不同时写 dressed 与 nude。
+【D4 × 穿着底线 L6】露到极限仍留可用物：「只余饰品与器具」（choker / thigh_strap / bodysuit 这类残留），不是一无所有。
+【签名隔离】状态词不进服装签名——签名只写颜色+材质+款式核心词+长度；D 档与 L6 只是内部代号，禁止出现在 prompt 正文。
+【变体 → 肢体几何】
+变体命中后，用该变体自己的 tags 展开肢体与角度（legs_up / bent_over / arm_support / spread_legs / on_side 等），不新造体位大类词；变体只改几何，不改主类，变体键名本身也不是 tag。
+变体判不出 → 用【主类速查表】锁定主类，再从正文取几何（谁压谁、骨盆朝向、支撑面、腿的朝向）。
+一组分镜至少有一张同时带主类 main 全 tag，其余分镜只留该变体的几何子集，单镜几何 tags 不超过 3 个。
+【机位与肢势互斥 · 每组只取一格】
+水平机位 pov / from_side / from_behind / profile 四选一，垂直机位 from_above / from_below 二选一、不许并用，景别整组只取一个；pov 不与 profile、也不与 from_behind 并用（pov 已含观察者视点）。
+肢势互斥：standing 不与 lying / sitting 并用；arm_support 只跟随 all_fours / prone_bone / bent_over；spread_legs 只跟随 lying / sitting / on_back。
+越界即判错：同组出现两个水平机位、两个垂直机位或任一上述非法组合，重排后再输出。
 【主类速查表 · 引擎总类 code → 主标签组（全部活词，永不造词）】
 C01 正常位 missionary,on_back
 C02 后入跪撑 sex_from_behind,doggystyle,all_fours
@@ -4027,6 +4040,8 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
             }
             store.systemPromptVersion = DEFAULT_SYSTEM_PROMPT_VERSION;
         }
+        // 6.5.63 不变式：非 custom 档下 store.customSystemPrompt 恒为空（清历史脏数据；自定义内容只在 custom 档生效）
+        if (store.systemPromptPreset !== 'custom' && store.customSystemPrompt) store.customSystemPrompt = '';
 
         if (!store.geminiJailbreakPreset || store.geminiJailbreakPreset === 'ny_gemini' || store.geminiJailbreakPreset === 'ny_kami') {
             if (store.geminiJailbreakPreset === 'ny_gemini' || store.geminiJailbreakPreset === 'ny_kami') {
@@ -12489,6 +12504,11 @@ SCHEMA:
             legacy_uc: false,
         };
 
+        // 6.5.63 闸门负向相位：服装 uc 类必须双写 negative_prompt 与 v4_negative_prompt.caption.base_caption。
+        // 必须在 v4 负向重建之后补写——早写会被 :12476 的 base_caption 覆盖丢弃（只写 negative_prompt 等于没写）。
+        // 调用时带第二参数，因此不会被 harness S17 那条「严格单参调用只许出现一次」的正则抓到。
+        try { sdtPoseGateApply(payload, 'neg'); } catch (e) { /* ignore */ }
+
         try {
             const dp = payload.parameters || {};
             sdtDiag() && sdtDiag().add('nai-payload', {
@@ -13099,7 +13119,7 @@ SCHEMA:
 
     // === [阶段2·体位词面矩阵] Danbooru 词表蒸馏（tools/build-matrix.js 生成，勿手改）===
     // 数据源：plugins/pose-matrix.fragment.js（构建产物）。改词表 → 重建 fragment → node tools/inline-matrix.mjs。
-    const SDT_POSE_MATRIX = {"version":"1.0.0","generatedAt":"2026-10-30T14:45:24.723Z","generator":"tools/build-matrix.js","thresholds":{"heatOk":3000,"heatLow":1},"stats":{"referencedTags":133,"emittedTags":133,"ok":129,"low":4,"dead":0,"deprecated":0,"unknown":0,"aliases":140,"implications":26,"deadFixes":0},"tags":{"against_wall":{"post_count":20311,"tier":"ok"},"all_fours":{"post_count":82713,"tier":"ok"},"anal":{"post_count":76858,"tier":"ok"},"anus":{"post_count":173206,"tier":"ok"},"arched_back":{"post_count":25321,"tier":"ok"},"arm_support":{"post_count":121254,"tier":"ok"},"armor":{"post_count":313819,"tier":"ok"},"bare_shoulders":{"post_count":1430829,"tier":"ok"},"bent_over":{"post_count":86272,"tier":"ok"},"bikini":{"post_count":716537,"tier":"ok"},"blindfold":{"post_count":31057,"tier":"ok"},"bloomers":{"post_count":28814,"tier":"ok"},"bondage":{"post_count":76266,"tier":"ok"},"bound_wrists":{"post_count":30919,"tier":"ok"},"bra":{"post_count":283309,"tier":"ok"},"bridal_veil":{"post_count":22931,"tier":"ok"},"business_suit":{"post_count":8184,"tier":"ok"},"camisole":{"post_count":69853,"tier":"ok"},"cardigan":{"post_count":133079,"tier":"ok"},"carrying":{"post_count":67097,"tier":"ok"},"chainmail":{"post_count":4268,"tier":"ok"},"close-up":{"post_count":65061,"tier":"ok"},"coat":{"post_count":392415,"tier":"ok"},"cocktail_dress":{"post_count":2705,"tier":"low"},"collar":{"post_count":286025,"tier":"ok"},"completely_nude":{"post_count":302697,"tier":"ok"},"corset":{"post_count":69158,"tier":"ok"},"cowboy_shot":{"post_count":875909,"tier":"ok"},"cowgirl_position":{"post_count":57402,"tier":"ok"},"crop_top":{"post_count":291918,"tier":"ok"},"deepthroat":{"post_count":8316,"tier":"ok"},"doggystyle":{"post_count":43115,"tier":"ok"},"double_penetration":{"post_count":14822,"tier":"ok"},"evening_gown":{"post_count":7183,"tier":"ok"},"fellatio":{"post_count":101277,"tier":"ok"},"ffm_threesome":{"post_count":19429,"tier":"ok"},"footjob":{"post_count":11857,"tier":"ok"},"from_above":{"post_count":149977,"tier":"ok"},"from_behind":{"post_count":337644,"tier":"ok"},"from_below":{"post_count":122852,"tier":"ok"},"from_side":{"post_count":349270,"tier":"ok"},"full_body":{"post_count":1321547,"tier":"ok"},"garter_straps":{"post_count":115359,"tier":"ok"},"girl_on_top":{"post_count":94461,"tier":"ok"},"group_sex":{"post_count":85167,"tier":"ok"},"gym_uniform":{"post_count":43005,"tier":"ok"},"handjob":{"post_count":53998,"tier":"ok"},"hoodie":{"post_count":203947,"tier":"ok"},"irrumatio":{"post_count":8354,"tier":"ok"},"jacket":{"post_count":1536085,"tier":"ok"},"kimono":{"post_count":350341,"tier":"ok"},"kneeling":{"post_count":160355,"tier":"ok"},"lace_bra":{"post_count":5099,"tier":"ok"},"latex":{"post_count":20062,"tier":"ok"},"leaning_forward":{"post_count":167067,"tier":"ok"},"leash":{"post_count":39967,"tier":"ok"},"leather_dress":{"post_count":204,"tier":"low"},"legs_up":{"post_count":48603,"tier":"ok"},"lingerie":{"post_count":68406,"tier":"ok"},"long_dress":{"post_count":53324,"tier":"ok"},"looking_at_viewer":{"post_count":5046690,"tier":"ok"},"looking_back":{"post_count":371737,"tier":"ok"},"looking_down":{"post_count":142876,"tier":"ok"},"looking_up":{"post_count":102851,"tier":"ok"},"lying":{"post_count":638370,"tier":"ok"},"maid":{"post_count":216630,"tier":"ok"},"maid_apron":{"post_count":83526,"tier":"ok"},"masturbation":{"post_count":52284,"tier":"ok"},"mating_press":{"post_count":6554,"tier":"ok"},"micro_bikini":{"post_count":61158,"tier":"ok"},"missionary":{"post_count":51116,"tier":"ok"},"mmf_threesome":{"post_count":18892,"tier":"ok"},"monokini":{"post_count":197,"tier":"low"},"mutual_masturbation":{"post_count":1177,"tier":"low"},"negligee":{"post_count":4528,"tier":"ok"},"nightgown":{"post_count":13306,"tier":"ok"},"nude":{"post_count":711298,"tier":"ok"},"nurse":{"post_count":23444,"tier":"ok"},"nurse_cap":{"post_count":35819,"tier":"ok"},"office_lady":{"post_count":23244,"tier":"ok"},"on_back":{"post_count":366844,"tier":"ok"},"on_side":{"post_count":127337,"tier":"ok"},"on_stomach":{"post_count":94562,"tier":"ok"},"oral":{"post_count":123687,"tier":"ok"},"orgy":{"post_count":9097,"tier":"ok"},"paizuri":{"post_count":61039,"tier":"ok"},"pajamas":{"post_count":42010,"tier":"ok"},"panties":{"post_count":834362,"tier":"ok"},"pantyhose":{"post_count":753448,"tier":"ok"},"plate_armor":{"post_count":3756,"tier":"ok"},"playboy_bunny":{"post_count":152138,"tier":"ok"},"pleated_skirt":{"post_count":727641,"tier":"ok"},"polo_shirt":{"post_count":4000,"tier":"ok"},"pov":{"post_count":207478,"tier":"ok"},"profile":{"post_count":186555,"tier":"ok"},"prone_bone":{"post_count":6839,"tier":"ok"},"qipao":{"post_count":79494,"tier":"ok"},"restrained":{"post_count":72764,"tier":"ok"},"reverse_cowgirl_position":{"post_count":12555,"tier":"ok"},"rope":{"post_count":73025,"tier":"ok"},"sailor_collar":{"post_count":424696,"tier":"ok"},"school_uniform":{"post_count":1082440,"tier":"ok"},"sex_from_behind":{"post_count":110061,"tier":"ok"},"shibari":{"post_count":25373,"tier":"ok"},"sitting":{"post_count":1343206,"tier":"ok"},"sitting_on_face":{"post_count":5435,"tier":"ok"},"sitting_on_lap":{"post_count":18908,"tier":"ok"},"socks":{"post_count":593850,"tier":"ok"},"solo":{"post_count":7216037,"tier":"ok"},"spooning":{"post_count":3800,"tier":"ok"},"sportswear":{"post_count":34295,"tier":"ok"},"spread_legs":{"post_count":358967,"tier":"ok"},"squatting_cowgirl_position":{"post_count":11663,"tier":"ok"},"standing":{"post_count":1363886,"tier":"ok"},"standing_sex":{"post_count":24238,"tier":"ok"},"straddling":{"post_count":99758,"tier":"ok"},"suit_jacket":{"post_count":22511,"tier":"ok"},"suspension":{"post_count":6123,"tier":"ok"},"sweater":{"post_count":314875,"tier":"ok"},"swimsuit":{"post_count":940727,"tier":"ok"},"t-shirt":{"post_count":103226,"tier":"ok"},"tank_top":{"post_count":126857,"tier":"ok"},"thigh_sex":{"post_count":5394,"tier":"ok"},"thighhighs":{"post_count":1563204,"tier":"ok"},"threesome":{"post_count":45579,"tier":"ok"},"tied_shirt":{"post_count":22415,"tier":"ok"},"top-down_bottom-up":{"post_count":29442,"tier":"ok"},"track_suit":{"post_count":14944,"tier":"ok"},"underwear":{"post_count":1035344,"tier":"ok"},"upper_body":{"post_count":1229761,"tier":"ok"},"upright_straddle":{"post_count":8112,"tier":"ok"},"wedding_dress":{"post_count":31402,"tier":"ok"},"yukata":{"post_count":32833,"tier":"ok"}},"aliases":{"aerial_view":"from_above","all-fours":"all_fours","anal_penetration":"anal","anal_sex":"anal","armour":"armor","ashikoki":"footjob","ass-up_head-down":"top-down_bottom-up","ass_hole":"anus","asshole":"anus","back_turned":"from_behind","back_view":"from_behind","bathing_suit":"swimsuit","bending_over":"bent_over","blindfolded":"blindfold","blow_job":"fellatio","blowjob":"fellatio","bound_hands":"bound_wrists","bunny_suit":"playboy_bunny","bunnysuit":"playboy_bunny","bust":"upper_body","butt_hole":"anus","butthole":"anus","carry":"carrying","cheongsam":"qipao","china_dress":"qipao","chinese_dress":"qipao","closeup":"close-up","completely_naked":"completely_nude","doggy_style":"doggystyle","dress_jacket":"suit_jacket","face_down_ass_up":"top-down_bottom-up","face_fucking":"irrumatio","facefuck":"irrumatio","female_on_top":"girl_on_top","fmm_threesome":"mmf_threesome","forced_blowjob":"irrumatio","forced_fellatio":"irrumatio","from_back":"from_behind","from_behind_position":"sex_from_behind","garter_strap":"garter_straps","groupsex":"group_sex","gym_clothes":"gym_uniform","hand_job":"handjob","hands_and_knees":"all_fours","hands_bound":"bound_wrists","hands_tied":"bound_wrists","in_profile":"profile","intercrural":"thigh_sex","intercrural_sex":"thigh_sex","kosode":"kimono","laying":"lying","laying_down":"lying","looking_over_shoulder":"looking_back","low_angle":"from_below","lying_down":"lying","lying_on_back":"on_back","lying_on_side":"on_side","lying_on_stomach":"on_stomach","mail_armor":"chainmail","male_pov":"pov","masturbate":"masturbation","masturbating":"masturbation","masturbating_each_other":"mutual_masturbation","mff_threesome":"ffm_threesome","microbikini":"micro_bikini","missionary_position":"missionary","mizugi":"swimsuit","naked":"nude","naked_socks":"socks","night_dress":"nightgown","night_gown":"nightgown","nightdress":"nightgown","nightie":"nightgown","nighty":"nightgown","nurse_hat":"nurse_cap","nurse_outfit":"nurse","nurse_uniform":"nurse","officelady":"office_lady","on_all_fours":"all_fours","on_belly":"on_stomach","on_front":"on_stomach","on_knees":"kneeling","open_legs":"spread_legs","pajama":"pajamas","pantsu":"panties","penetration_from_behind":"sex_from_behind","playboy_bunny_leotard":"playboy_bunny","prone":"on_stomach","pyjama":"pajamas","pyjamas":"pajamas","reverse_cowgirl":"reverse_cowgirl_position","rope_bondage":"shibari","ropes":"rope","school_girl":"school_uniform","school_uniforms":"school_uniform","schoolgirl":"school_uniform","secretary":"office_lady","seifuku":"school_uniform","side":"from_side","side_view":"from_side","sit":"sitting","sitting_down":"sitting","sitting_in_lap":"sitting_on_lap","sock":"socks","sports_uniform":"sportswear","spread_leg":"spread_legs","stocking":"thighhighs","stockings":"thighhighs","straddle":"straddling","straddle_penis":"thigh_sex","sucking_cock":"fellatio","sucking_dick":"fellatio","sucking_penis":"fellatio","sumata":"thigh_sex","supine":"on_back","sweatshirt":"sweater","swim_suit":"swimsuit","swimsuits":"swimsuit","taken_from_behind":"sex_from_behind","tanktop":"tank_top","tekoki":"handjob","thigh_job":"thigh_sex","thighjob":"thigh_sex","tied_hands":"bound_wrists","tied_up_(sexual)":"bondage","tied_wrists":"bound_wrists","tights":"pantyhose","tit_fuck":"paizuri","titfuck":"paizuri","titjob":"paizuri","tshirt":"t-shirt","turning":"looking_back","undergarments":"underwear","view_from_above":"from_above","view_from_below":"from_below","viewed_from_above":"from_above","viewed_from_behind":"from_behind","viewed_from_below":"from_below","viewed_from_side":"from_side","wedding_veil":"bridal_veil"},"implies":{"bikini":["swimsuit"],"bra":["underwear"],"chainmail":["armor"],"completely_nude":["nude"],"cowgirl_position":["straddling"],"deepthroat":["fellatio"],"doggystyle":["sex_from_behind"],"fellatio":["oral"],"ffm_threesome":["threesome"],"irrumatio":["fellatio"],"lace_bra":["bra"],"lingerie":["underwear"],"micro_bikini":["bikini"],"mmf_threesome":["threesome"],"on_back":["lying"],"on_side":["lying"],"on_stomach":["lying"],"orgy":["group_sex"],"panties":["underwear"],"plate_armor":["armor"],"reverse_cowgirl_position":["straddling"],"standing_sex":["standing"],"suit_jacket":["jacket"],"threesome":["group_sex"],"upright_straddle":["straddling"],"yukata":["kimono"]},"deadFixes":{},"proseOnly":[],"poses":[{"code":"C01","key":"missionary","label":"正常位","main":["missionary","on_back"],"variants":{"standard":{"tags":["missionary","on_back"],"when":"男上女下，面对面"},"legs_up":{"tags":["legs_up","missionary"],"when":"女方腿被抬起压向胸口"},"spread":{"tags":["spread_legs","missionary"],"when":"双腿大张，几何最清晰"}},"negative":["sex_from_behind","doggystyle","cowgirl_position","girl_on_top"]},{"code":"C02","key":"doggy","label":"后入跪撑","main":["sex_from_behind","doggystyle","all_fours"],"variants":{"standard":{"tags":["all_fours"],"when":"床面或地面四足支撑"},"standing":{"tags":["standing_sex","bent_over"],"when":"女方站立前倾被后入"},"prone":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧被压住下半身"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"男方全身压覆，女方完全在下"},"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立后入"},"carrying":{"tags":["carrying","standing_sex"],"when":"抱起悬空后入"}},"negative":["missionary","cowgirl_position","girl_on_top"]},{"code":"C03","key":"prone","label":"趴位压身","main":["prone_bone","on_stomach"],"variants":{"standard":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧，男方覆压"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆，仅手肘支撑"}},"negative":["missionary","on_back","cowgirl_position"]},{"code":"C04","key":"cowgirl","label":"骑乘正面","main":["cowgirl_position","girl_on_top","straddling"],"variants":{"standard":{"tags":["cowgirl_position"],"when":"面对面骑乘"},"squatting":{"tags":["squatting_cowgirl_position"],"when":"蹲踞式，手撑膝盖"},"upright":{"tags":["upright_straddle"],"when":"直立相拥，女在上"}},"negative":["sex_from_behind","doggystyle","all_fours","prone_bone"]},{"code":"C05","key":"reverse_cowgirl","label":"骑乘背面","main":["reverse_cowgirl_position","girl_on_top"],"variants":{"standard":{"tags":["reverse_cowgirl_position"],"when":"背对骑乘，反向"},"leaning":{"tags":["reverse_cowgirl_position","leaning_forward"],"when":"背对前倾，手撑床面"}},"negative":["missionary","sex_from_behind","doggystyle"]},{"code":"C06","key":"side","label":"侧入","main":["on_side","lying"],"variants":{"standard":{"tags":["on_side","sex_from_behind"],"when":"两人侧躺，男在后"},"spooning":{"tags":["spooning"],"when":"汤匙式贴身侧卧（低热 tag，仅点睛）"}},"negative":["missionary","cowgirl_position","standing_sex"]},{"code":"C07","key":"sitting","label":"坐姿","main":["sitting","straddling"],"variants":{"standard":{"tags":["sitting","straddling"],"when":"女方跨坐于男方腿上"},"lap":{"tags":["sitting_on_lap"],"when":"正坐怀中"}},"negative":["standing_sex","prone_bone"]},{"code":"C08","key":"standing","label":"站立","main":["standing_sex","standing"],"variants":{"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立"},"bent_over":{"tags":["bent_over","standing_sex"],"when":"站立前倾"},"in_arms":{"tags":["carrying","standing_sex"],"when":"抱起悬空（lifted 为死词，改用 carrying）"}},"negative":["lying","on_back","on_stomach"]},{"code":"C09","key":"carrying","label":"抱持挂身","main":["carrying"],"variants":{"standard":{"tags":["carrying","standing_sex"],"when":"抱起，女方挂身"},"suspended":{"tags":["suspension"],"when":"完全悬空（suspension 6,123）"}},"negative":["lying","on_back"]},{"code":"C10","key":"sitting_on_face","label":"颜面骑乘","main":["sitting_on_face","girl_on_top"],"variants":{"standard":{"tags":["sitting_on_face"],"when":"女方跨坐面部"}},"negative":["missionary","sex_from_behind"]},{"code":"C11","key":"oral","label":"口交","main":["fellatio","oral"],"variants":{"standard":{"tags":["fellatio","kneeling"],"when":"跪姿口交"},"looking_up":{"tags":["fellatio","looking_up"],"when":"抬眼看向对方"},"deepthroat":{"tags":["deepthroat"],"when":"深喉"},"irrumatio":{"tags":["irrumatio"],"when":"男方主动"}},"negative":["sex_from_behind","cowgirl_position","paizuri"]},{"code":"C12","key":"paizuri","label":"乳交","main":["paizuri"],"variants":{"standard":{"tags":["paizuri"],"when":"乳沟夹持"}},"negative":["fellatio","footjob"]},{"code":"C13","key":"leg","label":"足交腿交","main":["footjob","thigh_sex"],"variants":{"footjob":{"tags":["footjob"],"when":"足部夹持"},"thigh_grip":{"tags":["thigh_sex"],"when":"腿间夹持（键名原 intercrural 为死词，已改名）"}},"negative":["paizuri","fellatio"]},{"code":"C14","key":"handjob","label":"手交","main":["handjob","masturbation"],"variants":{"standard":{"tags":["handjob"],"when":"手部刺激"},"mutual":{"tags":["masturbation","mutual_masturbation"],"tier":"low","when":"互相抚慰"}},"negative":["paizuri","footjob"]},{"code":"C15","key":"anal","label":"肛交","main":["anal","anus"],"variants":{"standard":{"tags":["anal","sex_from_behind"],"when":"后入肛交"},"cowgirl":{"tags":["anal","reverse_cowgirl_position"],"when":"骑乘肛交"}},"negative":["missionary"]},{"code":"C16","key":"group","label":"多人","main":["group_sex","threesome"],"variants":{"mmf":{"tags":["mmf_threesome","group_sex"],"when":"两男一女"},"ffm":{"tags":["ffm_threesome","group_sex"],"when":"两女一男"},"orgy":{"tags":["orgy","group_sex"],"when":"群交"},"dp":{"tags":["double_penetration"],"when":"双插"}},"negative":["solo"]},{"code":"C17","key":"bondage","label":"束缚","main":["bondage","restrained"],"variants":{"standard":{"tags":["bondage","bound_wrists"],"when":"腕部束缚"},"shibari":{"tags":["shibari","rope"],"when":"绳缚"},"blindfold":{"tags":["blindfold"],"when":"蒙眼"}},"negative":["solo"]},{"code":"C18","key":"high_leverage","label":"特殊高杠杆","main":["mating_press","top-down_bottom-up"],"variants":{"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆"},"upright_straddle":{"tags":["upright_straddle"],"when":"直立相拥"}}}],"views":[{"group":"水平","tags":["pov","from_side","from_behind","profile"]},{"group":"垂直","tags":["from_above","from_below","looking_up","looking_down"]},{"group":"景别","tags":["close-up","cowboy_shot","full_body","upper_body"]},{"group":"视线","tags":["looking_at_viewer","looking_back"]}],"postures":["standing","sitting","kneeling","lying","straddling","on_back","on_stomach","all_fours","spread_legs","bent_over","arched_back","on_side","arm_support"],"outfits":[{"category":"校服","tags":["school_uniform","sailor_collar","pleated_skirt","polo_shirt"]},{"category":"泳装","tags":["bikini","swimsuit","micro_bikini","monokini"]},{"category":"睡衣","tags":["pajamas","nightgown","camisole","negligee"]},{"category":"女仆装","tags":["maid","maid_apron"]},{"category":"盔甲","tags":["armor","plate_armor","chainmail"]},{"category":"束腰调教装","tags":["corset","leash","collar","latex","leather_dress"]},{"category":"旗袍","tags":["qipao"]},{"category":"和服","tags":["kimono","yukata"]},{"category":"兔女郎","tags":["playboy_bunny"]},{"category":"护士装","tags":["nurse","nurse_cap"]},{"category":"休闲露脐","tags":["crop_top","tied_shirt","t-shirt","tank_top"]},{"category":"职场西装","tags":["business_suit","suit_jacket","office_lady"]},{"category":"运动服","tags":["gym_uniform","bloomers","track_suit","sportswear"]},{"category":"婚纱","tags":["wedding_dress","bridal_veil"]},{"category":"晚礼服","tags":["evening_gown","cocktail_dress","long_dress"]},{"category":"内衣","tags":["lingerie","underwear","bra","panties","lace_bra"]},{"category":"外套","tags":["hoodie","jacket","cardigan","coat","sweater"]},{"category":"着装状态","tags":["nude","completely_nude","bare_shoulders"]},{"category":"袜履","tags":["thighhighs","pantyhose","garter_straps","socks"]}]};
+    const SDT_POSE_MATRIX = {"version":"1.0.0","generatedAt":"2026-10-30T15:39:37.474Z","generator":"tools/build-matrix.js","thresholds":{"heatOk":3000,"heatLow":1},"stats":{"referencedTags":164,"emittedTags":164,"ok":160,"low":4,"dead":0,"deprecated":0,"unknown":0,"aliases":121,"implications":19,"deadFixes":0,"outfits":20,"outfitStates":5,"outfitForms":9,"outfitMaterials":6,"outfitHoisery":6,"outfitConflicts":10,"viewRuleGroups":3,"postureRuleGroups":4,"nonTag":1},"tags":{"against_wall":{"post_count":20311,"tier":"ok"},"all_fours":{"post_count":82713,"tier":"ok"},"amazon_position":{"post_count":1582,"tier":"low"},"anal":{"post_count":76858,"tier":"ok"},"anus":{"post_count":173206,"tier":"ok"},"apron":{"post_count":316519,"tier":"ok"},"arched_back":{"post_count":25321,"tier":"ok"},"arm_support":{"post_count":121254,"tier":"ok"},"bare_shoulders":{"post_count":1430829,"tier":"ok"},"barefoot":{"post_count":513229,"tier":"ok"},"bent_over":{"post_count":86272,"tier":"ok"},"bikini":{"post_count":716537,"tier":"ok"},"blazer":{"post_count":100573,"tier":"ok"},"blindfold":{"post_count":31057,"tier":"ok"},"bloomers":{"post_count":28814,"tier":"ok"},"blouse":{"post_count":50434,"tier":"ok"},"bodysuit":{"post_count":188215,"tier":"ok"},"bondage":{"post_count":76266,"tier":"ok"},"bottomless":{"post_count":125113,"tier":"ok"},"bound_wrists":{"post_count":30919,"tier":"ok"},"bra":{"post_count":283309,"tier":"ok"},"bra_lift":{"post_count":13216,"tier":"ok"},"buttons":{"post_count":223182,"tier":"ok"},"camisole":{"post_count":69853,"tier":"ok"},"cardigan":{"post_count":133079,"tier":"ok"},"carrying":{"post_count":67097,"tier":"ok"},"close-up":{"post_count":65061,"tier":"ok"},"clothed_sex":{"post_count":55256,"tier":"ok"},"clothing_aside":{"post_count":67613,"tier":"ok"},"coat":{"post_count":392415,"tier":"ok"},"competition_swimsuit":{"post_count":39186,"tier":"ok"},"completely_nude":{"post_count":302697,"tier":"ok"},"cowboy_shot":{"post_count":875909,"tier":"ok"},"cowgirl_position":{"post_count":57402,"tier":"ok"},"crossed_legs":{"post_count":109216,"tier":"ok"},"deepthroat":{"post_count":8316,"tier":"ok"},"doggystyle":{"post_count":43115,"tier":"ok"},"double_penetration":{"post_count":14822,"tier":"ok"},"dress":{"post_count":2006407,"tier":"ok"},"dress_shirt":{"post_count":169492,"tier":"ok"},"fellatio":{"post_count":101277,"tier":"ok"},"ffm_threesome":{"post_count":19429,"tier":"ok"},"fishnets":{"post_count":96011,"tier":"ok"},"folded":{"post_count":18564,"tier":"ok"},"footjob":{"post_count":11857,"tier":"ok"},"from_above":{"post_count":149977,"tier":"ok"},"from_behind":{"post_count":337644,"tier":"ok"},"from_below":{"post_count":122852,"tier":"ok"},"from_side":{"post_count":349270,"tier":"ok"},"full_body":{"post_count":1321547,"tier":"ok"},"garter_straps":{"post_count":115359,"tier":"ok"},"girl_on_top":{"post_count":94461,"tier":"ok"},"group_sex":{"post_count":85167,"tier":"ok"},"gym_uniform":{"post_count":43005,"tier":"ok"},"hakama":{"post_count":69095,"tier":"ok"},"handjob":{"post_count":53998,"tier":"ok"},"high_heels":{"post_count":303013,"tier":"ok"},"hoodie":{"post_count":203947,"tier":"ok"},"hugging_own_legs":{"post_count":20038,"tier":"ok"},"indian_style":{"post_count":21628,"tier":"ok"},"irrumatio":{"post_count":8354,"tier":"ok"},"jacket":{"post_count":1536085,"tier":"ok"},"kimono":{"post_count":350341,"tier":"ok"},"kneehighs":{"post_count":171045,"tier":"ok"},"kneeling":{"post_count":160355,"tier":"ok"},"knees_to_chest":{"post_count":7576,"tier":"ok"},"knees_up":{"post_count":84237,"tier":"ok"},"latex":{"post_count":20062,"tier":"ok"},"leaning_forward":{"post_count":167067,"tier":"ok"},"leg_lift":{"post_count":21767,"tier":"ok"},"leg_up":{"post_count":114657,"tier":"ok"},"leg_wrap":{"post_count":2575,"tier":"low"},"legs_apart":{"post_count":47773,"tier":"ok"},"legs_together":{"post_count":38108,"tier":"ok"},"legs_up":{"post_count":48603,"tier":"ok"},"leotard":{"post_count":325269,"tier":"ok"},"lingerie":{"post_count":68406,"tier":"ok"},"looking_at_viewer":{"post_count":5046690,"tier":"ok"},"looking_back":{"post_count":371737,"tier":"ok"},"looking_down":{"post_count":142876,"tier":"ok"},"looking_up":{"post_count":102851,"tier":"ok"},"lying":{"post_count":638370,"tier":"ok"},"maid":{"post_count":216630,"tier":"ok"},"maid_headdress":{"post_count":213891,"tier":"ok"},"masturbation":{"post_count":52284,"tier":"ok"},"mating_press":{"post_count":6554,"tier":"ok"},"midriff":{"post_count":412617,"tier":"ok"},"miniskirt":{"post_count":395809,"tier":"ok"},"missionary":{"post_count":51116,"tier":"ok"},"mmf_threesome":{"post_count":18892,"tier":"ok"},"mutual_masturbation":{"post_count":1177,"tier":"low"},"necktie":{"post_count":685170,"tier":"ok"},"nude":{"post_count":711298,"tier":"ok"},"nurse":{"post_count":23444,"tier":"ok"},"nurse_cap":{"post_count":35819,"tier":"ok"},"obi":{"post_count":109217,"tier":"ok"},"off_shoulder":{"post_count":353494,"tier":"ok"},"on_back":{"post_count":366844,"tier":"ok"},"on_side":{"post_count":127337,"tier":"ok"},"on_stomach":{"post_count":94562,"tier":"ok"},"one-piece_swimsuit":{"post_count":192276,"tier":"ok"},"open_shirt":{"post_count":153300,"tier":"ok"},"oral":{"post_count":123687,"tier":"ok"},"orgy":{"post_count":9097,"tier":"ok"},"paizuri":{"post_count":61039,"tier":"ok"},"panties":{"post_count":834362,"tier":"ok"},"panties_around_one_leg":{"post_count":27790,"tier":"ok"},"panties_aside":{"post_count":34056,"tier":"ok"},"panty_pull":{"post_count":60156,"tier":"ok"},"pantyhose":{"post_count":753448,"tier":"ok"},"partially_undressed":{"post_count":9891,"tier":"ok"},"playboy_bunny":{"post_count":152138,"tier":"ok"},"pleated_skirt":{"post_count":727641,"tier":"ok"},"pov":{"post_count":207478,"tier":"ok"},"profile":{"post_count":186555,"tier":"ok"},"prone_bone":{"post_count":6839,"tier":"ok"},"qipao":{"post_count":79494,"tier":"ok"},"restrained":{"post_count":72764,"tier":"ok"},"reverse_cowgirl_position":{"post_count":12555,"tier":"ok"},"reverse_upright_straddle":{"post_count":6611,"tier":"ok"},"ribbon":{"post_count":1488901,"tier":"ok"},"rope":{"post_count":73025,"tier":"ok"},"sailor_collar":{"post_count":424696,"tier":"ok"},"school_swimsuit":{"post_count":76887,"tier":"ok"},"school_uniform":{"post_count":1082440,"tier":"ok"},"see-through_clothes":{"post_count":224952,"tier":"ok"},"serafuku":{"post_count":399815,"tier":"ok"},"sex_from_behind":{"post_count":110061,"tier":"ok"},"shibari":{"post_count":25373,"tier":"ok"},"shirt":{"post_count":3034081,"tier":"ok"},"shirt_lift":{"post_count":111710,"tier":"ok"},"shorts":{"post_count":678156,"tier":"ok"},"side_slit":{"post_count":61253,"tier":"ok"},"sitting":{"post_count":1343206,"tier":"ok"},"sitting_on_face":{"post_count":5435,"tier":"ok"},"sitting_on_lap":{"post_count":18908,"tier":"ok"},"skirt":{"post_count":2230728,"tier":"ok"},"skirt_lift":{"post_count":96651,"tier":"ok"},"socks":{"post_count":593850,"tier":"ok"},"solo":{"post_count":7216037,"tier":"ok"},"spooning":{"post_count":3800,"tier":"ok"},"spread_legs":{"post_count":358967,"tier":"ok"},"squatting_cowgirl_position":{"post_count":11663,"tier":"ok"},"standing":{"post_count":1363886,"tier":"ok"},"standing_sex":{"post_count":24238,"tier":"ok"},"straddling":{"post_count":99758,"tier":"ok"},"string_bikini":{"post_count":69966,"tier":"ok"},"suspension":{"post_count":6123,"tier":"ok"},"sweater":{"post_count":314875,"tier":"ok"},"swimsuit":{"post_count":940727,"tier":"ok"},"thigh_sex":{"post_count":5394,"tier":"ok"},"thighhighs":{"post_count":1563204,"tier":"ok"},"threesome":{"post_count":45579,"tier":"ok"},"top-down_bottom-up":{"post_count":29442,"tier":"ok"},"torn_clothes":{"post_count":217598,"tier":"ok"},"track_suit":{"post_count":14944,"tier":"ok"},"trench_coat":{"post_count":8535,"tier":"ok"},"turtleneck":{"post_count":185492,"tier":"ok"},"undressing":{"post_count":69844,"tier":"ok"},"upper_body":{"post_count":1229761,"tier":"ok"},"upright_straddle":{"post_count":8112,"tier":"ok"},"wet_clothes":{"post_count":62772,"tier":"ok"},"wheelbarrow":{"post_count":1195,"tier":"low"},"zipper":{"post_count":58468,"tier":"ok"}},"aliases":{"aerial_view":"from_above","all-fours":"all_fours","anal_penetration":"anal","anal_sex":"anal","ashikoki":"footjob","ass-up_head-down":"top-down_bottom-up","ass_hole":"anus","asshole":"anus","back_turned":"from_behind","back_view":"from_behind","bathing_suit":"swimsuit","bending_over":"bent_over","blindfolded":"blindfold","blow_job":"fellatio","blowjob":"fellatio","bound_hands":"bound_wrists","bunny_suit":"playboy_bunny","bunnysuit":"playboy_bunny","bust":"upper_body","butt_hole":"anus","butthole":"anus","carry":"carrying","cheongsam":"qipao","china_dress":"qipao","chinese_dress":"qipao","closeup":"close-up","completely_naked":"completely_nude","doggy_style":"doggystyle","face_down_ass_up":"top-down_bottom-up","face_fucking":"irrumatio","facefuck":"irrumatio","female_on_top":"girl_on_top","fmm_threesome":"mmf_threesome","forced_blowjob":"irrumatio","forced_fellatio":"irrumatio","from_back":"from_behind","from_behind_position":"sex_from_behind","garter_strap":"garter_straps","groupsex":"group_sex","gym_clothes":"gym_uniform","hand_job":"handjob","hands_and_knees":"all_fours","hands_bound":"bound_wrists","hands_tied":"bound_wrists","in_profile":"profile","intercrural":"thigh_sex","intercrural_sex":"thigh_sex","kosode":"kimono","laying":"lying","laying_down":"lying","looking_over_shoulder":"looking_back","low_angle":"from_below","lying_down":"lying","lying_on_back":"on_back","lying_on_side":"on_side","lying_on_stomach":"on_stomach","male_pov":"pov","masturbate":"masturbation","masturbating":"masturbation","masturbating_each_other":"mutual_masturbation","mff_threesome":"ffm_threesome","missionary_position":"missionary","mizugi":"swimsuit","naked":"nude","naked_socks":"socks","nurse_hat":"nurse_cap","nurse_outfit":"nurse","nurse_uniform":"nurse","on_all_fours":"all_fours","on_belly":"on_stomach","on_front":"on_stomach","on_knees":"kneeling","open_legs":"spread_legs","pantsu":"panties","penetration_from_behind":"sex_from_behind","playboy_bunny_leotard":"playboy_bunny","prone":"on_stomach","reverse_cowgirl":"reverse_cowgirl_position","rope_bondage":"shibari","ropes":"rope","school_girl":"school_uniform","school_uniforms":"school_uniform","schoolgirl":"school_uniform","seifuku":"school_uniform","side":"from_side","side_view":"from_side","sit":"sitting","sitting_down":"sitting","sitting_in_lap":"sitting_on_lap","sock":"socks","spread_leg":"spread_legs","stocking":"thighhighs","stockings":"thighhighs","straddle":"straddling","straddle_penis":"thigh_sex","sucking_cock":"fellatio","sucking_dick":"fellatio","sucking_penis":"fellatio","sumata":"thigh_sex","supine":"on_back","sweatshirt":"sweater","swim_suit":"swimsuit","swimsuits":"swimsuit","taken_from_behind":"sex_from_behind","tekoki":"handjob","thigh_job":"thigh_sex","thighjob":"thigh_sex","tied_hands":"bound_wrists","tied_up_(sexual)":"bondage","tied_wrists":"bound_wrists","tights":"pantyhose","tit_fuck":"paizuri","titfuck":"paizuri","titjob":"paizuri","turning":"looking_back","view_from_above":"from_above","view_from_below":"from_below","viewed_from_above":"from_above","viewed_from_behind":"from_behind","viewed_from_below":"from_below","viewed_from_side":"from_side"},"implies":{"bikini":["swimsuit"],"completely_nude":["nude"],"cowgirl_position":["straddling"],"deepthroat":["fellatio"],"doggystyle":["sex_from_behind"],"fellatio":["oral"],"ffm_threesome":["threesome"],"irrumatio":["fellatio"],"mmf_threesome":["threesome"],"on_back":["lying"],"on_side":["lying"],"on_stomach":["lying"],"orgy":["group_sex"],"pleated_skirt":["skirt"],"qipao":["dress"],"reverse_cowgirl_position":["straddling"],"standing_sex":["standing"],"threesome":["group_sex"],"upright_straddle":["straddling"]},"deadFixes":{},"proseOnly":[],"poses":[{"code":"C01","key":"missionary","label":"正常位","main":["missionary","on_back"],"variants":{"standard":{"tags":["missionary","on_back"],"when":"男上女下，面对面"},"legs_up":{"tags":["legs_up","missionary"],"when":"女方腿被抬起压向胸口"},"spread":{"tags":["spread_legs","missionary"],"when":"双腿大张，几何最清晰"}},"negative":["sex_from_behind","doggystyle","cowgirl_position","girl_on_top"]},{"code":"C02","key":"doggy","label":"后入跪撑","main":["sex_from_behind","doggystyle","all_fours"],"variants":{"standard":{"tags":["all_fours"],"when":"床面或地面四足支撑"},"standing":{"tags":["standing_sex","bent_over"],"when":"女方站立前倾被后入"},"prone":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧被压住下半身"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"男方全身压覆，女方完全在下"},"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立后入"},"carrying":{"tags":["carrying","standing_sex"],"when":"抱起悬空后入"}},"negative":["missionary","cowgirl_position","girl_on_top"]},{"code":"C03","key":"prone","label":"趴位压身","main":["prone_bone","on_stomach"],"variants":{"standard":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧，男方覆压"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆，仅手肘支撑"},"legs_together":{"tags":["prone_bone","legs_together"],"when":"俯卧并腿，双膝与脚踝并拢，几何最稳，优先上"},"legs_apart":{"tags":["prone_bone","legs_apart"],"when":"俯卧双腿张开到最大张角，脊椎下凹、臀线最低"},"knees_up":{"tags":["prone_bone","knees_up"],"when":"俯卧屈膝抬臀，腰臀抬高、胸口贴床"},"folded":{"tags":["prone_bone","folded"],"when":"小腿后折贴向背侧，身体折成两截（folded 是体位词，不是叠衣服）"},"leg_lift":{"tags":["prone_bone","leg_lift"],"when":"俯卧单腿抬起，左右不对称，最不稳，排最后用"}},"negative":["missionary","on_back","cowgirl_position"]},{"code":"C04","key":"cowgirl","label":"骑乘正面","main":["cowgirl_position","girl_on_top","straddling"],"variants":{"standard":{"tags":["cowgirl_position"],"when":"面对面骑乘"},"squatting":{"tags":["squatting_cowgirl_position"],"when":"蹲踞式，手撑膝盖"},"upright":{"tags":["upright_straddle"],"when":"直立相拥，女在上"}},"negative":["sex_from_behind","doggystyle","all_fours","prone_bone"]},{"code":"C05","key":"reverse_cowgirl","label":"骑乘背面","main":["reverse_cowgirl_position","girl_on_top"],"variants":{"standard":{"tags":["reverse_cowgirl_position"],"when":"背对骑乘，反向"},"leaning":{"tags":["reverse_cowgirl_position","leaning_forward"],"when":"背对前倾，手撑床面"}},"negative":["missionary","sex_from_behind","doggystyle"]},{"code":"C06","key":"side","label":"侧入","main":["on_side","lying"],"variants":{"standard":{"tags":["on_side","sex_from_behind"],"when":"两人侧躺，男在后"},"spooning":{"tags":["spooning"],"when":"汤匙式贴身侧卧（低热 tag，仅点睛）"}},"negative":["missionary","cowgirl_position","standing_sex"]},{"code":"C07","key":"sitting","label":"坐姿","main":["sitting","straddling"],"variants":{"standard":{"tags":["sitting","straddling"],"when":"女方跨坐于男方腿上"},"lap":{"tags":["sitting_on_lap"],"when":"正坐怀中"},"crossed_legs":{"tags":["sitting","crossed_legs"],"when":"翘腿交叠坐，膝向一侧，最稳的新增项"},"hugging_legs":{"tags":["sitting","hugging_own_legs"],"when":"抱腿坐，身体前团贴膝（正名 hugging_own_legs，不写 alias 形式）"},"indian_style":{"tags":["sitting","indian_style"],"when":"盘腿正坐，双膝外展、脚掌相对贴于身前"},"legs_apart":{"tags":["sitting","legs_apart"],"when":"开腿坐，膝向两侧（与 C03 同名 tag，组装时按 Set 去重）"},"amazon_position":{"tags":["amazon_position"],"tier":"low","when":"反骑坐（低热度 1,582，仅点缀，不单独成镜）"}},"negative":["standing_sex","prone_bone"]},{"code":"C08","key":"standing","label":"站立","main":["standing_sex","standing"],"variants":{"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立"},"bent_over":{"tags":["bent_over","standing_sex"],"when":"站立前倾"},"in_arms":{"tags":["carrying","standing_sex"],"when":"抱起悬空（lifted 为死词，改用 carrying）"}},"negative":["lying","on_back","on_stomach"]},{"code":"C09","key":"carrying","label":"抱持挂身","main":["carrying"],"variants":{"standard":{"tags":["carrying","standing_sex"],"when":"抱起，女方挂身"},"suspended":{"tags":["suspension"],"when":"完全悬空（suspension 6,123）"}},"negative":["lying","on_back"]},{"code":"C10","key":"sitting_on_face","label":"颜面骑乘","main":["sitting_on_face","girl_on_top"],"variants":{"standard":{"tags":["sitting_on_face"],"when":"女方跨坐面部"}},"negative":["missionary","sex_from_behind"]},{"code":"C11","key":"oral","label":"口交","main":["fellatio","oral"],"variants":{"standard":{"tags":["fellatio","kneeling"],"when":"跪姿口交"},"looking_up":{"tags":["fellatio","looking_up"],"when":"抬眼看向对方"},"deepthroat":{"tags":["deepthroat"],"when":"深喉"},"irrumatio":{"tags":["irrumatio"],"when":"男方主动"}},"negative":["sex_from_behind","cowgirl_position","paizuri"]},{"code":"C12","key":"paizuri","label":"乳交","main":["paizuri"],"variants":{"standard":{"tags":["paizuri"],"when":"乳沟夹持"}},"negative":["fellatio","footjob"]},{"code":"C13","key":"leg","label":"足交腿交","main":["footjob","thigh_sex"],"variants":{"footjob":{"tags":["footjob"],"when":"足部夹持"},"thigh_grip":{"tags":["thigh_sex"],"when":"腿间夹持（键名原 intercrural 为死词，已改名）"}},"negative":["paizuri","fellatio"]},{"code":"C14","key":"handjob","label":"手交","main":["handjob","masturbation"],"variants":{"standard":{"tags":["handjob"],"when":"手部刺激"},"mutual":{"tags":["masturbation","mutual_masturbation"],"tier":"low","when":"互相抚慰"}},"negative":["paizuri","footjob"]},{"code":"C15","key":"anal","label":"肛交","main":["anal","anus"],"variants":{"standard":{"tags":["anal","sex_from_behind"],"when":"后入肛交"},"cowgirl":{"tags":["anal","reverse_cowgirl_position"],"when":"骑乘肛交"}},"negative":["missionary"]},{"code":"C16","key":"group","label":"多人","main":["group_sex","threesome"],"variants":{"mmf":{"tags":["mmf_threesome","group_sex"],"when":"两男一女"},"ffm":{"tags":["ffm_threesome","group_sex"],"when":"两女一男"},"orgy":{"tags":["orgy","group_sex"],"when":"群交"},"dp":{"tags":["double_penetration"],"when":"双插"}},"negative":["solo"]},{"code":"C17","key":"bondage","label":"束缚","main":["bondage","restrained"],"variants":{"standard":{"tags":["bondage","bound_wrists"],"when":"腕部束缚"},"shibari":{"tags":["shibari","rope"],"when":"绳缚"},"blindfold":{"tags":["blindfold"],"when":"蒙眼"}},"negative":["solo"]},{"code":"C18","key":"high_leverage","label":"特殊高杠杆","main":["mating_press","top-down_bottom-up"],"variants":{"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆"},"upright_straddle":{"tags":["upright_straddle"],"when":"直立相拥"},"reverse_upright_straddle":{"tags":["reverse_upright_straddle"],"when":"背向直立相拥，与 upright_straddle 同族，方向相反"},"folded":{"tags":["folded","mating_press"],"when":"压覆 + 大腿后折折身，折角最大"},"knees_to_chest":{"tags":["knees_to_chest"],"when":"团身抱膝，身体缩成一团，正面朝向相机"},"leg_lift":{"tags":["mating_press","leg_lift"],"when":"压覆 + 单腿抬起，比 prone 单腿更成立"},"wheelbarrow":{"tags":["wheelbarrow","leg_up"],"tier":"low","when":"推车式（低热度 1,195，仅点缀，不单独成镜）。与 carrying 的区别：carrying 是抱起悬空、上身贴人；wheelbarrow 是对方上身压低靠手撑，双腿被举离地成水平"},"leg_wrap":{"tags":["leg_wrap"],"tier":"low","when":"腿缠式（低热度 2,576，仅点缀，不单独成镜）"}}}],"views":[{"group":"水平","tags":["pov","from_side","from_behind","profile"]},{"group":"垂直","tags":["from_above","from_below","looking_up","looking_down"]},{"group":"景别","tags":["close-up","cowboy_shot","full_body","upper_body"]},{"group":"视线","tags":["looking_at_viewer","looking_back"]}],"postures":["standing","sitting","kneeling","lying","straddling","on_back","on_stomach","all_fours","spread_legs","bent_over","arched_back","on_side","arm_support"],"outfits":[{"key":"serafuku","cn":"水手服","category":"制服","base":["serafuku","sailor_collar"],"comp":["pleated_skirt","ribbon"],"tags":["serafuku","sailor_collar","pleated_skirt","ribbon"]},{"key":"school","cn":"校园制服","category":"制服","base":["school_uniform","blazer"],"comp":["necktie","pleated_skirt"],"tags":["school_uniform","blazer","necktie","pleated_skirt"]},{"key":"maid","cn":"女仆装","category":"职业装","base":["maid"],"comp":["maid_headdress","apron"],"tags":["maid","maid_headdress","apron"]},{"key":"nurse","cn":"护士服","category":"职业装","base":["nurse"],"comp":["nurse_cap","blouse"],"tags":["nurse","nurse_cap","blouse"]},{"key":"office","cn":"职场西装","category":"职业装","base":["blazer","dress_shirt"],"comp":["necktie","miniskirt"],"tags":["blazer","dress_shirt","necktie","miniskirt"]},{"key":"qipao","cn":"旗袍","category":"传统","base":["qipao"],"comp":["side_slit","obi"],"tags":["qipao","side_slit","obi"]},{"key":"kimono","cn":"和服浴衣","category":"传统","base":["kimono"],"comp":["obi","hakama"],"tags":["kimono","obi","hakama"]},{"key":"gym","cn":"体操服","category":"运动","base":["gym_uniform","bloomers"],"comp":["track_suit","socks"],"tags":["gym_uniform","bloomers","track_suit","socks"]},{"key":"schoolswim","cn":"学校泳装","category":"泳装","base":["school_swimsuit"],"comp":["competition_swimsuit"],"tags":["school_swimsuit","competition_swimsuit"]},{"key":"swimsuit","cn":"连体泳衣","category":"泳装","base":["swimsuit"],"comp":["one-piece_swimsuit","competition_swimsuit"],"tags":["swimsuit","one-piece_swimsuit","competition_swimsuit"]},{"key":"bikini","cn":"比基尼","category":"泳装","base":["bikini"],"comp":["string_bikini","midriff"],"tags":["bikini","string_bikini","midriff"]},{"key":"bunny","cn":"兔女郎","category":"特殊","base":["playboy_bunny"],"comp":["leotard","pantyhose"],"tags":["playboy_bunny","leotard","pantyhose"]},{"key":"bodysuit","cn":"紧身胶衣","category":"特殊","base":["bodysuit","latex"],"comp":["zipper","leotard"],"tags":["bodysuit","latex","zipper","leotard"]},{"key":"leotard","cn":"连体体操衣","category":"特殊","base":["leotard"],"comp":["midriff","turtleneck"],"tags":["leotard","midriff","turtleneck"]},{"key":"pajama","cn":"睡衣","category":"居家","base":["camisole","shorts"],"comp":["sweater"],"tags":["camisole","shorts","sweater"]},{"key":"sweater","cn":"毛线衫","category":"日常","base":["sweater"],"comp":["cardigan","turtleneck"],"tags":["sweater","cardigan","turtleneck"]},{"key":"hoodie","cn":"连帽衫","category":"日常","base":["hoodie"],"comp":["jacket","shorts"],"tags":["hoodie","jacket","shorts"]},{"key":"trench","cn":"长风衣","category":"日常","base":["trench_coat","coat"],"comp":["zipper","buttons"],"tags":["trench_coat","coat","zipper","buttons"]},{"key":"apron","cn":"围裙","category":"居家","base":["apron","bare_shoulders"],"comp":["thighhighs"],"tags":["apron","bare_shoulders","thighhighs"]},{"key":"lingerie","cn":"内衣吊带","category":"内衣","base":["lingerie","bra"],"comp":["panties","garter_straps"],"tags":["lingerie","bra","panties","garter_straps"]}],"outfitStates":{"D0":{"cn":"全着 · 衣不卸","add":["clothed_sex"],"ucAdd":["nude","completely_nude"]},"D1":{"cn":"半脱","add":["partially_undressed"],"ucAdd":["nude","completely_nude"]},"D2":{"cn":"拨开让位","add":["clothing_aside"],"ucAdd":["nude","completely_nude"]},"D3":{"cn":"正在脱","add":["undressing"],"ucAdd":["nude","completely_nude","jacket","coat","trench_coat","blazer"]},"D4":{"cn":"全裸","add":["completely_nude"],"ucAdd":["clothes","shirt","bra","panties"]}},"outfitForms":{"skirt_lift":"skirt_lift","shirt_lift":"shirt_lift","open_shirt":"open_shirt","panty_pull":"panty_pull","panties_aside":"panties_aside","panties_around_one_leg":"panties_around_one_leg","bra_lift":"bra_lift","off_shoulder":"off_shoulder","bottomless":"bottomless"},"outfitMaterials":{"wet":"wet_clothes","torn":"torn_clothes","sheer":"see-through_clothes","latex":"latex","fishnet":"fishnets","knit":"sweater"},"outfitHoisery":{"thighhighs":"thighhighs","pantyhose":"pantyhose","kneehighs":"kneehighs","socks":"socks","garter":"garter_straps","barefoot":"barefoot"},"outfitConflicts":[{"name":"nude_kills_all","trig":["nude","completely_nude"],"mode":"uc","kill":["serafuku","school_uniform","blazer","sailor_collar","maid","qipao","kimono","dress","skirt","pleated_skirt","shirt","bra","panties","apron","trench_coat","bodysuit","leotard","camisole"]},{"name":"bottomless_no_lower","trig":["bottomless"],"mode":"drop","kill":["skirt","shorts","pantyhose","pleated_skirt","miniskirt"]},{"name":"barefoot_no_socks","trig":["barefoot"],"mode":"drop","kill":["socks","thighhighs","kneehighs","pantyhose","high_heels"]},{"name":"leg_wrap_invisible","trig":["panties_around_one_leg"],"mode":"dropTrig","kill":["sex_from_behind","from_behind"]},{"name":"open_shirt_blocked","trig":["open_shirt"],"mode":"dropTrig","kill":["sex_from_behind","from_behind"]},{"name":"pantyhose_one_piece","trig":["pantyhose"],"mode":"drop","kill":["panties_aside","panty_pull"]},{"name":"latex_no_wet","trig":["latex"],"mode":"drop","kill":["wet_clothes"]},{"name":"skirt_lift_no_hands","trig":["skirt_lift"],"mode":"dropTrig","kill":["girl_on_top","cowgirl_position"]},{"name":"heels_no_kneel","trig":["high_heels"],"mode":"dropTrig","kill":["all_fours","bent_over","prone_bone"]},{"name":"wet_no_sheer","trig":["wet_clothes"],"mode":"drop","kill":["see-through_clothes"]}],"viewRules":{"oneOf":[["pov","from_side","from_behind","profile"],["from_above","from_below"],["close-up","cowboy_shot","upper_body","full_body"]],"forbid":[["pov","profile"],["pov","from_side"]]},"postureRules":{"requires":{"arm_support":["all_fours","prone_bone","bent_over"],"spread_legs":["lying","sitting","on_back"]},"forbid":[["standing","lying"],["standing","sitting"],["on_back","on_stomach"],["kneeling","standing"]]},"nonTag":["clothes"]};
 
     // === [阶段1·桥接] 姿势引擎（local 变量）→ storyFacts 事实卡片 ===
     // 变量真身：chat_metadata.variables['姿势引擎']['状态']。ST-Prompt-Template 用 lodash _.set 写点号路径，
@@ -13239,12 +13259,13 @@ SCHEMA:
         try {
             const readEngine = (deps && typeof deps.readEngine === 'function') ? deps.readEngine : readPoseEngine;
             const engine = readEngine();
-            if (!engine) return null;
-            const triple = parsePoseTriple(coercePoseState(engine.state));
-            if (!triple) return null;                       // 引擎未掷骰 → 视为无变量
-            const rawState = (triple.state && typeof triple.state === 'object') ? triple.state : null;
-            return {
-                pose: {
+            const triple = engine ? parsePoseTriple(coercePoseState(engine.state)) : null;
+            // 阶段2：服装路线与体位路线同级读变量——只有着装行 / 只有档位也要出卡片（pose 缺位写 null，不伪造）
+            const outfit = buildOutfitFacts(engine, deps);
+            if (!triple && !outfit) return null;            // 体位与着装两段全空 → 视为无变量
+            const rawState = (triple && triple.state && typeof triple.state === 'object') ? triple.state : null;
+            const facts = {
+                pose: triple ? {
                     id: triple.id,
                     className: triple.className,
                     name: triple.name,
@@ -13255,14 +13276,17 @@ SCHEMA:
                         换牌: rawState && rawState['换牌'] !== undefined ? rawState['换牌'] : null,
                         已用数量: rawState && Array.isArray(rawState['已用']) ? rawState['已用'].length : 0,
                     },
-                },
-                scene: engine.scene !== undefined && engine.scene !== null ? engine.scene : null,
-                dress: engine.dress !== undefined && engine.dress !== null ? engine.dress : null,
-                sock: engine.sock !== undefined && engine.sock !== null ? engine.sock : null,
-                arousal: engine.arousal !== undefined && engine.arousal !== null ? engine.arousal : null,
-                session: engine.session !== undefined && engine.session !== null ? engine.session : null,
+                } : null,
+                scene: engine && engine.scene !== undefined && engine.scene !== null ? engine.scene : null,
+                dress: engine && engine.dress !== undefined && engine.dress !== null ? engine.dress : null,
+                sock: engine && engine.sock !== undefined && engine.sock !== null ? engine.sock : null,
+                arousal: engine && engine.arousal !== undefined && engine.arousal !== null ? engine.arousal : null,
+                session: engine && engine.session !== undefined && engine.session !== null ? engine.session : null,
                 source: 'chat_metadata.variables',           // 供日志/回归定位
             };
+            // 阶段2：服装事实只在命中时追加到末尾——既有 7 键前缀与键序一字不动（harness A6 逐字断言依赖）
+            if (outfit) facts.outfit = outfit;
+            return facts;
         } catch (e) {
             return null;                                    // 任何异常静默降级，绝不打断请求构造
         }
@@ -13317,41 +13341,451 @@ SCHEMA:
         } catch (e) { return []; }
     }
 
-    /** 6.5.61 词法闸门：锁定主类一张都没落进 payload，且 payload 已经出现别的主类 main tag（=明确换类）→ 补回锁定主类 */
-    function sdtPoseGateApply(payload) {
+/* ── 6.5.63 词法闸门工具：整词边界匹配 / 权重壳剔除 / 负向双写 ── */
+
+    /** tag 边界正则：前后必须是非 [a-z0-9_]，所以 panties 不会命中 panties_aside（_ 按词内字符处理） */
+    function sdtTagBoundary(tag, flags) {
+        const esc = String(tag).replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+        return new RegExp('(^|[^a-z0-9_])' + esc + '([^a-z0-9_]|$)', flags || 'i');
+    }
+
+    /** 串里是否已有该 tag（整词；容忍 (tag:1.2) / {tag} 权重语法） */
+    function sdtTagHas(text, tag) {
         try {
-            if (!payload || typeof payload.input !== 'string' || !payload.input) return null;
-            const engine = readPoseEngine();
-            const triple = engine ? parsePoseTriple(coercePoseState(engine.state)) : null;
-            if (!triple || !triple.className) return null;
-            const entry = sdtPoseMatrixEntry(triple.className);
-            if (!entry) return null;
-            const main = Array.isArray(entry.main) ? entry.main.filter(Boolean) : [];
-            if (!main.length) return null;
-            const cap = payload.input.toLowerCase();
-            const hasOwn = main.some(function (t) { return cap.indexOf(String(t).toLowerCase()) >= 0; });
-            if (hasOwn) return null;
-            const all = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX.poses : [];
-            const others = [];
-            all.forEach(function (p) {
-                if (!p || p.code === entry.code) return;
-                (p.main || []).forEach(function (t) {
-                    const v = String(t || '').toLowerCase();
-                    if (v && others.indexOf(v) < 0) others.push(v);
-                });
-            });
-            const hit = others.filter(function (t) { return cap.indexOf(t) >= 0; });
-            if (!hit.length) return null;                 // 没有换类证据（纯前戏/特写/局部）→ 不动
-            if (payload.input.length > 1800) return null; // 已接近长度上限，不再加词
-            const add = main.slice(0, 2).join(', ');
-            payload.input = payload.input + ', ' + add;
-            const rec = {
-                locked: triple.id, className: entry.code, name: sdtFactText(entry.label, 40),
-                added: add, switched: hit.slice(0, 6), inputLen: payload.input.length,
+            if (!text || !tag) return false;
+            return sdtTagBoundary(tag).test(String(text));
+        } catch (e) { return false; }
+    }
+
+    /** 从逗号串里删一个 tag（连 (tag:1.2)/[tag]/{tag} 权重壳）；未命中 → 原样返回（幂等 + 零差异） */
+    function sdtTagDrop(text, tag) {
+        const raw = String(text === null || text === undefined ? '' : text);
+        try {
+            if (!raw || !tag) return raw;
+            const esc = String(tag).replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+            let out = raw;
+            out = out.replace(new RegExp('\\(\\s*' + esc + '\\s*:\\s*[0-9.]+\\s*\\)', 'gi'), '');
+            out = out.replace(new RegExp('\\[\\s*' + esc + '\\s*(?::\\s*[0-9.]+\\s*)?\\]', 'gi'), '');
+            out = out.replace(new RegExp('\\{\\s*' + esc + '\\s*(?::\\s*[0-9.]+\\s*)?\\}', 'gi'), '');
+            out = out.replace(new RegExp('(^|[^a-z0-9_])' + esc + '(?=[^a-z0-9_]|$)', 'gi'), '$1');
+            if (out === raw) return raw;                 // 没命中：一个字节都不动（幂等硬要求）
+            out = out.replace(/\s*,\s*(?=,|$)/g, '');     // 删词留下的空段
+            out = out.replace(/,(\s*,)+/g, ',');
+            out = out.replace(/[ \t]{2,}/g, ' ');
+            out = out.replace(/^[\s,]+|[\s,]+$/g, '');
+            return out;
+        } catch (e) { return raw; }
+    }
+
+    /** 批量剔除（顺序执行 → 天然幂等）；命中的 tag 记进 rec.dropped */
+    function sdtTagDropAll(text, list, rec) {
+        let out = text;
+        const arr = Array.isArray(list) ? list : [];
+        for (let i = 0; i < arr.length; i++) {
+            const tag = String(arr[i] || '');
+            if (!tag || !sdtTagHas(out, tag)) continue;
+            const next = sdtTagDrop(out, tag);
+            if (next === out) continue;
+            out = next;
+            if (rec && Array.isArray(rec.dropped)) rec.dropped.push(tag);
+        }
+        return out;
+    }
+
+    /** 负向双写（幂等）：negative_prompt（宿主直读）+ v4_negative_prompt.caption.base_caption（NAI v4 重建用） */
+    function sdtNegWrite(payload, words) {
+        const added = [];
+        try {
+            const dp = payload && payload.parameters;
+            if (!dp || typeof dp !== 'object' || !Array.isArray(words) || !words.length) return added;
+            const appendTo = function (text) {
+                let out = String(text === null || text === undefined ? '' : text);
+                for (let i = 0; i < words.length; i++) {
+                    const w = String(words[i] || '');
+                    if (!w || sdtTagHas(out, w)) continue;
+                    out = out ? (out.replace(/[\s,]+$/, '') + ', ' + w) : w;
+                    if (added.indexOf(w) < 0) added.push(w);
+                }
+                return out;
             };
+            dp.negative_prompt = appendTo(dp.negative_prompt);
+            const v4neg = (dp.v4_negative_prompt && typeof dp.v4_negative_prompt === 'object') ? dp.v4_negative_prompt : null;
+            if (v4neg && v4neg.caption && typeof v4neg.caption === 'object') {
+                v4neg.caption.base_caption = appendTo(v4neg.caption.base_caption);
+            }
+        } catch (e) { /* ignore */ }
+        return added;
+    }
+
+    /**
+     * 6.5.63 统一 payload 词法闸门（幂等：同一 payload 连过两次结果逐字节相同）。
+     * 执行顺序固定：① 主类补词（6.5.61 原逻辑）→ ② viewRules 机位 → ③ postureRules 肢势 → ④ outfitConflicts 服装。
+     * ②③ 只在「本类已落词」时生效：连主类都没落的纯前戏/特写不做互斥剪枝（否则会剪掉构图需要的肢势词）。
+     * phase === 'neg'（负向相位）：只在 v4_negative_prompt 重建之后补 uc 双写，绝不动 payload.input。
+     * 无任何变量（姿势引擎 / 服饰引擎都缺）→ return null，payload 一字不动（6.5.62 契约）。
+     */
+    function sdtPoseGateApply(payload, phase) {
+        try {
+            const negOnly = (phase === 'neg');
+            if (!payload || typeof payload.input !== 'string' || !payload.input) return null;
+            const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : null;
+            if (!M) return null;
+            const engine = readPoseEngine();
+            const outfit = engine ? buildOutfitFacts(engine, {}) : null;      // 台账开关在 buildOutfitFacts 内部
+            if (!engine && !outfit) return null;                             // 无变量聊天：零改动（V8 契约）
+            const triple = engine ? parsePoseTriple(coercePoseState(engine.state)) : null;
+            const entry = (triple && triple.className) ? sdtPoseMatrixEntry(triple.className) : null;
+            const main = (entry && Array.isArray(entry.main)) ? entry.main.filter(Boolean) : [];
+            const asm = outfit ? assembleOutfitTags(outfit) : { tags: [], uc: [] };
+            const outfitTags = Array.isArray(asm.tags) ? asm.tags : [];
+            const hasOutfit = !!(outfit && (outfitTags.length || (Array.isArray(asm.uc) && asm.uc.length)));
+            const conflicts = Array.isArray(M.outfitConflicts) ? M.outfitConflicts : [];
+            const rec = {
+                locked: triple ? triple.id : null,
+                className: entry ? entry.code : null,
+                name: (entry && entry.label) ? sdtFactText(entry.label, 40) : '',
+                phase: negOnly ? 'neg' : 'input',
+                added: '', switched: [], dropped: [], uc: [], inputLen: 0,
+            };
+            let input = payload.input;
+            let changed = false;
+
+            // uc 类清单（幂等重算）：trig 命中正向或服装事实 → kill 全部进负向，正向先剔干净
+            const ucList = [];
+            if (hasOutfit) {
+                for (let i = 0; i < conflicts.length; i++) {
+                    const rule = conflicts[i] || {};
+                    if (String(rule.mode || '') !== 'uc') continue;
+                    const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
+                    const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
+                    if (!trig.length) continue;
+                    const hit = trig.some(function (t) { return sdtTagHas(input, t) || outfitTags.indexOf(t) >= 0; });
+                    if (!hit) continue;
+                    for (let k = 0; k < kill.length; k++) if (ucList.indexOf(kill[k]) < 0) ucList.push(kill[k]);
+                }
+            }
+            if (ucList.length) rec.uc = ucList.slice(0, 24);   // 正/负相都记：诊断能看出本次排除了哪些词（幂等重算、无副作用）
+
+            if (!negOnly) {
+                // ① 主类补词（6.5.61 原逻辑）：锁定主类一张都没落、却出现别的主类 main → 补回锁定主类
+                let hasOwn = main.some(function (t) { return sdtTagHas(input, t); });
+                if (main.length && !hasOwn && entry) {
+                    const all = Array.isArray(M.poses) ? M.poses : [];
+                    const others = [];
+                    for (let i = 0; i < all.length; i++) {
+                        const pe = all[i];
+                        if (!pe || pe.code === entry.code) continue;
+                        const pm = Array.isArray(pe.main) ? pe.main : [];
+                        for (let k = 0; k < pm.length; k++) {
+                            const v = String(pm[k] || '');
+                            if (v && others.indexOf(v) < 0) others.push(v);
+                        }
+                    }
+                    const hit = others.filter(function (t) { return sdtTagHas(input, t); });
+                    if (hit.length && input.length <= 1800) {                 // 已接近长度上限 → 不再加词
+                        const add = main.slice(0, 2).join(', ');
+                        input = input + ', ' + add;
+                        rec.added = add;
+                        rec.switched = hit.slice(0, 6);
+                        hasOwn = true;
+                    }
+                }
+                // ②③ 只在本类已落词时剪枝
+                if (hasOwn) {
+                    const vr = (M.viewRules && typeof M.viewRules === 'object') ? M.viewRules : {};
+                    const oneOf = Array.isArray(vr.oneOf) ? vr.oneOf : [];
+                    for (let i = 0; i < oneOf.length; i++) {
+                        const group = Array.isArray(oneOf[i]) ? oneOf[i].map(String) : [];
+                        const present = group.filter(function (t) { return sdtTagHas(input, t); });
+                        if (present.length > 1) input = sdtTagDropAll(input, present.slice(1), rec);   // 只留矩阵序第一个
+                    }
+                    const vForbid = Array.isArray(vr.forbid) ? vr.forbid : [];
+                    for (let i = 0; i < vForbid.length; i++) {
+                        const pair = Array.isArray(vForbid[i]) ? vForbid[i].map(String) : [];
+                        if (pair.length < 2) continue;
+                        if (sdtTagHas(input, pair[0]) && sdtTagHas(input, pair[1])) input = sdtTagDropAll(input, [pair[1]], rec);
+                    }
+                    const pr = (M.postureRules && typeof M.postureRules === 'object') ? M.postureRules : {};
+                    const req = (pr.requires && typeof pr.requires === 'object') ? pr.requires : {};
+                    const reqKeys = Object.keys(req);
+                    for (let i = 0; i < reqKeys.length; i++) {
+                        const key = reqKeys[i];
+                        const need = Array.isArray(req[key]) ? req[key].map(String) : [];
+                        if (!sdtTagHas(input, key)) continue;
+                        const ok = need.some(function (t) { return sdtTagHas(input, t); });
+                        if (!ok) input = sdtTagDropAll(input, [key], rec);            // requires 前提不成立 → 剔除肢势词
+                    }
+                    const pForbid = Array.isArray(pr.forbid) ? pr.forbid : [];
+                    for (let i = 0; i < pForbid.length; i++) {
+                        const pair = Array.isArray(pForbid[i]) ? pForbid[i].map(String) : [];
+                        if (pair.length < 2) continue;
+                        if (!sdtTagHas(input, pair[0]) || !sdtTagHas(input, pair[1])) continue;
+                        // 更贴锁定体位的一侧留下：主类 main 里出现过的那侧优先，都没有 → 按矩阵序保留第一个
+                        const dropIdx = (main.indexOf(pair[1]) >= 0 && main.indexOf(pair[0]) < 0) ? 0 : 1;
+                        input = sdtTagDropAll(input, [pair[dropIdx]], rec);
+                    }
+                }
+                // ④ 服装冲突（仅当服装事实存在且有组装输出）：uc 已进上方清单，这里只做 drop / dropTrig
+                if (hasOutfit) {
+                    for (let i = 0; i < conflicts.length; i++) {
+                        const rule = conflicts[i] || {};
+                        const mode = String(rule.mode || '');
+                        if (mode === 'uc') continue;
+                        const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
+                        const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
+                        if (!trig.length) continue;
+                        const hit = trig.some(function (t) { return sdtTagHas(input, t) || outfitTags.indexOf(t) >= 0; });
+                        if (!hit) continue;
+                        input = sdtTagDropAll(input, mode === 'dropTrig' ? trig : kill, rec);
+                    }
+                }
+                if (ucList.length) input = sdtTagDropAll(input, ucList, rec);      // uc 词先剔正向（幂等）
+                if (input !== payload.input) { payload.input = input; changed = true; rec.inputLen = input.length; }
+            }
+
+            // ⑤ 负向相位：只在 v4_negative_prompt 建好之后双写（早写会被 :12476 的 base_caption 覆盖丢弃）
+            if (negOnly && ucList.length) {
+                const added = sdtNegWrite(payload, ucList);
+                if (added.length) { changed = true; rec.ucAdded = added.slice(0, 24); }
+            }
+
+            if (!changed) return null;
             try { sdtDiag() && sdtDiag().add('pose-gate', rec); } catch (e) { /* ignore */ }
             return rec;
         } catch (e) { return null; }
+    }
+
+    // === [阶段2·服装桥接] 服饰引擎.今日（服装事实）→ storyFacts.outfit + OUTFIT 矩阵组装 ===
+    // 数据源：chat_metadata.variables['服饰引擎.今日']（uid35 台账）。二次侧只读 SDT_POSE_MATRIX
+    // （outfits / outfitStates / outfitMaterials / outfitHoisery / outfitConflicts），不硬编码服装 tag 串。
+    // 【签名隔离】状态档位 D0–D4 与状态 tag（clothed_sex / partially_undressed / clothing_aside / undressing /
+    // completely_nude）绝不写进 profile.currentOutfit / profile.wardrobe[].outfit 或 outfitTags：isSameOutfit(:3987) 按交集/max>0.7 判换衣，
+    // 状态词一旦混进签名就每升一档判一次换衣 → 衣橱无限归档（:5004）。状态只走 storyFacts.outfit 与 prompt 文本。
+    const OUTFIT_ENGINE_KEY = '服饰引擎.今日';
+    const OUTFIT_SEP = String.fromCharCode(0xFF5C);   // 全角竖线 U+FF5C：台账行分隔符，半角 '|' 匹配不到（实测坑）
+    const OUTFIT_D4_RESIDUE = 'choker';               // 矩阵未收录的 D4×L6 残留件（doc 07 §2.3 推论2 / §3.4 步骤3b）
+
+    /** 读服饰引擎当日台账 → {date, rows[]} | null；任何异常静默降级，绝不抛出 */
+    function readOutfitEngine() {
+        try {
+            const vars = readPoseEngineVars();
+            if (!vars) return null;
+            const bag = pickVar(vars, OUTFIT_ENGINE_KEY);
+            if (!bag) return null;
+            if (Array.isArray(bag)) return { date: null, rows: bag };
+            if (typeof bag !== 'object') return null;
+            let rows = bag['rows'] !== undefined ? bag['rows'] : (bag['行'] !== undefined ? bag['行'] : null);
+            if (typeof rows === 'string') {
+                try { rows = JSON.parse(rows); } catch (e2) { rows = null; }
+            }
+            if (!Array.isArray(rows)) return null;
+            const date = bag['date'] !== undefined ? bag['date'] : (bag['日期'] !== undefined ? bag['日期'] : null);
+            return { date: (date === null || date === undefined) ? null : sdtFactText(date, 24), rows: rows };
+        } catch (e) { return null; }
+    }
+
+    /** 取本角色那一行：rows 每行首段是「序号. 女/男」，按性别序位取第 index 个 */
+    function pickOutfitRow(rows, sex, index) {
+        try {
+            if (!Array.isArray(rows)) return null;
+            const who = (typeof sex === 'string' && sex) ? sex : '女';
+            const idx = (typeof index === 'number' && index >= 0) ? Math.floor(index) : 0;
+            const hit = [];
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i];
+                if (typeof r === 'string' && r.indexOf(who + OUTFIT_SEP) >= 0) hit.push(r);
+            }
+            return hit[idx] || null;
+        } catch (e) { return null; }
+    }
+
+    /** 台账行 → { 特指, 气质, 档位, 内层, 外层, 内裤, 单位, 装饰, 底牌, 器具 }（首段「序号. 女」无等号，自然跳过） */
+    function parseOutfitRow(row) {
+        if (typeof row !== 'string' || !row) return null;
+        try {
+            const out = {};
+            const segs = row.split(OUTFIT_SEP);
+            for (let i = 0; i < segs.length; i++) {
+                const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(segs[i]);
+                if (m) out[m[1]] = m[2];
+            }
+            return Object.keys(out).length ? out : null;
+        } catch (e) { return null; }
+    }
+
+    /** 中文名 → 矩阵 key（20 类逐字比对）；查不到返回 null —— 猜错等于把角色穿成别的衣服，绝不硬猜 */
+    function mapGarmentKey(cn) {
+        try {
+            const name = sdtFactText(cn, 40);
+            if (!name) return null;
+            const list = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.outfits)) ? SDT_POSE_MATRIX.outfits : [];
+            for (let i = 0; i < list.length; i++) {
+                const e = list[i];
+                if (e && e.key && String(e.cn || '') === name) return String(e.key);
+            }
+            return null;
+        } catch (e) { return null; }
+    }
+
+    /**
+     * 衣着事实（一次侧，doc 07 §2 形状）：{garment,state,exposure,wetness,hoisery,source,missing} | null
+     * 纯函数（deps.readOutfitEngine 可注入），不写 store、不发请求；档位与着装行两段全空 → null。
+     */
+    function buildOutfitFacts(engine, deps) {
+        try {
+            const opts = (deps && typeof deps === 'object') ? deps : {};
+            const pose = (engine && typeof engine === 'object') ? engine : null;
+            const readOutfit = (typeof opts.readOutfitEngine === 'function') ? opts.readOutfitEngine : readOutfitEngine;
+            let bag = null;
+            try { bag = readOutfit(); } catch (e1) { bag = null; }
+            const dress = (pose && pose.dress && typeof pose.dress === 'object') ? pose.dress : null;
+            let d = null;
+            if (dress && dress['档位'] !== undefined && dress['档位'] !== null && dress['档位'] !== '') {
+                const n = Number(dress['档位']);
+                if (isFinite(n) && n >= 0 && n <= 4) d = Math.floor(n);   // 非法档位一律当缺失，不猜
+            }
+            const upgraded = !!(dress && dress['升级'] === true);
+            const hoiseryOn = !!(pose && pose.sock === true);             // 严格 bool：getvar(...) === true 才为真
+            const rows = (bag && Array.isArray(bag.rows)) ? bag.rows : [];
+            const parsed = parseOutfitRow(pickOutfitRow(rows, '女', 0));
+            // 服饰台账（服饰引擎.今日）整键未落盘 → 整段不注入：无服装变量时 prompt 与 6.5.62 逐字节一致
+            // （A9 恒等断言 / B8 无状态断言 / A6 七键序断言都锁这个口径，台账存在与否是唯一开关）
+            if (!bag) return null;
+            if (d === null && !parsed) return null;                        // 台账在但两段全空 → 整段不注入（doc 07 §3.5 ⑥）
+            const garmentCn = (parsed && parsed['特指']) ? sdtFactText(parsed['特指'], 40) : null;
+            const levelRaw = (parsed && parsed['档位']) ? sdtFactText(parsed['档位'], 8) : '';
+            const lv = /L(\d)/i.exec(levelRaw);
+            const exposure = {
+                level: lv ? ('L' + lv[1]) : null,
+                unit: (parsed && parsed['单位']) ? sdtFactText(parsed['单位'], 40) : null,
+            };
+            const missing = [];
+            if (!garmentCn) missing.push('garment');
+            if (d === null) missing.push('state.d');
+            if (!exposure.level) missing.push('exposure.level');
+            missing.push('wetness');                                       // 无变量来源（doc 07 §2.1），恒缺
+            return {
+                garment: { cn: garmentCn, key: garmentCn ? mapGarmentKey(garmentCn) : null },
+                state: { d: d, upgraded: upgraded },
+                exposure: exposure,
+                wetness: {
+                    wet: null, torn: null,
+                    trace: (dress && dress['痕迹'] !== undefined && dress['痕迹'] !== null) ? sdtFactText(dress['痕迹'], 60) : '',
+                },
+                hoisery: { on: hoiseryOn },
+                source: 'vars',
+                missing: missing,
+            };
+        } catch (e) { return null; }
+    }
+
+    /**
+     * 二次侧组装（doc 07 §3.4 六步）：base → comp → 档位状态词 → D4×L6 残留 → 突破补 undressing → 材质/袜履 → 冲突剔除
+     * 返回 { tags, uc }；只读 SDT_POSE_MATRIX，不硬编码服装 tag 串（D4 残留件是唯一例外，见 OUTFIT_D4_RESIDUE）。
+     */
+    function assembleOutfitTags(facts) {
+        try {
+            const f = (facts && typeof facts === 'object') ? facts : null;
+            if (!f) return { tags: [], uc: [] };
+            const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : {};
+            const tags = [];
+            let uc = [];
+            const push = function (list) {
+                if (!Array.isArray(list)) return;
+                for (let i = 0; i < list.length; i++) { if (list[i]) tags.push(String(list[i])); }
+            };
+            const dropAll = function (target, list) {
+                for (let i = target.length - 1; i >= 0; i--) { if (list.indexOf(target[i]) >= 0) target.splice(i, 1); }
+            };
+            const uniq = function (arr) {
+                const seen = Object.create(null);
+                const out = [];
+                for (let i = 0; i < arr.length; i++) { const v = arr[i]; if (!seen[v]) { seen[v] = true; out.push(v); } }
+                return out;
+            };
+            const gkey = (f.garment && f.garment.key) ? String(f.garment.key) : '';
+            let garment = null;
+            const outfits = Array.isArray(M.outfits) ? M.outfits : [];
+            for (let i = 0; i < outfits.length; i++) {
+                if (outfits[i] && String(outfits[i].key || '') === gkey) { garment = outfits[i]; break; }
+            }
+            const dRaw = (f.state && f.state.d !== undefined && f.state.d !== null) ? Number(f.state.d) : null;
+            const d = (dRaw !== null && isFinite(dRaw)) ? dRaw : null;
+            const sTable = (M.outfitStates && typeof M.outfitStates === 'object') ? M.outfitStates : {};
+            const sEntry = (d === null) ? null : (sTable['D' + d] || null);
+            // 1/2 base + comp（D4 无遮：衣物 tag 一律不进正向）
+            if (garment && d !== null && d < 4) { push(garment.base); push(garment.comp); }
+            // 3 档位状态词（档位缺失就不出状态词，绝不猜档）
+            if (sEntry) { push(sEntry.add); if (Array.isArray(sEntry.ucAdd)) uc = uc.concat(sEntry.ucAdd.map(String)); }
+            // 3b D4 × 穿着底线 L6 =「只余饰品与器具」，不是一无所有
+            if (d === 4 && f.exposure && String(f.exposure.level || '') === 'L6') tags.push(OUTFIT_D4_RESIDUE);
+            // 4 突破标记 → 写「正在被脱」，而不是「已经脱光」
+            if (f.state && f.state.upgraded === true && d !== null && d >= 2) tags.push('undressing');
+            // 5 材质 / 袜履（矩阵键名 → tag）
+            const mats = (M.outfitMaterials && typeof M.outfitMaterials === 'object') ? M.outfitMaterials : {};
+            if (f.wetness && f.wetness.wet && mats.wet) tags.push(String(mats.wet));
+            if (f.wetness && f.wetness.torn && mats.torn) tags.push(String(mats.torn));
+            const hois = (M.outfitHoisery && typeof M.outfitHoisery === 'object') ? M.outfitHoisery : {};
+            if (f.hoisery && f.hoisery.on === true && hois.thighhighs) tags.push(String(hois.thighhighs));
+            // 6 冲突剔除（矩阵顺序即优先级：uc 无条件排除 / drop 只动正向 / dropTrig 丢触发项本身）
+            const rules = Array.isArray(M.outfitConflicts) ? M.outfitConflicts : [];
+            for (let r = 0; r < rules.length; r++) {
+                const rule = rules[r] || {};
+                const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
+                const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
+                const mode = String(rule.mode || '');
+                const hit = trig.some(function (x) { return tags.indexOf(x) >= 0; });
+                if (!hit) continue;
+                if (mode === 'uc') { uc = uc.concat(kill); dropAll(tags, kill); }
+                else if (mode === 'drop') { dropAll(tags, kill); }
+                else if (mode === 'dropTrig') { dropAll(tags, trig); }
+            }
+            const tagOut = uniq(tags);
+            return { tags: tagOut, uc: uniq(uc).filter(function (x) { return tagOut.indexOf(x) < 0; }) };
+        } catch (e) { return { tags: [], uc: [] }; }
+    }
+
+    /** 数字千分位：79494 → '79,494'（与 doc 07 §3.5 样例同形） */
+    function sdtGroupNum(n) {
+        try { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); } catch (e) { return ''; }
+    }
+
+    /** 【本场着装】一行事实（档位 + 主件 + 建议 tag + 排除）；无 outfit → ''（调用方据此恒等返回） */
+    function sdtOutfitLine(outfit) {
+        try {
+            if (!outfit || typeof outfit !== 'object') return '';
+            const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : {};
+            const dRaw = (outfit.state && outfit.state.d !== undefined && outfit.state.d !== null) ? Number(outfit.state.d) : null;
+            let dText = '未标注';
+            if (dRaw !== null && isFinite(dRaw)) {
+                const sEntry = (M.outfitStates && M.outfitStates['D' + dRaw]) ? M.outfitStates['D' + dRaw] : null;
+                dText = 'D' + dRaw + ((sEntry && sEntry.cn) ? ' ' + sdtFactText(sEntry.cn, 12) : '');
+            }
+            const head = '【本场着装】' + dText;
+            const gkey = (outfit.garment && outfit.garment.key) ? sdtFactText(outfit.garment.key, 40) : '';
+            const gcn = (outfit.garment && outfit.garment.cn) ? sdtFactText(outfit.garment.cn, 20) : '';
+            let gar = '';
+            if (gkey) {
+                const row = (M.tags && M.tags[gkey]) ? M.tags[gkey] : null;
+                const cnt = (row && typeof row.post_count === 'number') ? sdtGroupNum(row.post_count) : '';
+                gar = '｜主件 ' + gkey + (cnt ? '(' + cnt + ')' : '');
+            } else if (gcn) {
+                gar = '｜主件 ' + gcn;      // 中文名未收录矩阵：只报事实，不出 tag（绝不硬猜 key）
+            }
+            const asm = assembleOutfitTags(outfit);
+            let tags = asm.tags.slice(0, 8);   // 建议 tag 上限 8
+            let uc = asm.uc.slice(0, 6);       // 排除词上限 6
+            for (let guard = 0; guard < 32; guard++) {
+                const line = head + gar +
+                    (tags.length ? '｜建议 tag：' + tags.join(', ') : '') +
+                    (uc.length ? '｜排除：' + uc.join(', ') : '');
+                if (line.length <= 200) return sdtFactText(line, 200);   // 整行 ≤200 才落盘，避免截出半个 tag
+                if (uc.length) { uc = uc.slice(0, uc.length - 1); continue; }
+                if (tags.length) { tags = tags.slice(0, tags.length - 1); continue; }
+                return sdtFactText(line, 200);
+            }
+            return sdtFactText(head + gar, 200);
+        } catch (e) { return ''; }
     }
 
     /**
@@ -13361,29 +13795,38 @@ SCHEMA:
     function applyPoseDirective(systemPrompt, storyFacts) {
         const base = typeof systemPrompt === 'string' ? systemPrompt : '';
         try {
-            if (!storyFacts || !storyFacts.pose || !storyFacts.pose.id) return base;
-            const pose = storyFacts.pose;
-            const poseClass = pose.className ? sdtFactText(pose.className, 16) : '未标注';
-            const poseName = pose.name ? sdtFactText(pose.name, 120) : '未标注';
-            const scene = (storyFacts.scene !== null && storyFacts.scene !== undefined) ? (sdtFactText(storyFacts.scene, 200) || '未标注') : '未标注';
-            const session = (storyFacts.session !== null && storyFacts.session !== undefined) ? (sdtFactText(storyFacts.session, 40) || '未标注') : '未标注';
-            let dress = '未标注';
-            if (storyFacts.dress && typeof storyFacts.dress === 'object' && storyFacts.dress['档位'] !== undefined && storyFacts.dress['档位'] !== null) {
-                dress = 'D' + String(storyFacts.dress['档位']);
-            } else if (typeof storyFacts.dress === 'string' && storyFacts.dress) {
-                dress = storyFacts.dress;
+            if (!storyFacts) return base;                    // 无事实卡片 → 逐字节恒等（S3 契约）
+            const parts = [];
+            const pose = (storyFacts.pose && storyFacts.pose.id) ? storyFacts.pose : null;
+            if (pose) {
+                const poseClass = pose.className ? sdtFactText(pose.className, 16) : '未标注';
+                const poseName = pose.name ? sdtFactText(pose.name, 120) : '未标注';
+                const scene = (storyFacts.scene !== null && storyFacts.scene !== undefined) ? (sdtFactText(storyFacts.scene, 200) || '未标注') : '未标注';
+                const session = (storyFacts.session !== null && storyFacts.session !== undefined) ? (sdtFactText(storyFacts.session, 40) || '未标注') : '未标注';
+                let dress = '未标注';
+                if (storyFacts.dress && typeof storyFacts.dress === 'object' && storyFacts.dress['档位'] !== undefined && storyFacts.dress['档位'] !== null) {
+                    dress = sdtFactText('D' + String(storyFacts.dress['档位']), 12) || '未标注';
+                } else if (typeof storyFacts.dress === 'string' && storyFacts.dress) {
+                    dress = sdtFactText(storyFacts.dress, 24) || '未标注';
+                }
+                const lines = [
+                    '【体位锁定】本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
+                    '① storyFacts.pose 存在 → 主类定稿，不得换类，不得改写成近邻体位（骑乘≠背入，后入≠正常位）；',
+                    '② 缺失但正文有明确动作描写 → 按正文提取主类，禁止「美化」成更好画/更常见的体位；',
+                    '③ 两者皆无 → 才允许按剧情推测。',
+                    '【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（标记与正文冲突时以标记为准）。',
+                    // 6.5.64 F1/F4：id 与整行都过清洗 —— id 带换行会把这一行拆成多行（注入面缺口）
+                    sdtFactText('本轮：' + sdtFactText(pose.id, 24) + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress, 320)
+                ];
+                const vocab = sdtPoseVocabLines(pose.className);
+                if (vocab.length) lines.push.apply(lines, vocab);
+                parts.push(lines.join('\n'));
             }
-            const lines = [
-                '【体位锁定】本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
-                '① storyFacts.pose 存在 → 主类定稿，不得换类，不得改写成近邻体位（骑乘≠背入，后入≠正常位）；',
-                '② 缺失但正文有明确动作描写 → 按正文提取主类，禁止「美化」成更好画/更常见的体位；',
-                '③ 两者皆无 → 才允许按剧情推测。',
-                '【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（标记与正文冲突时以标记为准）。',
-                '本轮：' + pose.id + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress
-            ];
-            const vocab = sdtPoseVocabLines(pose.className);
-            if (vocab.length) lines.push.apply(lines, vocab);
-            const block = lines.join('\n');
+            // 阶段2：服装段只在服装事实命中时追加；未命中时本函数恒等返回 base（零差异硬契约）
+            const outfitLine = sdtOutfitLine(storyFacts.outfit);
+            if (outfitLine) parts.push(outfitLine);
+            if (!parts.length) return base;
+            const block = parts.join('\n\n');
             return base ? (base + '\n\n' + block) : block;
         } catch (e) {
             return base;
@@ -13393,7 +13836,7 @@ SCHEMA:
     // 测试 seam（S4）：仅在显式开启 __RBQ_SDT_TEST__ 时把桥接纯函数挂到 RBQ.api 供 harness 断言，生产不暴露
     try {
         if (typeof window !== 'undefined' && window.__RBQ_SDT_TEST__ === true && RBQ && RBQ.api) {
-            RBQ.api.__sdtTest = { readPoseEngine: readPoseEngine, buildStoryFacts: buildStoryFacts, applyPoseDirective: applyPoseDirective, poseVocabLines: sdtPoseVocabLines, poseGateApply: sdtPoseGateApply };
+            RBQ.api.__sdtTest = { readPoseEngine: readPoseEngine, buildStoryFacts: buildStoryFacts, applyPoseDirective: applyPoseDirective, poseVocabLines: sdtPoseVocabLines, poseGateApply: sdtPoseGateApply, outfitFacts: buildOutfitFacts, assembleOutfitTags: assembleOutfitTags, readOutfitEngine: readOutfitEngine, outfitLine: sdtOutfitLine };
         }
     } catch (e) {
         // 测试挂载失败不影响插件主体
@@ -19160,6 +19603,10 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             if (s.systemPromptPreset === 'custom') {
                 s.customSystemPrompt = val('rbq-sdt-system-prompt').trim();
                 s.systemPrompt = s.customSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+            } else {
+                // 6.5.63 custom 收敛：非 custom 档下 store.customSystemPrompt 恒为空，systemPrompt 不留非内置文本
+                s.customSystemPrompt = '';
+                s.systemPrompt = '';
             }
             s.systemPromptVersion = DEFAULT_SYSTEM_PROMPT_VERSION;
             save();
@@ -19196,6 +19643,9 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const s = getStore();
             s.systemPromptPreset = preset;
             if (preset !== 'custom') {
+                // 6.5.63 custom 收敛：切回内置档即清空自定义文本（非 custom 档下 store.customSystemPrompt 恒为空）
+                s.customSystemPrompt = '';
+                s.systemPrompt = '';
                 s.systemPromptVersion = DEFAULT_SYSTEM_PROMPT_VERSION;
                 document.getElementById('rbq-sdt-system-prompt-version').textContent = `${SYSTEM_PROMPT_PRESETS[preset]?.label || '内置 Prompt'} · v${DEFAULT_SYSTEM_PROMPT_VERSION}（最新）`;
                 toastr.info(`已切换为：${SYSTEM_PROMPT_PRESETS[preset]?.label || preset}`, PLUGIN_NAME);
