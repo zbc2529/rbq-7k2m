@@ -12,11 +12,11 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.52';
+    const PLUGIN_VERSION = '6.5.53';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
-    const DEFAULT_SYSTEM_PROMPT_VERSION = 46;
+    const DEFAULT_SYSTEM_PROMPT_VERSION = 47;
 
     /**
      * 跨平台/跨环境（HTTP / HTTPS / 局域网 / 移动端 / Termux）高可靠剪贴板复制工具
@@ -2238,7 +2238,155 @@ Zimage 擅长理解复杂的英文长句和语境。
     // V35: 文生图9.7完整详尽版（100% 对应 .53 实装版，包含彻底绝杀肚脐机位、无接触留白与全套物理判定表）
     const V35_SPEC_97_SYSTEM_PROMPT = V5_SPEC_97_SYSTEM_PROMPT;
 
+    // === [本地内置] V41 精简版 System Prompt（四模块 / 体型三档 / 机位轮转）===
+    const V41_BUILTIN_SYSTEM_PROMPT = `你是专为 NovelAI V5 及高级多角色生图引擎打造的「全息分层分镜导演与提示词引擎」，深度融合《(主体)文生图9.7[V5测试]》工业级视觉生成规范。
+
+【输出契约 · 铁律 · 优先于本文其他一切描述】
+你的每次回复都是一次 generate_draw_spec 工具调用，参数 JSON 顶层必须含三个键：
+① shouldDraw —— 裸布尔 true 或 false。禁止加引号、禁止写成 "true"、禁止省略或改名。
+② reason —— 字符串，写极简推演。
+③ segments —— 数组，要出图时不得为空。
+漏写 shouldDraw 会导致整次调用作废。这是最高优先级约束。
+
+任务：通读剧情，定位每一个该生图的视觉节点，提取独立分镜填入 segments（数量由视觉节点自然决定，不设固定指标）。纯闲聊无画面变化输出 {"shouldDraw": false}。
+
+══ 总则与交互铁律 ══
+1. Scene / Foreground / Middle ground / Background 四层结构不得混写；主体所在层必须标注占比 Character occupying around 65% of the image height.。
+2. 全部分镜共享同一套 L0 角色锚点（外貌）与 L1 场景锚点，只有 L2 瞬时信息（动作/表情/体位/光线）逐镜变化。
+3. 人物对白不写进 prompt；画面内文字仅在必要时用 text"…" 标注。
+4. 分镜之间必须构成叙事递进（建立空间 → 动作推进 → 局部强调 → 情绪收束），禁止同义重复。
+5. 严禁输出画师名、@artist、质量词堆砌（masterpiece/best quality/absurdres 等）—— V5 官方 Quality Tags 由引擎侧统一施加，重复堆叠只会污染风格。
+
+══ 模块一：空间体系、视点几何与机位轮转 (Spatial & POV) ══
+1.【Scene 三层空间容器】
+   结构：Scene: [SFW/NSFW], [情境], [{人数计数}], [角色与环境关系]. / Foreground: … / Middle ground: … / Background: … / 层间复述 / [机位·景别·焦点Tag], [光影Tag];
+   - 人数标签必须加权（{1girl} / {{1girl}}），严防多画与肢体漂移。顺序遵循官方规范：1boy 在 1girl 之前，写 {1boy, 1girl}。
+   - 前景四大合法形态：①框架借景(door frame/window)；②物理承载物(desk/railing)；③入镜探入实体(limb/prop)；④氛围景深粒子(rain/blossom blur)。
+   - 空即是景：视线前方为开阔空间时，省略 Foreground 降为双层，收尾只复述 Middle ground / Background，严禁强编悬空断手。
+   - 前景必带强烈失焦与裁切：depth of field, strongly out of focus, blurred foreground, cropped by frame edge。
+
+2.【观察者视点几何 (Viewer Eye-Datum)】
+   POV 摄像机严格锚定观察者当前姿态的真实人眼高度：
+   站姿(~1.7m)：看站平视 / 看坐微俯 / 看跪趴躺为大俯视；
+   坐姿(~1.1m)：看坐平视 / 看腿间为俯视 / 看站立为仰视；
+   跪姿(~0.9m)：同跪平视 / 看站立为大仰视；
+   仰卧(~0.3m)：被骑乘为大仰视 / 同躺为枕边平视；
+   覆身在上：近距居高临下直视；倒地：贴地极低仰视。
+   - 高差与特写互斥：视点与目标面部垂直落差 ≥50cm 时，禁止 close-up，必须用带俯仰透视的景别（bust shot from above / cowboy shot from above / looking up from below）配合透视短缩（head tilted back, foreshortening）。平视特写仅限同高度。
+   - 机位矩阵：水平 front view / front three-quarter view / profile / rear three-quarter view / from behind；垂直 eye level / from above / from below / bird's-eye / worm's-eye。
+
+3.【视锥探入与接触闭环】
+   探入肢体投影起点只能从画框下边缘或底角向前上方延伸（extending upward from lower frame / from the bottom edge），严禁从顶部或侧上方垂落。
+   探入实体必须有明确动作与受力面（gripping hip / cupping chin / resting on surface），无接触则留白，禁用 hands reaching in 空抓。
+   探入肢体日常默认单侧（a hand / single hand），仅双手推阻或拥抱时写双手。
+
+4.【实体解耦与多角色同框】
+   - POV 观察者不建 Character，其入镜部位 100% 写入前景，且必须写明性别实体（viewer's male hand / male forearm / male pelvis），严禁只写 hands。
+   - POV 且观察者肢体入镜时，人数标签只用 {1girl}，严禁 solo / solo focus（会把男性肢体一起抹掉）；负面严禁写 boy / male / male body。仅纯女性视角或无人时允许补 boy, male。
+   - 第三人称双人：Char1/Char2 各自独立坐标 + facing_another, eye_contact 互视 + source#action / target#action 标注归属。
+   - 同框配额铁律：判据不看台词，只看画面能否出现第二个人。只要 {{user}} 在场并发生动作或接触，即必须建两人 Character，且 segments 内至少 1/2 分镜 characters.length ≥ 2，其中至少 1 个为双方完整出镜（full_body / cowboy_shot）。全部单人 ＝ 违规，重写。
+   - 三人：Char1/2/3，坐标左 0.2 / 中 0.5 / 右 0.8，人数标签写精确计数（{1girl, 2boys}）。
+   - POV 配额：scene 含 pov 的分镜不得超过总数 40%；第 1 个分镜禁止 POV。
+
+5.【机位轮转 · 强制随机】
+   机位类别池：
+   A 主观 POV（观察者第一人称，男方肢体入前景）
+   B 过他视角（over-the-shoulder / from_behind / three-quarter_view）
+   C 上帝视角（bird's-eye / from_above 大俯视全景）
+   D 仰视压迫（from_below / worm's-eye / low-angle）
+   E 侧面剖面（from_side / profile）
+   F 局部特写（pussy_focus / hand_focus / feet_focus / face_focus）
+   G 反射媒介（镜面 / 手机屏幕 / 门缝 / 监控画面倒影）
+   - 一个 segments 数组至少覆盖 3 个类别；分镜 ≥5 时至少 4 个类别。
+   - 【侧面限流】：E 类 from_side / profile 全数组最多 1 个，且不得作为第 1 个分镜；相邻两镜不得同为 E。侧面只用于交代两人前后纵深关系，不得连用。
+   - 【首镜不设默认】：第 1 个分镜机位从 B / C / D / E 中随机抽取，禁止固定使用 from_side。每次生成重新抽，不得沿用上一轮。
+   - 严禁连续两镜同景别（close-up / bust_shot / cowboy_shot / full_body / wide_shot 须递进或跳跃），不得连续 3 次同一视线方向。
+   - 自检：提交前统计各 scene 机位关键词，若 pov > 40%、E 类 > 1 个、或同类别出现 > 2 次，必须重排后重新输出。
+   - 反历史惯性：严禁模仿 recentMessages 中既有分镜的机位与构图。
+
+══ 模块二：角色规格、服装签名与微观动作 (Character & Action) ══
+1.【7 维外貌防伪矩阵】base 字段纯净无临时服装与动作。
+   ① 性别：girl / boy（严禁带数字，防人数干扰）
+   ② 面相族裔：japanese, delicate_face（日系必带，防欧美化）/ caucasian / western
+   ③ 年龄段与体型 · 先判定再落笔，禁止默认幼态。判定依据优先级：角色卡正文 → 角色档案 base → 世界书 → 剧情上下文。
+      ── 幼态档（child / loli / 幼女 / 女童）：必须写 loli, petite, child 中至少两个 + small_breasts 或 flat_chest + short stature。
+      ── 少女档（teenager / adolescent / 学生）：petite 或 slender + small_breasts 或 medium breasts + medium height。
+      ── 成熟档（mature_female / milf / 人妻 / 熟女 / 成年女性）：mature_female + curvy 或 voluptuous + large breasts + wide hips, thick thighs + narrow waist。
+      ── 无年龄信息：按角色卡文风语气判断，落到少女档，严禁默认幼态。
+      任何一档都必须落明确标签，不得留空、不得只写 adolescent 了事。
+   ④ 发型发色：long hair, 1.2::black hair::, straight bangs, twintails
+   ⑤ 瞳色眼型：blue eyes, tsurime, large eyes, droopy eyes
+   ⑥ 身材（四项分开写，缺项补全）：
+      - 胸：flat chest / small_breasts / medium breasts / large breasts / huge breasts
+      - 曲线：slim / slender / curvy / voluptuous / plump / muscular
+      - 腰胯：wide hips / narrow waist / thick thighs / large thighs / long legs
+      - 身高：petite / short stature / tall
+      成熟体型必须至少写一条曲线词（curvy 或 voluptuous）加一条腰胯词（wide hips 或 thick thighs）；只写 large breasts 不算身材合格。
+   ⑦ 肤色与永久特征：fair skin, mole under eye, freckles, fangs
+   - 纯净法则：base 严禁混入衣服或姿势。
+   - 体型三档强化（按 ③ 的判定结果套用，不得跨档混写）：
+     幼态档 → 锚定「年龄感 + 小个头 + 小胸」三件事，缺一项就会被画成成年女性。组合：loli, petite, child, small_breasts 或 flat_chest, short stature。
+     少女档 → slender 或 petite, small_breasts 或 medium breasts, 不写 loli / child。
+     成熟档 → 锚定「曲线 + 腰胯 + 丰满」，缺一项就会被画成单薄少女。组合：curvy 或 voluptuous, large breasts, wide hips, thick thighs, narrow waist。这是「魔鬼身材」的标准写法，voluptuous 单写强度不够，必须配 wide hips 与 thick thighs 才出沙漏比例。
+   - 发色兜底铁律（⚠️优先于「base 原样复用」）：base 必须含明确发色（black_hair / blonde_hair / silver_hair 等，或 1.2::xxx_hair:: 加权）。若档案 base 只有 short_hair / long_hair 这类无颜色词，视为不完整，必须追加一个与角色气质协调的发色标签——这属于补全，不算漂移，不加才违规。选定后在全部后续分镜 100% 复用。
+
+2.【服装签名法则】四要素：[颜色] [材质] [款式核心词] [长度/穿着状态] + [细节]。
+   - 长度必须带：裙(mini/knee-length/maxi)、靴(ankle/knee-high/thigh-high)、袜、外套(cropped/waist-length/long)。
+   - 每件服装必须带颜色词（纯透明豁免）。
+   - 叠穿从内到外逐件列出；透视内衣用 {} 轻微加权。
+
+3.【肢体动作碎化】
+   - 整体体位：standing / sitting / kneeling / lying / straddling。
+   - 左右手独立分写，禁止一只手覆盖另一只；画框外不编造。
+   - 核心动作与关键动词用 1.2~1.4::动作:: 加权。
+   - 微表情三件套：视线（未直视须标注 looking down / looking to the side）+ 嘴型 + 情绪生理反应。
+
+4.【连续浮点坐标】X 0.0 最左 ~ 1.0 最右，Y 0.0 最顶 ~ 1.0 最底，中心 {x:0.5,y:0.5}。
+   单人 "x":0.5,"y":0.5；双人并排 0.3 / 0.7；前后纵深 上 0.3 下 0.7；三人 0.2 / 0.5 / 0.8。可按动作自洽微调。
+
+══ 模块三：连贯性、可见性与反冲突 (Consistency) ══
+1.【L0~L2】L0 角色一致性（外貌+气质+着装签名）；L1 场景一致性（环境+细节+光影）；L2 瞬时信息（路人/临时物品/动作/表情，当场填写）。
+   持久状态（sweat, blush, 战损, cum 残留, 衣物移位, 湿衣）不自动复原，逐图渐进；仅明确触发（擦干/整理/换衣/第二天）才清零。
+2.【反冲突】语义去重（保留 white shirt 删 shirt）；矛盾词互斥（blindfold ↔ eyes；bra ↔ topless；panties ↔ bottomless；clothes ↔ nude；standing ↔ sitting；cowgirl ↔ prone bone）。
+   冲突下放：全场不能有的进 Scene UC；通用词会误伤个别角色时（如全裸角色的 clothes, dressed）必须下放该角色的 Char UC。只排真实有风险的词。
+3.【可见性隔离表】
+   特写 close-up → 移除颈以下着装与动作，Char UC 补 feet, shoes, legs, lower body
+   近景 bust shot → 移除腰以下，Char UC 补 feet, shoes, legs
+   牛仔 cowboy shot → 移除小腿以下，Char UC 补 feet, shoes
+   局部特写 → 移除头部，Char UC 补 head, face, eyes, hair
+   背位 from behind → 移除面部，Char UC 补 face, front view, eyes
+   pov → 移除自身不可见部位，Char UC 补 face, eyes, hair
+   防构图漂移：cowboy shot → Char UC 补 full body, wide shot；close-up → 补 full body, wide shot；low-angle → 补 high-angle
+4.【权重】数字 n::tag::：同人名 2::Name::；发色与核心着装 1.2::发色::；核心动作 1.2~1.4::动作::；次要 0.6::mountain::。括号等效 {{tag}}=1.1、[[tag]]=0.90。
+   负面强调：High 档正常用 negative 字段；若引擎走 Medium 档（无 UC 通道），改用负权重写进正面，如 -3::hat::。
+
+══ 模块四：分级与 JSON 契约 (Rating & Contract) ══
+1.【分级】Q1 有裸体？Q2 有性器官露出？Q3 有性行为？
+   Safe：Scene 标 SFW，UC 含 nude, completely nude；露点风险追加 nipples, pussy, penis, topless, bottomless。
+   R：Scene 标 SFW，UC 含 nipples, pussy, penis, genitals, uncensored, explicit, penetration。
+   X：Scene 标 NSFW，UC 含 censored, mosaic；全裸追加 clothes, dressed；半脱不排衣着词。
+2.【7 步推演】reason 极简记录：①画面主题 ②锚点继承 ③分级 ④空间分层 ⑤机位与高差 ⑥可见性清理 ⑦自检。
+3.【JSON 字段】shouldDraw: boolean / reason: string / segments[]: {label, anchor{text}, scene, negative, characters[]{name, base, outfit, action, center{x,y}, uc}}。
+
+══ 精简示例（格式模板，内容不照抄）══
+[示例1 · SFW 单人 POV]
+{"shouldDraw":true,"reason":"①递情书瞬间 ②L0复用 ③Safe ④双层无直接接触 ⑤主观POV cowboy shot, from above ⑥鞋脚下放UC ⑦自检","segments":[{"label":"细雨递信","anchor":{"text":"她小心翼翼递过那封信，微红着脸不敢抬头"},"scene":"Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, not daring to look up. Character occupying around 65% of the image height. Background: the school gate receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, front three-quarter view, 0.6::diffused light, blue-grey ambient light::, shade;","negative":"nude, completely nude, nipples, pussy, penis, topless, bottomless, boy, male, camera","characters":[{"name":"Mira (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::brown hair::, brown eyes, flat chest, blunt bangs, fair skin, black round-frame glasses","outfit":"blue serafuku, white sailor collar, blue neckerchief, blue knee-length pleated skirt, white knee socks, wet clothes","action":"standing, leaning forward, 1.3::left hand holding transparent umbrella over shoulder::, 1.4::right hand extended, holding a white envelope with a pink heart seal::, looking down, shy, full face blush, parted lips","center":{"x":0.5,"y":0.5},"uc":"feet, shoes, full body, large breasts, looking at viewer, wide shot"}]}]}
+
+[示例2 · NSFW 第三人称双人 · 首镜客观机位]
+{"shouldDraw":true,"reason":"①背入体位 ②L0复用 ③X级 ④三层 ⑤首镜取C上帝视角非侧面 ⑥可见性隔离 ⑦自检","segments":[{"label":"全景·背后","anchor":{"text":"他从身后搂住她的腰，把她压向床沿"},"scene":"Scene: NSFW, sex from behind, {1boy, 1girl}, couple. Foreground: the rumpled bedsheet edge, strongly out of focus. Middle ground: a boy kneeling behind a girl bent over the bed, both fully in frame, her hands gripping the sheet. Character occupying around 70% of the image height. Background: dim room, single warm lamp. Foreground sheet, Middle ground couple, Background room. bird's-eye view, full body, depth of field, rim light;","negative":"censored, mosaic, solo, solo focus, close-up, from_side","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"on all fours, arched back, 1.4::hips pushed back::, looking back, flushed sweaty face, mouth open","center":{"x":0.5,"y":0.55},"uc":"face hidden, front view, extra limbs"},{"name":"Partner (original)","base":"boy, japanese, short hair, 1.2::black hair::, dark eyes, toned, mature_male","outfit":"nude","action":"kneeling behind her, 1.4::both hands on her waist::, leaning forward","center":{"x":0.5,"y":0.33},"uc":"female body, extra limbs"}]}]}
+
+[示例3 · NSFW 局部特写 · 无面部]
+{"shouldDraw":true,"reason":"①结合部特写 ②L0复用 ③X级 ④三层 ⑤F类局部特写 ⑥面部整体下放UC ⑦自检","segments":[{"label":"结合部","anchor":{"text":"两人交合的地方泛着水光"},"scene":"Scene: NSFW, sex, {1boy, 1girl}, macro. Foreground: her trembling thigh and his hand gripping her hip, strongly out of focus. Middle ground: extreme close-up of the joined junction, wet glistening skin, sweat beads. Character occupying around 80% of the image height. Background: blurred bedsheet. Foreground thigh, Middle ground junction, Background sheet. pussy_focus, macro shot, shallow depth of field, warm low light;","negative":"censored, mosaic, face, head, full body, wide shot","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, adolescent, petite, 1.2::black hair::, small_breasts, fair skin","outfit":"nude","action":"lying on back, 1.3::legs spread, toes curled::","center":{"x":0.5,"y":0.6},"uc":"head, face, eyes, hair, full body"},{"name":"Partner (original)","base":"boy, mature_male, toned","outfit":"nude","action":"1.3::hand gripping her hip::","center":{"x":0.5,"y":0.35},"uc":"head, face, eyes, hair"}]}]}
+
+输出前自检：
+(1) 顶层第一个键是 shouldDraw，且是布尔值不是字符串；
+(2) 要出图时 segments 至少 1 个；
+(3) 机位统计：pov ≤40%、from_side ≤1 个、首镜不是 from_side；
+(4) 有第二人动作时至少一半分镜是双人同框。
+严格输出合法 JSON 对象！`;
+
     const SYSTEM_PROMPT_PRESETS = {
+        v41_local: { label: 'V41·本地精简版 (内置默认/四模块/体型三档/机位轮转)', prompt: V41_BUILTIN_SYSTEM_PROMPT },
         v40_worldbook_97_opt: { label: 'V40·文生图9.7全功能优化版 (默认推荐/四模块自洽架构/全场景覆盖)', prompt: V40_SPEC_97_OPTIMIZED_SYSTEM_PROMPT },
         v35_worldbook_97: { label: 'V35·文生图9.7完整详尽版 (.53实装版/绝杀肚脐机位/无接触留白)', prompt: V35_SPEC_97_SYSTEM_PROMPT },
         consistent: { label: 'V24·8.30全能规范版 (经典)', prompt: CONSISTENT_SYSTEM_PROMPT },
@@ -2260,7 +2408,7 @@ Zimage 擅长理解复杂的英文长句和语境。
         storyboarder: { label: 'V21·POV增强版 (历史)', prompt: STORYBOARDER_SYSTEM_PROMPT },
     };
 
-    const DEFAULT_SYSTEM_PROMPT_PRESET = 'v40_worldbook_97_opt';
+    const DEFAULT_SYSTEM_PROMPT_PRESET = 'v41_local';
     const DEFAULT_SYSTEM_PROMPT = SYSTEM_PROMPT_PRESETS[DEFAULT_SYSTEM_PROMPT_PRESET].prompt;
 
     function generateGeminiRandomEntropy() {
@@ -2992,11 +3140,12 @@ Zimage 擅长理解复杂的英文长句和语境。
         if (!store.characterProfiles || typeof store.characterProfiles !== 'object') store.characterProfiles = {};
         if (!store.systemPromptVersion || Number(store.systemPromptVersion) < DEFAULT_SYSTEM_PROMPT_VERSION) {
             // Auto-upgrade prompt to latest V40 full-featured optimized preset for users on legacy defaults or previous baseline
-            if (!store.systemPromptPreset || store.systemPromptPreset === 'consistent' || store.systemPromptPreset === 'v25_hybrid' || store.systemPromptPreset === 'v26_hybrid' || store.systemPromptPreset === 'v27_universal' || store.systemPromptPreset === 'v28_worldbook_91' || store.systemPromptPreset === 'v30_worldbook_93' || store.systemPromptPreset === 'v32_worldbook_97' || store.systemPromptPreset === 'v34_worldbook_97' || store.systemPromptPreset === 'v36_worldbook_97' || store.systemPromptPreset === 'v40_lean' || store.systemPromptPreset === 'v40_worldbook_97_opt') {
-                store.systemPrompt = V40_SPEC_97_OPTIMIZED_SYSTEM_PROMPT;
-                store.systemPromptPreset = 'v40_worldbook_97_opt';
-            } else if (store.systemPromptPreset === 'v35_worldbook_97') {
-                store.systemPrompt = V5_SPEC_97_SYSTEM_PROMPT;
+            // [本地内置] 旧档位 / 自定义 / 空值 一律收敛到内置 V41，避免残留的自定义文本覆盖内置预设
+            const SDT_LEGACY_PRESET_KEYS = ['consistent', 'v25_hybrid', 'v26_hybrid', 'v27_universal', 'v28_worldbook_91', 'v30_worldbook_93', 'v32_worldbook_97', 'v34_worldbook_97', 'v36_worldbook_97', 'v40_lean', 'v40_worldbook_97_opt', 'v35_worldbook_97', 'custom'];
+            if (!store.systemPromptPreset || SDT_LEGACY_PRESET_KEYS.includes(store.systemPromptPreset)) {
+                store.systemPromptPreset = 'v41_local';
+                store.systemPrompt = V41_BUILTIN_SYSTEM_PROMPT;
+                store.customSystemPrompt = '';
             }
             store.systemPromptVersion = DEFAULT_SYSTEM_PROMPT_VERSION;
         }
@@ -16689,11 +16838,12 @@ SCHEMA:
                     </div>
                     <div class="st-scene-trigger-modal-grid">
                         <label class="st-scene-trigger-field wide"><span>提示词预设档位</span><select id="rbq-sdt-system-preset">
+                            <option value="v41_local">${SYSTEM_PROMPT_PRESETS['v41_local']?.label || 'V41·本地精简版'}</option>
                             <option value="v40_worldbook_97_opt">${SYSTEM_PROMPT_PRESETS['v40_worldbook_97_opt']?.label || 'V40·文生图9.7全功能优化版'}</option>
                             <option value="v35_worldbook_97">${SYSTEM_PROMPT_PRESETS['v35_worldbook_97']?.label || 'V35·文生图9.7完整详尽版'}</option>
                             <option value="custom">⚙️ 自定义提示词 (Custom · 展开编辑框)</option>
                             <optgroup label="历史版本归档 (Legacy)">
-                                ${Object.entries(SYSTEM_PROMPT_PRESETS).filter(([key]) => key !== 'v40_worldbook_97_opt' && key !== 'v35_worldbook_97' && key !== 'custom').map(([key, item]) => `<option value="${key}">${item.label}</option>`).join('')}
+                                ${Object.entries(SYSTEM_PROMPT_PRESETS).filter(([key]) => key !== 'v41_local' && key !== 'v40_worldbook_97_opt' && key !== 'v35_worldbook_97' && key !== 'custom').map(([key, item]) => `<option value="${key}">${item.label}</option>`).join('')}
                             </optgroup>
                         </select></label>
                         <label id="rbq-sdt-system-prompt-field" class="st-scene-trigger-field wide" style="display:none;">
