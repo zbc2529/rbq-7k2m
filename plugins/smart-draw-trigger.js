@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.57';
+    const PLUGIN_VERSION = '6.5.58';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2982,6 +2982,11 @@ C18 高杠杆 mating_press,top-down_bottom-up
         thinkingBudget: 2048,
         cache: {},
         apiTemplates: [],
+
+        // 6.5.58 多渠道：channels 为空时由 sdtEnsureChannels 用上面的单渠道字段迁移出「默认渠道」
+        channels: [],
+        channelHealth: {},
+        channelCooldownMinutes: 10,
     };
 
     const pendingTimers = new Map();
@@ -3039,8 +3044,10 @@ C18 高杠杆 mating_press,top-down_bottom-up
         if (store.provider === 'custom') {
             return !!String(store.customUrl || '').trim();
         }
-        const url = normalizeBaseUrl(store.openaiBaseUrl);
-        const model = (store.openaiModelCustom || '').trim() || store.openaiModel;
+        // 6.5.58 多渠道：任一条启用的渠道可用即视为已配置（单渠道时等价于原来的判断）
+        const primary = sdtPrimaryChannelTarget(store);
+        const url = normalizeBaseUrl(primary && primary.baseUrl);
+        const model = String((primary && primary.model) || '').trim();
         return !!(url && model);
     }
 
@@ -3187,6 +3194,809 @@ C18 高杠杆 mating_press,top-down_bottom-up
         }, 300);
     }
 
+    /* ═══════════════ 6.5.58 多渠道路由：channels / channelHealth / 故障转移 / 自检 ═══════════════ */
+    // 1) store.channels 是渠道数组，store.channelHealth 按渠道 id 记录健康度（失败次数 / 冷却 / 延迟 / 工具支持）。
+    // 2) 老存档没有 channels 时，自动用 openaiBaseUrl / openaiApiKey / openaiModel 生成「默认渠道」，
+    //    单渠道请求行为与 6.5.57 完全一致（同一个 URL、同一个 Bearer、同一个模型）。
+    // 3) 所有 chat/completions 调用点统一经 resolveChannelChain(store) 取值；失败按链切换，
+    //    连续失败 2 次的渠道冷却 10 分钟，冷却期跳过，全部冷却时强试最早到期的一条。
+    const SDT_CHANNEL_COOLDOWN_MS = 10 * 60 * 1000;
+    const SDT_CHANNEL_FAIL_THRESHOLD = 2;
+    const SDT_CHANNEL_PROBE_MAX_TOKENS = 512;
+    const SDT_CHANNEL_PROBE_TIMEOUT_MS = 45000;
+    const SDT_CHANNEL_TOOL_NAME = 'generate_draw_spec';
+    const SDT_CHANNEL_DEFAULT_ID = 'default';
+    const SDT_CHANNEL_TOOL_PROBE = {
+        type: 'function',
+        function: {
+            name: SDT_CHANNEL_TOOL_NAME,
+            description: '生成一张图的绘画规格（连通性自检用，参数随意填即可）。',
+            parameters: {
+                type: 'object',
+                properties: {
+                    tags: { type: 'string', description: '英文逗号分隔的绘画标签' },
+                    background: { type: 'string', description: '背景描述' },
+                },
+                required: ['tags'],
+            },
+        },
+    };
+
+    // 日志/toast 里的密钥一律脱敏：只显示前 6 后 4，短密钥只留前 2
+    function sdtMaskSecret(secret) {
+        const text = String(secret || '');
+        if (!text) return '';
+        if (text.length <= 10) return text.slice(0, 2) + '••••';
+        return text.slice(0, 6) + '••••' + text.slice(-4);
+    }
+
+    function sdtNewChannelId() {
+        return 'ch' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function sdtEmptyChannelHealth() {
+        return { failCount: 0, lastOkAt: 0, lastFailAt: 0, cooldownUntil: 0, latencyMs: 0, lastError: '', toolSupport: 'unknown' };
+    }
+
+    function sdtGetCooldownMs(store) {
+        const minutes = Number(store && store.channelCooldownMinutes);
+        if (Number.isFinite(minutes) && minutes > 0) return minutes * 60 * 1000;
+        return SDT_CHANNEL_COOLDOWN_MS;
+    }
+
+    function sdtNormalizeChannel(raw, index) {
+        const src = (raw && typeof raw === 'object') ? raw : {};
+        const id = String(src.id || '').trim() || sdtNewChannelId();
+        const priority = Number(src.priority);
+        return {
+            id: id,
+            name: String(src.name || '').trim() || ('渠道 ' + (index + 1)),
+            baseUrl: String(src.baseUrl || '').trim(),
+            apiKey: String(src.apiKey || '').trim(),
+            model: String(src.model || '').trim(),
+            enabled: src.enabled !== false,
+            priority: Number.isFinite(priority) ? priority : index,
+        };
+    }
+
+    // 渠道落位：老存档（无 channels）自动迁移出一条「默认渠道」；channelHealth 逐条补齐（含 toolSupport='unknown'）
+    function sdtEnsureChannels(store) {
+        if (!store || typeof store !== 'object') return [];
+        try {
+            if (!store.channelHealth || typeof store.channelHealth !== 'object' || Array.isArray(store.channelHealth)) {
+                store.channelHealth = {};
+            }
+            let rawList = Array.isArray(store.channels) ? store.channels : [];
+            if (!rawList.length) {
+                const legacyModel = String(store.openaiModelCustom || '').trim() || String(store.openaiModel || '').trim();
+                rawList = [{
+                    id: SDT_CHANNEL_DEFAULT_ID,
+                    name: '默认渠道',
+                    baseUrl: String(store.openaiBaseUrl || '').trim(),
+                    apiKey: String(store.openaiApiKey || '').trim(),
+                    model: legacyModel,
+                    enabled: true,
+                    priority: 0,
+                }];
+            }
+            const normalized = [];
+            const seen = new Set();
+            rawList.forEach(function (raw, index) {
+                const channel = sdtNormalizeChannel(raw, index);
+                if (seen.has(channel.id)) channel.id = sdtNewChannelId();
+                seen.add(channel.id);
+                if (!store.channelHealth[channel.id] || typeof store.channelHealth[channel.id] !== 'object') {
+                    store.channelHealth[channel.id] = sdtEmptyChannelHealth();
+                }
+                normalized.push(channel);
+            });
+            store.channels = normalized;
+            return normalized;
+        } catch (e) {
+            return Array.isArray(store.channels) ? store.channels : [];
+        }
+    }
+
+    // 主渠道（面板回填 / 诊断 / 未显式指定渠道时的兜底）
+    function sdtPrimaryChannelTarget(store) {
+        try {
+            const list = sdtEnsureChannels(store);
+            const enabled = list.filter(function (channel) { return channel.enabled !== false; });
+            const pool = enabled.length ? enabled : list;
+            const sorted = pool.slice().sort(function (a, b) { return (Number(a.priority) || 0) - (Number(b.priority) || 0); });
+            return sorted[0] || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // 渠道链：按优先级排序，跳过冷却中的渠道；toolCallMode=true 时「不支持工具调用」的渠道排到链尾
+    function resolveChannelChain(store) {
+        const safeStore = (store && typeof store === 'object') ? store : {};
+        const list = sdtEnsureChannels(safeStore);
+        const health = safeStore.channelHealth || {};
+        const now = Date.now();
+        const useTool = !!safeStore.toolCallMode;
+        const items = [];
+        list.forEach(function (channel, index) {
+            const record = health[channel.id] || (health[channel.id] = sdtEmptyChannelHealth());
+            const cooldownUntil = Number(record.cooldownUntil) || 0;
+            const support = (record.toolSupport === 'yes' || record.toolSupport === 'no') ? record.toolSupport : 'unknown';
+            items.push({
+                id: channel.id,
+                name: channel.name,
+                baseUrl: channel.baseUrl,
+                apiKey: channel.apiKey,
+                model: channel.model,
+                enabled: channel.enabled !== false,
+                priority: Number.isFinite(Number(channel.priority)) ? Number(channel.priority) : index,
+                index: index,
+                toolSupport: support,
+                cooling: cooldownUntil > now,
+                cooldownUntil: cooldownUntil,
+                health: record,
+            });
+        });
+        const enabled = items.filter(function (item) { return item.enabled; });
+        if (!enabled.length) return [];
+        const byPriority = function (a, b) { return (a.priority - b.priority) || (a.index - b.index); };
+        const ready = [];
+        const toolNo = [];
+        const cooling = [];
+        enabled.forEach(function (item) {
+            if (item.cooling) { cooling.push(item); return; }
+            if (useTool && item.toolSupport === 'no') { toolNo.push(item); return; }
+            ready.push(item);
+        });
+        ready.sort(byPriority);
+        toolNo.sort(byPriority);
+        cooling.sort(function (a, b) { return (a.cooldownUntil - b.cooldownUntil) || byPriority(a, b); });
+        // 冷却中的渠道排到最后：优先走其它渠道，只有前面全失败才回落到它们，避免彻底没有可用渠道
+        const chain = ready.concat(toolNo, cooling);
+        if (chain.length) {
+            if (!ready.length && !toolNo.length) chain[0].forced = true;
+            return chain;
+        }
+        return [];
+    }
+
+    // 健康上报：成功清零失败计数并写延迟；连续失败达到阈值进冷却；toolSupport 只在明确判定时改写
+    function reportChannelResult(store, id, ok, info) {
+        try {
+            const live = (store && typeof store === 'object') ? store : getStore();
+            const key = String(id || '');
+            if (!key) return null;
+            if (!live.channelHealth || typeof live.channelHealth !== 'object') live.channelHealth = {};
+            const record = (live.channelHealth[key] && typeof live.channelHealth[key] === 'object')
+                ? live.channelHealth[key]
+                : (live.channelHealth[key] = sdtEmptyChannelHealth());
+            const detail = info || {};
+            const now = Date.now();
+            const latency = Math.max(0, Math.round(Number(detail.latencyMs) || 0));
+            let changed = false;
+            if (ok) {
+                changed = (Number(record.failCount) || 0) > 0 || (Number(record.cooldownUntil) || 0) > 0 || !Number(record.lastOkAt);
+                record.failCount = 0;
+                record.cooldownUntil = 0;
+                record.lastOkAt = now;
+                record.lastError = '';
+                if (latency) record.latencyMs = latency;
+            } else {
+                const fails = (Number(record.failCount) || 0) + 1;
+                record.failCount = fails;
+                record.lastFailAt = now;
+                record.lastError = String(detail.error || detail.message || '').slice(0, 300);
+                if (latency) record.latencyMs = latency;
+                if (fails >= SDT_CHANNEL_FAIL_THRESHOLD) record.cooldownUntil = now + sdtGetCooldownMs(live);
+                changed = true;
+            }
+            const support = String(detail.toolSupport || '');
+            if (support === 'yes' || support === 'no') {
+                if (record.toolSupport !== support) changed = true;
+                record.toolSupport = support;
+            }
+            if (!record.toolSupport) record.toolSupport = 'unknown';
+            if (changed) {
+                try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+            }
+            return record;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function sdtChannelConfigError(kind, messages) {
+        const tips = messages || {};
+        const isModel = kind === 'model';
+        const err = new Error(isModel
+            ? (tips.model || '请先填写模型名称')
+            : (tips.url || '请先填写 OpenAI 兼容接口 Base URL'));
+        err.code = 'SDT_CONFIG';
+        return err;
+    }
+
+    function sdtChannelChainEmptyError(store) {
+        const list = sdtEnsureChannels(store);
+        const enabled = list.filter(function (channel) { return channel.enabled !== false; });
+        if (enabled.length) return sdtChannelConfigError('url');
+        const err = new Error('所有渠道均已停用：请在设置「渠道」里启用至少一条，或填写 OpenAI 兼容接口 Base URL');
+        err.code = 'SDT_NO_CHANNEL';
+        return err;
+    }
+
+    function sdtChannelNoToolError(chain) {
+        const names = (chain || []).map(function (item) { return item && item.name; }).filter(Boolean).join('、');
+        const err = new Error('所有渠道均不支持工具调用：请关闭「结构化工具调用 (Tool Call)」开关，或换支持 function calling 的渠道');
+        err.code = 'SDT_NO_TOOL_CHANNEL';
+        err.channels = names;
+        return err;
+    }
+
+    function sdtAllChannelsFailedError(label, chain, report, lastErr) {
+        const names = (chain || []).map(function (item) { return item && item.name; }).filter(Boolean).join(' → ');
+        const lines = (report || []).map(function (item, index) { return '  ' + (index + 1) + '. ' + item; }).join('\n');
+        const err = new Error((label || 'tagger API') + ' 全部渠道失败（' + (chain ? chain.length : 0) + ' 条渠道：' + names + '）\n' + lines);
+        err.code = 'SDT_ALL_CHANNELS_FAILED';
+        err.retryError = lastErr;
+        err.rawOutput = lines;
+        return err;
+    }
+
+    function sdtBriefError(err) {
+        const text = String((err && err.message) || err || '未知错误');
+        return text.replace(/\s+/g, ' ').slice(0, 220);
+    }
+
+    // 失败分类：只有渠道自身的问题才触发切换；配置缺失 / 内容审核 / 漫画协议错误原样抛出
+    function sdtClassifyChannelFailure(err, signal) {
+        try {
+            if (signal && signal.aborted) return 'abort';
+            if (!err) return '';
+            if (err.name === 'AbortError') return 'abort';
+            const code = String(err.code || '');
+            const message = String(err.message || err);
+            if (/^MANGA_/.test(code)) return '';
+            if (code === 'SDT_CONFIG' || code === 'SDT_NO_CHANNEL') return 'config';
+            if (code === 'SDT_TOOLS_UNSUPPORTED') return 'tool';
+            if (code === 'SDT_CHANNEL_EMPTY' || code === 'SDT_TOOL_RESPONSE_TRUNCATED') return 'empty';
+            if (/请先(填写|在设置中填写|配置)/.test(message)) return 'config';
+            const httpMatch = message.match(/HTTP\s*(\d{3})/);
+            if (httpMatch) {
+                const status = Number(httpMatch[1]);
+                if (status === 401 || status === 403) return 'auth';
+                if (status === 402) return 'quota';
+                if (status === 404) return 'notfound';
+                if (status === 408) return 'timeout';
+                if (status === 429) return 'rate';
+                if (status >= 500) return 'server';
+            }
+            if (err.name === 'TimeoutError' || /timeout|timed out|超时|ETIMEDOUT/i.test(message)) return 'timeout';
+            if (/Failed to fetch|NetworkError|Load failed|network error|ECONN|ENOTFOUND|EAI_AGAIN/i.test(message)) return 'network';
+            if (/返回体为空|没有返回任何内容|空返回/i.test(message)) return 'empty';
+            return '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    // 响应用性判定：content 与 tool_calls 皆空即「空返回」（finish_reason=length 时必判空）
+    function sdtCompletionShape(json) {
+        try {
+            if (!json || typeof json !== 'object') return { empty: true, finishReason: '', hasContent: false, hasToolCalls: false };
+            if (json.error) return { empty: false, finishReason: 'error', hasContent: false, hasToolCalls: false };
+            const choice = Array.isArray(json.choices) ? json.choices[0] : null;
+            const message = (choice && (choice.message || choice.delta)) || {};
+            const candidate = Array.isArray(json.candidates) ? json.candidates[0] : null;
+            const parts = (candidate && candidate.content && Array.isArray(candidate.content.parts)) ? candidate.content.parts : [];
+            const finishReason = String((choice && choice.finish_reason) || (candidate && candidate.finishReason) || '');
+            const hasToolCalls = (Array.isArray(message.tool_calls) && message.tool_calls.length > 0)
+                || parts.some(function (part) { return !!(part && part.functionCall); });
+            const content = typeof message.content === 'string' ? message.content.trim()
+                : (choice && typeof choice.text === 'string' ? choice.text.trim() : '');
+            const nativeText = parts.some(function (part) { return !!(part && typeof part.text === 'string' && part.text.trim() && !part.thought); });
+            const hasContent = !!content || nativeText;
+            return { empty: !hasToolCalls && !hasContent, finishReason: finishReason, hasContent: hasContent, hasToolCalls: hasToolCalls };
+        } catch (e) {
+            return { empty: false, finishReason: '', hasContent: false, hasToolCalls: false };
+        }
+    }
+
+    function sdtLogChannelTrace(label, target, report, elapsedMs) {
+        try {
+            const hops = (report && report.length) ? ('切换链 ' + report.length + ' 跳；') : '';
+            console.info('[' + PLUGIN_NAME + '] ' + label + ' 命中渠道「' + (target && target.name) + '」'
+                + (target && target.model ? '（' + target.model + '）' : '') + '，' + hops + '耗时 ' + elapsedMs + 'ms'
+                + (target && target.apiKey ? '，密钥 ' + sdtMaskSecret(target.apiKey) : ''));
+        } catch (e) { /* ignore */ }
+    }
+
+    // 渠道链执行器：runner(target) 只发一次请求，失败按分类切换下一条；链上全失败才抛错
+    async function sdtWithChannelChain(storeLike, label, runner, options) {
+        const opts = options || {};
+        const store = storeLike || getStore();
+        const chain = resolveChannelChain(store);
+        if (!chain.length) throw sdtChannelChainEmptyError(store);
+        const useTool = !!store.toolCallMode && opts.toolCall !== false;
+        if (useTool && chain.every(function (item) { return item.toolSupport === 'no'; })) throw sdtChannelNoToolError(chain);
+        const report = [];
+        let lastErr = null;
+        for (let index = 0; index < chain.length; index++) {
+            const target = chain[index];
+            const hopStart = Date.now();
+            if (index > 0) {
+                const previous = chain[index - 1];
+                console.warn('[' + PLUGIN_NAME + '] ' + label + '：渠道「' + (previous && previous.name) + '」失败，切换到「' + target.name + '」');
+                if (typeof toastr !== 'undefined' && typeof toastr.warning === 'function') {
+                    toastr.warning('渠道「' + (previous && previous.name) + '」失败，切换到「' + target.name + '」', PLUGIN_NAME);
+                }
+            }
+            try {
+                const result = await runner(target, { index: index, chain: chain, report: report, isLast: index === chain.length - 1 });
+                const toolVerdict = (useTool && result && result.isToolCall === true) ? 'yes' : '';
+                reportChannelResult(store, target.id, true, { latencyMs: Date.now() - hopStart, toolSupport: toolVerdict });
+                sdtLogChannelTrace(label, target, report, Date.now() - hopStart);
+                return result;
+            } catch (err) {
+                if (err && err.name === 'AbortError') throw err;
+                const kind = sdtClassifyChannelFailure(err, opts.signal);
+                if (!kind || kind === 'abort' || kind === 'config') throw err;
+                lastErr = err;
+                const brief = sdtBriefError(err);
+                report.push('渠道「' + target.name + '」' + (target.model ? '（' + target.model + '）' : '') + '：' + brief);
+                reportChannelResult(store, target.id, false, {
+                    error: brief,
+                    latencyMs: Date.now() - hopStart,
+                    toolSupport: kind === 'tool' ? 'no' : '',
+                });
+            }
+        }
+        // 单渠道时保持 6.5.57 的原始报错（不套聚合壳），多渠道才给「每跳渠道名 + 原因」
+        if (chain.length === 1 && lastErr) throw lastErr;
+        throw sdtAllChannelsFailedError(label, chain, report, lastErr);
+    }
+
+    // 非工具模式的 tagger JSON 请求：统一走渠道链（角色外貌提取 / 手工生图 / 生图测试共用）
+    async function sdtRequestTaggerJson(storeLike, messages, options) {
+        const opts = options || {};
+        const store = storeLike || getStore();
+        const label = opts.label || 'tagger API';
+        const tips = { url: opts.missingUrlMessage || '请先填写 OpenAI 兼容接口 Base URL', model: opts.missingModelMessage || '请先填写模型名称' };
+        return await sdtWithChannelChain(store, label, async function (target) {
+            const url = normalizeBaseUrl(target.baseUrl);
+            if (!url) throw sdtChannelConfigError('url', tips);
+            const modelName = String(target.model || '').trim();
+            if (!modelName) throw sdtChannelConfigError('model', tips);
+            checkUrlSafety(url);
+            const body = Object.assign({
+                model: modelName,
+                temperature: opts.temperature !== undefined ? opts.temperature : 0.2,
+                stream: false,
+                messages: messages,
+            }, buildThinkingParams(store), opts.body || {});
+            const response = await callApiWithJsonFallback(url, {
+                method: 'POST',
+                signal: opts.signal,
+                headers: Object.assign({ 'Content-Type': 'application/json' }, target.apiKey ? { Authorization: 'Bearer ' + target.apiKey } : {}),
+            }, body, opts.fetchFn || smartFetch);
+            if (!response.ok) {
+                const err = new Error(label + ' 请求失败: HTTP ' + response.status);
+                err.status = response.status;
+                throw err;
+            }
+            const json = await safeReadJsonResponse(response);
+            const shape = sdtCompletionShape(json);
+            if (shape.empty) {
+                const err = new Error(label + ' 返回体为空（finish_reason: ' + (shape.finishReason || '未知') + '，content 与 tool_calls 皆为空）');
+                err.code = 'SDT_CHANNEL_EMPTY';
+                try { err.rawOutput = JSON.stringify(json, null, 2).slice(0, 4000); } catch (_e) { err.rawOutput = ''; }
+                throw err;
+            }
+            return json;
+        }, { toolCall: false, signal: opts.signal });
+    }
+
+    /* ── 渠道自检：① /models 存活 + 模型数 ② 最小 tool-call 探针（max_tokens 给足，防思维链吃空） ── */
+    async function sdtProbeChannelToolCall(url, target, body, modelName, signal) {
+        const out = { http: 0, toolSupport: 'unknown', error: '' };
+        const post = async function (payload) {
+            return await smartFetch(url, {
+                method: 'POST',
+                signal: signal,
+                headers: Object.assign({ 'Content-Type': 'application/json' }, target.apiKey ? { Authorization: 'Bearer ' + target.apiKey } : {}),
+                body: JSON.stringify(payload),
+            });
+        };
+        let response;
+        try {
+            response = await post(body);
+        } catch (err) {
+            out.error = '工具探针请求失败: ' + sdtBriefError(err);
+            return out;
+        }
+        out.http = response.status;
+        if (!response.ok) {
+            let text = '';
+            try { text = await response.text(); } catch (_e) { text = ''; }
+            const brief = 'HTTP ' + response.status + (text ? ' · ' + String(text).replace(/\s+/g, ' ').slice(0, 140) : '');
+            const looksToolUnsupported = /tool|function|tool_choice|不支持|unsupported/i.test(text);
+            if (looksToolUnsupported) {
+                out.toolSupport = 'no';
+                out.error = '接口拒绝工具调用: ' + brief;
+            } else {
+                out.error = brief;
+            }
+            return out;
+        }
+        let json = null;
+        try { json = await safeReadJsonResponse(response); } catch (_e) { json = null; }
+        const shape = sdtCompletionShape(json);
+        const choice = json && Array.isArray(json.choices) ? json.choices[0] : null;
+        const message = (choice && (choice.message || choice.delta)) || {};
+        const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+        const nameMatched = calls.some(function (call) { return !!(call && call.function && call.function.name === SDT_CHANNEL_TOOL_NAME); });
+        if (nameMatched) {
+            out.toolSupport = 'yes';
+            return out;
+        }
+        // HTTP 200 但没拿到工具调用：换「普通 JSON、不带 tools」再打一次，区分「渠道临时故障」与「模型不支持工具调用」
+        const plainBody = {
+            model: modelName,
+            temperature: 0,
+            max_tokens: SDT_CHANNEL_PROBE_MAX_TOKENS,
+            stream: false,
+            messages: body.messages.concat([{ role: 'user', content: '不要调用任何工具，直接只输出一个 JSON 对象：{"tags":"1girl, solo"}' }]),
+            response_format: { type: 'json_object' },
+        };
+        let plainText = '';
+        try {
+            const plainResponse = await post(plainBody);
+            if (plainResponse.ok) {
+                const plainJson = await safeReadJsonResponse(plainResponse);
+                const plainMessage = (plainJson && Array.isArray(plainJson.choices) && plainJson.choices[0] && plainJson.choices[0].message) || {};
+                plainText = typeof plainMessage.content === 'string' ? plainMessage.content.trim() : '';
+            }
+        } catch (_e) { plainText = ''; }
+        if (plainText) {
+            out.toolSupport = 'no';
+            out.error = calls.length ? '返回了工具调用但函数名不匹配' : '工具模式没有 tool_calls，普通模式有内容';
+        } else if (calls.length) {
+            out.error = '返回了工具调用但函数名不匹配';
+        } else if (!shape.empty) {
+            out.error = '只回了正文，没有 tool_calls，普通模式也没内容';
+        } else {
+            out.error = '响应为空（finish_reason: ' + (shape.finishReason || '未知') + '）';
+        }
+        return out;
+    }
+
+    async function sdtProbeChannel(channel, storeLike, options) {
+        const opts = options || {};
+        const store = storeLike || getStore();
+        const target = sdtNormalizeChannel(channel, 0);
+        const result = {
+            id: target.id, name: target.name, alive: false, http: 0, models: [], modelCount: 0,
+            latencyMs: 0, toolSupport: 'unknown', error: '', modelsError: '', toolError: '',
+        };
+        const startedAt = Date.now();
+        let timer = null;
+        let controller = null;
+        let signal = opts.signal || null;
+        if (!signal && typeof AbortController !== 'undefined') {
+            controller = new AbortController();
+            signal = controller.signal;
+            timer = setTimeout(function () { try { controller.abort(); } catch (_e) { /* ignore */ } }, SDT_CHANNEL_PROBE_TIMEOUT_MS);
+        }
+        try {
+            const modelsUrl = normalizeModelsUrl(target.baseUrl);
+            if (!modelsUrl) {
+                result.error = '未填写 Base URL';
+                return result;
+            }
+            // ① /models：只判存活与模型数
+            try {
+                const response = await smartFetch(modelsUrl, {
+                    method: 'GET',
+                    signal: signal,
+                    headers: target.apiKey ? { Authorization: 'Bearer ' + target.apiKey } : {},
+                });
+                result.http = response.status;
+                if (response.ok) {
+                    const data = await response.json();
+                    const models = Array.isArray(data && data.data) ? data.data.map(function (item) { return item && item.id; }).filter(Boolean)
+                        : (Array.isArray(data && data.models) ? data.models.map(function (item) { return typeof item === 'string' ? item : (item && item.id); }).filter(Boolean) : []);
+                    result.models = models;
+                    result.modelCount = models.length;
+                    result.alive = true;
+                } else {
+                    let text = '';
+                    try { text = await response.text(); } catch (_e) { text = ''; }
+                    result.modelsError = '模型列表 HTTP ' + response.status + (text ? ' · ' + String(text).replace(/\s+/g, ' ').slice(0, 120) : '');
+                }
+            } catch (err) {
+                result.modelsError = '模型列表请求失败: ' + sdtBriefError(err);
+            }
+            // ② 最小 tool-call 探针
+            const modelName = String(target.model || (result.models[0] || '')).trim();
+            if (!modelName) {
+                result.toolError = '未填写模型名称';
+            } else {
+                const chatUrl = normalizeBaseUrl(target.baseUrl);
+                const toolBody = {
+                    model: modelName,
+                    temperature: 0,
+                    max_tokens: SDT_CHANNEL_PROBE_MAX_TOKENS,
+                    stream: false,
+                    messages: [
+                        { role: 'system', content: '你是连通性检测器。必须通过 generate_draw_spec 工具回答，不要输出自然语言。' },
+                        { role: 'user', content: '请调用 generate_draw_spec 工具，tags 填 "1girl, solo"，background 填 "white"。' },
+                    ],
+                    tools: [SDT_CHANNEL_TOOL_PROBE],
+                    tool_choice: { type: 'function', function: { name: SDT_CHANNEL_TOOL_NAME } },
+                };
+                const verdict = await sdtProbeChannelToolCall(chatUrl, target, toolBody, modelName, signal);
+                result.toolSupport = verdict.toolSupport;
+                result.toolError = verdict.error || '';
+                if (!result.http && verdict.http) result.http = verdict.http;
+                if (verdict.http === 200) result.alive = true;
+            }
+            result.latencyMs = Date.now() - startedAt;
+            if (!result.alive && !result.error) result.error = result.modelsError || result.toolError || '自检未通过';
+            return result;
+        } catch (err) {
+            result.latencyMs = Date.now() - startedAt;
+            if (!result.error) result.error = sdtBriefError(err);
+            return result;
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
+    function sdtChannelProbeText(result) {
+        if (!result) return '';
+        const parts = [];
+        parts.push('渠道「' + result.name + '」');
+        parts.push(result.alive ? '存活 ✅' : '不可用 ❌');
+        if (result.modelCount) parts.push('模型 ' + result.modelCount + ' 个');
+        parts.push(result.toolSupport === 'yes' ? '工具 ✅' : (result.toolSupport === 'no' ? '工具 ❌' : '工具 ❓'));
+        parts.push('延迟 ' + (result.latencyMs || 0) + 'ms');
+        if (result.http) parts.push('HTTP ' + result.http);
+        if (result.modelsError) parts.push(result.modelsError);
+        if (result.toolError) parts.push(result.toolError);
+        if (result.error) parts.push('错误: ' + result.error);
+        return parts.join(' · ');
+    }
+
+    /* ── 面板「渠道」区的读写与自检动作 ── */
+    function sdtChannelSupportBadge(support) {
+        if (support === 'yes') return '<span style="font-size:12px;color:#4ade80;border:1px solid currentColor;border-radius:6px;padding:0 6px;" title="实测支持 function calling">工具 ✅</span>';
+        if (support === 'no') return '<span style="font-size:12px;color:#f87171;border:1px solid currentColor;border-radius:6px;padding:0 6px;" title="实测不支持工具调用，工具模式下会排到链尾">工具 ❌</span>';
+        return '<span style="font-size:12px;opacity:0.75;border:1px solid currentColor;border-radius:6px;padding:0 6px;" title="还没测过工具调用能力">工具 ❓</span>';
+    }
+
+    function sdtChannelHealthBadge(record) {
+        const health = record || {};
+        const cooldownUntil = Number(health.cooldownUntil) || 0;
+        if (cooldownUntil > Date.now()) {
+            const left = Math.max(1, Math.round((cooldownUntil - Date.now()) / 60000));
+            return '<span style="font-size:12px;color:#fbbf24;border:1px solid currentColor;border-radius:6px;padding:0 6px;">冷却中 · 剩 ' + left + ' 分钟</span>';
+        }
+        if (!Number(health.lastOkAt)) return '<span style="font-size:12px;opacity:0.75;border:1px solid currentColor;border-radius:6px;padding:0 6px;">未测</span>';
+        const latency = Number(health.latencyMs) || 0;
+        const fails = Number(health.failCount) || 0;
+        return '<span style="font-size:12px;color:#4ade80;border:1px solid currentColor;border-radius:6px;padding:0 6px;">存活 · ' + latency + 'ms'
+            + (fails ? ' · 失败 ' + fails + ' 次' : '') + '</span>';
+    }
+
+    function renderChannelList() {
+        const listEl = document.getElementById('rbq-sdt-channel-list');
+        if (!listEl) return;
+        const store = getStore();
+        const channels = sdtEnsureChannels(store);
+        const health = store.channelHealth || {};
+        const rows = channels.map(function (channel) {
+            const record = health[channel.id] || {};
+            const isDefault = channel.id === SDT_CHANNEL_DEFAULT_ID;
+            const readonly = isDefault ? ' readonly title="这条渠道跟随上方「大模型 API 接口配置」的 Base URL / Key / 模型"' : '';
+            const masked = sdtMaskSecret(channel.apiKey);
+            return ''
+                + '<div data-ch-id="' + escapeHtml(channel.id) + '" style="border:1px solid var(--SmartThemeBorderColor,#3a3a3a);border-radius:8px;padding:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px;' + (channel.enabled === false ? 'opacity:0.55;' : '') + '">'
+                + '  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+                + '    <input data-ch-field="name" type="text" value="' + escapeHtml(channel.name) + '" placeholder="渠道名称" style="flex:0 0 140px;">'
+                + '    <input data-ch-field="baseUrl" type="text" value="' + escapeHtml(channel.baseUrl) + '" placeholder="https://api.example.com/v1"' + readonly + ' style="flex:1 1 240px;">'
+                + '    <input data-ch-field="model" type="text" value="' + escapeHtml(channel.model) + '" placeholder="模型名"' + readonly + ' style="flex:0 0 180px;">'
+                + '    <input data-ch-field="apiKey" type="password" value="" autocomplete="new-password" placeholder="' + escapeHtml(masked || 'API Key（留空沿用）') + '"' + readonly + ' style="flex:0 0 190px;">'
+                + '  </div>'
+                + '  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+                + '    <label style="display:flex;gap:4px;align-items:center;font-size:13px;"><input data-ch-field="enabled" type="checkbox"' + (channel.enabled !== false ? ' checked' : '') + '> 启用</label>'
+                + '    <span style="font-size:12px;opacity:0.75;">优先级 ' + escapeHtml(String(Number(channel.priority) || 0)) + '</span>'
+                + sdtChannelSupportBadge(record.toolSupport || 'unknown')
+                + sdtChannelHealthBadge(record)
+                + '    <span style="margin-left:auto;display:flex;gap:6px;">'
+                + '      <button type="button" class="menu_button" data-ch-act="up" title="上移（优先级更高）" style="width:auto;">↑</button>'
+                + '      <button type="button" class="menu_button" data-ch-act="down" title="下移" style="width:auto;">↓</button>'
+                + '      <button type="button" class="menu_button" data-ch-act="test" title="测活 + 工具调用检测" style="width:auto;">🩺 测试</button>'
+                + (isDefault ? '' : '      <button type="button" class="menu_button" data-ch-act="del" title="删除该渠道" style="width:auto;">✕</button>')
+                + '    </span>'
+                + '  </div>'
+                + (record.lastError ? '  <div style="font-size:12px;color:#f87171;word-break:break-all;">最近错误: ' + escapeHtml(String(record.lastError).slice(0, 200)) + '</div>' : '')
+                + '</div>';
+        }).join('');
+        listEl.innerHTML = rows || '<div style="opacity:0.75;font-size:13px;">还没有渠道。</div>';
+    }
+
+    function sdtReadChannelRows() {
+        const listEl = document.getElementById('rbq-sdt-channel-list');
+        if (!listEl) return null;
+        const rows = Array.prototype.slice.call(listEl.querySelectorAll('[data-ch-id]'));
+        if (!rows.length) return null;
+        const previous = sdtEnsureChannels(getStore());
+        const byId = new Map(previous.map(function (channel) { return [channel.id, channel]; }));
+        return rows.map(function (row, index) {
+            const id = String(row.getAttribute('data-ch-id') || '');
+            const old = byId.get(id) || {};
+            const pick = function (field) { return row.querySelector('[data-ch-field="' + field + '"]'); };
+            const keyEl = pick('apiKey');
+            const keyInput = keyEl ? String(keyEl.value || '').trim() : '';
+            const nameEl = pick('name');
+            const baseEl = pick('baseUrl');
+            const modelEl = pick('model');
+            const enabledEl = pick('enabled');
+            return {
+                id: id || sdtNewChannelId(),
+                name: nameEl ? String(nameEl.value || '').trim() : (old.name || ('渠道 ' + (index + 1))),
+                baseUrl: baseEl ? String(baseEl.value || '').trim() : String(old.baseUrl || ''),
+                model: modelEl ? String(modelEl.value || '').trim() : String(old.model || ''),
+                // 密钥框留空 = 沿用原值；只有真输了新值才覆盖（面板只显示脱敏后的前 6 后 4）
+                apiKey: keyInput || String(old.apiKey || ''),
+                enabled: enabledEl ? !!enabledEl.checked : (old.enabled !== false),
+                priority: index,
+            };
+        });
+    }
+
+    function sdtApplyChannelRows(persist) {
+        const rows = sdtReadChannelRows();
+        if (!rows) return false;
+        const store = getStore();
+        // 「默认渠道」跟随上方老字段（Base URL / Key / 模型），避免同一份配置在两处各说各话
+        const legacyBase = val('rbq-sdt-openai-base').trim();
+        const legacyKey = val('rbq-sdt-openai-key').trim();
+        const legacyModel = val('rbq-sdt-openai-model-custom').trim() || val('rbq-sdt-openai-model').trim();
+        const merged = rows.map(function (channel) {
+            if (channel.id !== SDT_CHANNEL_DEFAULT_ID) return channel;
+            return Object.assign({}, channel, { baseUrl: legacyBase, apiKey: legacyKey, model: legacyModel });
+        });
+        store.channels = merged;
+        sdtEnsureChannels(store);
+        if (persist) { try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ } }
+        return true;
+    }
+
+    function sdtMirrorPrimaryChannel(store) {
+        try {
+            const list = sdtEnsureChannels(store);
+            const first = list.filter(function (channel) { return channel.id === SDT_CHANNEL_DEFAULT_ID; })[0];
+            if (!first) return;
+            store.openaiBaseUrl = String(first.baseUrl || '').trim();
+            store.openaiApiKey = String(first.apiKey || '').trim();
+            const model = String(first.model || '').trim();
+            if (model) store.openaiModelCustom = model;
+        } catch (e) { /* ignore */ }
+    }
+
+    function sdtAddChannel() {
+        const store = getStore();
+        const list = sdtEnsureChannels(store);
+        list.push({
+            id: sdtNewChannelId(),
+            name: '渠道 ' + (list.length + 1),
+            baseUrl: '',
+            apiKey: '',
+            model: '',
+            enabled: true,
+            priority: list.length,
+        });
+        store.channels = list.map(function (channel, index) { return Object.assign({}, channel, { priority: index }); });
+        sdtEnsureChannels(store);
+        renderChannelList();
+        try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+    }
+
+    function sdtMoveChannel(id, delta) {
+        const store = getStore();
+        const list = sdtEnsureChannels(store).slice();
+        const index = list.findIndex(function (channel) { return channel.id === id; });
+        const target = index + delta;
+        if (index < 0 || target < 0 || target >= list.length) return;
+        const moved = list.splice(index, 1)[0];
+        list.splice(target, 0, moved);
+        store.channels = list.map(function (channel, i) { return Object.assign({}, channel, { priority: i }); });
+        sdtEnsureChannels(store);
+        renderChannelList();
+        try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+    }
+
+    function sdtDeleteChannel(id) {
+        if (id === SDT_CHANNEL_DEFAULT_ID) return;
+        const store = getStore();
+        const list = sdtEnsureChannels(store).filter(function (channel) { return channel.id !== id; });
+        if (!list.length) return;
+        store.channels = list.map(function (channel, index) { return Object.assign({}, channel, { priority: index }); });
+        sdtEnsureChannels(store);
+        renderChannelList();
+        try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+    }
+
+    function sdtSetChannelStatus(text) {
+        const statusEl = document.getElementById('rbq-sdt-channel-status');
+        if (statusEl) statusEl.textContent = text || '';
+    }
+
+    async function sdtTestChannelById(id) {
+        const store = getStore();
+        const channel = sdtEnsureChannels(store).filter(function (item) { return item.id === id; })[0];
+        if (!channel) return null;
+        sdtSetChannelStatus('⏳ 正在自检渠道「' + channel.name + '」…');
+        const result = await sdtProbeChannel(channel, store, {});
+        reportChannelResult(store, channel.id, result.alive, {
+            latencyMs: result.latencyMs,
+            error: result.alive ? '' : (result.error || '自检未通过'),
+            toolSupport: result.toolSupport === 'yes' ? 'yes' : (result.toolSupport === 'no' ? 'no' : ''),
+        });
+        sdtSetChannelStatus(sdtChannelProbeText(result));
+        renderChannelList();
+        return result;
+    }
+
+    async function sdtTestAllChannels() {
+        const store = getStore();
+        const list = sdtEnsureChannels(store).slice();
+        if (!list.length) return [];
+        const summary = [];
+        for (let index = 0; index < list.length; index++) {
+            const channel = list[index];
+            sdtSetChannelStatus('⏳ 正在依次自检 ' + (index + 1) + '/' + list.length + '：' + channel.name + '…');
+            const result = await sdtProbeChannel(channel, store, {});
+            reportChannelResult(store, channel.id, result.alive, {
+                latencyMs: result.latencyMs,
+                error: result.alive ? '' : (result.error || '自检未通过'),
+                toolSupport: result.toolSupport === 'yes' ? 'yes' : (result.toolSupport === 'no' ? 'no' : ''),
+            });
+            summary.push(sdtChannelProbeText(result));
+            renderChannelList();
+        }
+        sdtSetChannelStatus(summary.join('\n'));
+        return summary;
+    }
+
+    function bindChannelPanelEvents() {
+        const listEl = document.getElementById('rbq-sdt-channel-list');
+        if (listEl) {
+            listEl.onclick = function (event) {
+                const button = event.target && event.target.closest ? event.target.closest('[data-ch-act]') : null;
+                if (!button) return;
+                const row = button.closest('[data-ch-id]');
+                const id = row ? String(row.getAttribute('data-ch-id') || '') : '';
+                if (!id) return;
+                const action = String(button.getAttribute('data-ch-act') || '');
+                if (action === 'up') sdtMoveChannel(id, -1);
+                else if (action === 'down') sdtMoveChannel(id, 1);
+                else if (action === 'del') sdtDeleteChannel(id);
+                else if (action === 'test') { sdtTestChannelById(id); }
+            };
+            listEl.onchange = function (event) {
+                const field = event.target && event.target.getAttribute ? event.target.getAttribute('data-ch-field') : '';
+                if (!field) return;
+                sdtApplyChannelRows(true);
+                renderChannelList();
+            };
+        }
+        const addBtn = document.getElementById('rbq-sdt-channel-add');
+        if (addBtn) addBtn.onclick = function () { sdtAddChannel(); };
+        const testAllBtn = document.getElementById('rbq-sdt-channel-test-all');
+        if (testAllBtn) testAllBtn.onclick = function () { sdtTestAllChannels(); };
+    }
+
     function getStore() {
         const settings = RBQ.api.getSettings();
 
@@ -3244,6 +4054,9 @@ C18 高杠杆 mating_press,top-down_bottom-up
         // （见 applyJailbreakPresetSwitches 与 API 模板载入）。以前这里每次 getStore() 都把
         // sandbox / classic_multiturn / render_pipeline(_v2) 的 toolCallMode 强制改回 true，
         // 导致用户关掉「结构化工具调用 (Tool Call)」后依旧发送 tools，报「未返回工具调用参数」。
+
+        // 6.5.58 多渠道：老存档没有 channels 时在这里迁移出「默认渠道」，并补齐 channelHealth（toolSupport 一律 unknown）
+        try { sdtEnsureChannels(store); } catch (e) { /* 渠道迁移失败不得打断请求构造 */ }
 
         return store;
     }
@@ -4739,7 +5552,8 @@ ${activeRegistrySection}`;
             let extractedOutfit = '';
 
             const store = getStore();
-            const hasLlm = (store.provider === 'custom' && store.customUrl) || (store.provider !== 'custom' && store.openaiBaseUrl);
+            // 6.5.58 多渠道：单渠道判定改为「主渠道就绪」
+            const hasLlm = store.provider === 'custom' ? !!String(store.customUrl || '').trim() : isTaggerApiConfigured(store);
 
             if (!hasLlm) throw new Error('请先配置智能生图的 Tagger 接口，再提取角色外貌');
             if (!contextText) throw new Error('当前角色卡没有可提取的角色描述或世界书');
@@ -4774,25 +5588,14 @@ ${getCharacterMemoryTagSpecification()}
                 if (!res.ok) throw new Error(`角色外貌提取失败: HTTP ${res.status}`);
                 jsonRes = await safeReadJsonResponse(res);
             } else {
-                const url = normalizeBaseUrl(store.openaiBaseUrl);
-                const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
-                checkUrlSafety(url);
-                const res = await callApiWithJsonFallback(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {})
-                    }
-                }, {
-                    model: modelName,
+                // 6.5.58 多渠道：外貌提取走渠道链（原来只认单一 openaiBaseUrl，无法享受故障切换）
+                jsonRes = await sdtRequestTaggerJson(store, promptMessages, {
+                    label: '角色外貌提取',
                     temperature: 0.2,
-                    response_format: { type: 'json_object' },
-                    stream: false,
-                    messages: promptMessages,
-                    ...buildThinkingParams(store),
+                    body: { response_format: { type: 'json_object' } },
+                    missingUrlMessage: '请先配置智能生图的 Tagger 接口，再提取角色外貌',
+                    missingModelMessage: '请先配置智能生图的 Tagger 接口，再提取角色外貌',
                 });
-                if (!res.ok) throw new Error(`角色外貌提取失败: HTTP ${res.status}`);
-                jsonRes = await safeReadJsonResponse(res);
             }
 
             const rawContent = jsonRes?.choices?.[0]?.message?.content || jsonRes?.content || '';
@@ -9328,27 +10131,14 @@ SCHEMA:
             if (!response.ok) throw new Error(`Tagger API 请求失败: HTTP ${response.status}`);
             json = await safeReadJsonResponse(response);
         } else {
-            const url = normalizeBaseUrl(store.openaiBaseUrl);
-            if (!url) throw new Error('请先在设置中填写 OpenAI 兼容接口 Base URL');
-            const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
-            if (!modelName) throw new Error('请先在设置中填写模型名称');
-            checkUrlSafety(url);
-            const response = await callApiWithJsonFallback(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {})
-                }
-            }, {
-                model: modelName,
+            // 6.5.58 多渠道：细分重绘请求走渠道链
+            json = await sdtRequestTaggerJson(store, messages, {
+                label: 'Tagger API',
                 temperature: 0.3,
-                response_format: { type: 'json_object' },
-                stream: false,
-                messages,
-                ...buildThinkingParams(store),
+                body: { response_format: { type: 'json_object' } },
+                missingUrlMessage: '请先在设置中填写 OpenAI 兼容接口 Base URL',
+                missingModelMessage: '请先在设置中填写模型名称',
             });
-            if (!response.ok) throw new Error(`Tagger API 请求失败: HTTP ${response.status}`);
-            json = await safeReadJsonResponse(response);
         }
 
         if (requestContext) assertMangaRequestContext(requestContext);
@@ -13723,13 +14513,15 @@ function sdtIsRetryableError(err, signal) {
     return true;
 }
 
-function sdtBuildModelChain(store) {
-    const primary = String((store.openaiModelCustom || '').trim() || store.openaiModel || '').trim();
+function sdtBuildModelChain(store, target) {
+    // 6.5.58 多渠道：模型名优先取渠道自己的，渠道没填才退回全局字段
+    const primary = String((target && target.model) || '').trim() || String((store.openaiModelCustom || '').trim() || store.openaiModel || '').trim();
     const chain = [];
     const push = (m) => { const v = String(m || '').trim(); if (v && !chain.includes(v)) chain.push(v); };
     push(primary);
     const enabled = store.modelFallbackEnabled !== false;
-    if (enabled && /blqs\.cc/i.test(String(store.openaiBaseUrl || ''))) {
+    const chainBaseUrl = String((target && target.baseUrl) || store.openaiBaseUrl || '');
+    if (enabled && /blqs\.cc/i.test(chainBaseUrl)) {
         SDT_FALLBACK_MODELS.forEach(push);
         String(store.modelFallbackList || '').split(/[\n,]+/).forEach(push);
     }
@@ -13742,83 +14534,143 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     const sdtDiagT0 = Date.now();
     if (o.__noFallback) return await callOpenAiCompatibleOnce(messageId, trigger, o);
     const store = o.storeSnapshot || getStore();
-    const chain = sdtBuildModelChain(store);
+    // 6.5.58 多渠道：外层按渠道链切换，内层沿用「模型降级 + 每模型重试」的旧逻辑
+    const channels = resolveChannelChain(store);
+    if (!channels.length) throw sdtChannelChainEmptyError(store);
+    const useTool = !!store.toolCallMode;
+    // 工具调用模式下全部渠道都明确「不支持」时直接报错，禁止静默降级成普通 JSON 解析
+    if (useTool && channels.every(function (item) { return item.toolSupport === 'no'; })) throw sdtChannelNoToolError(channels);
     const startedAt = Date.now();
-    const report = [];
+    const attemptLog = [];
+    const channelLog = [];
+    let attemptCount = 0;
+    let modelCount = 0;
     let lastErr = null;
     let budgetHit = false;
-    for (let ci = 0; ci < chain.length; ci++) {
-        const model = chain[ci];
-        const attempts = ci === 0 ? (SDT_RETRY_PER_MODEL + 1) : SDT_RETRY_PER_MODEL;
-        for (let a = 1; a <= attempts; a++) {
-            if (Date.now() - startedAt > SDT_RETRY_BUDGET_MS) { budgetHit = true; break; }
-            if (a > 1) {
-                console.warn(`[${PLUGIN_NAME}] 重试 ${model} (第 ${a} 次 / 共 ${attempts} 次)`);
-                if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') {
-                    toastr.info(`请求失败，正在重试 ${model}（${a}/${attempts}）`, PLUGIN_NAME);
-                }
-            }
-            try {
-                const result = await callOpenAiCompatibleOnce(messageId, trigger, Object.assign({}, o, { modelOverride: model }));
-                if (ci > 0 || a > 1) {
-                    console.info(`[${PLUGIN_NAME}] 已由 ${model} 成功返回`);
-                    if (typeof toastr !== 'undefined' && typeof toastr.success === 'function') {
-                        toastr.success(`已由 ${model} 成功返回`, PLUGIN_NAME);
+
+    for (let chi = 0; chi < channels.length; chi++) {
+        if (budgetHit) break;
+        const channel = channels[chi];
+        const channelStart = Date.now();
+        const models = sdtBuildModelChain(store, channel);
+        modelCount += models.length;
+        let channelErr = null;
+        let channelToolUnsupported = false;
+        let channelEmpty = false;
+        for (let ci = 0; ci < models.length; ci++) {
+            if (budgetHit) break;
+            const model = models[ci];
+            const attempts = ci === 0 ? (SDT_RETRY_PER_MODEL + 1) : SDT_RETRY_PER_MODEL;
+            for (let a = 1; a <= attempts; a++) {
+                if (Date.now() - startedAt > SDT_RETRY_BUDGET_MS) { budgetHit = true; break; }
+                if (a > 1) {
+                    console.warn(`[${PLUGIN_NAME}] 重试 ${model} (第 ${a} 次 / 共 ${attempts} 次)`);
+                    if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') {
+                        toastr.info(`请求失败，正在重试 ${model}（${a}/${attempts}）`, PLUGIN_NAME);
                     }
                 }
+                attemptCount++;
                 try {
-                    sdtDiagHandle && sdtDiagHandle.add('tagger-ok', {
-                        trigger: String(trigger || ''),
-                        messageId: messageId,
-                        model: model,
-                        primaryModel: chain[0] || '',
-                        attempt: a,
-                        chainIndex: ci,
-                        chain: chain,
-                        elapsedMs: Date.now() - sdtDiagT0,
-                        isToolCall: !!(result && result.isToolCall),
-                        toolName: (result && result.toolName) || '',
-                        reasoning: String((result && result.reasoning) || '').slice(0, 8000),
-                        rawReply: String((result && result.rawReply) || '').slice(0, 4000),
-                        rawOutput: String((result && result.rawOutput) || '').slice(0, 80000)
-                    });
-                } catch (e) { /* ignore */ }
-                return result;
-            } catch (err) {
-                lastErr = err;
-                const brief = String(err && err.message || err).replace(/\s+/g, ' ').slice(0, 220);
-                report.push(`${model} 第${a}次: ${brief}`);
-                console.warn(`[${PLUGIN_NAME}] ${model} 第${a}次失败: ${brief}`);
-                if (!sdtIsRetryableError(err, o.signal)) throw err;
+                    const result = await callOpenAiCompatibleOnce(messageId, trigger, Object.assign({}, o, { modelOverride: model, channel: channel }));
+                    if (chi > 0 || ci > 0 || a > 1) {
+                        console.info(`[${PLUGIN_NAME}] 已由「${channel.name}」的 ${model} 成功返回`);
+                        if (typeof toastr !== 'undefined' && typeof toastr.success === 'function') {
+                            toastr.success(`已由「${channel.name}」的 ${model} 成功返回`, PLUGIN_NAME);
+                        }
+                    }
+                    // 只有真的拿到 tool_calls 才敢标「支持工具调用」——内部剥离 tools 兜底成普通 JSON 也算成功，但不能当作能力证据
+                    reportChannelResult(store, channel.id, true, { latencyMs: Date.now() - channelStart, toolSupport: (useTool && result && result.isToolCall === true) ? 'yes' : '' });
+                    try {
+                        sdtDiagHandle && sdtDiagHandle.add('tagger-ok', {
+                            trigger: String(trigger || ''),
+                            messageId: messageId,
+                            channel: channel.name,
+                            channelId: channel.id,
+                            model: model,
+                            primaryModel: (channels[0] && channels[0].model) || '',
+                            attempt: a,
+                            chainIndex: ci,
+                            channelIndex: chi,
+                            chain: models,
+                            elapsedMs: Date.now() - sdtDiagT0,
+                            isToolCall: !!(result && result.isToolCall),
+                            toolName: (result && result.toolName) || '',
+                            reasoning: String((result && result.reasoning) || '').slice(0, 8000),
+                            rawReply: String((result && result.rawReply) || '').slice(0, 4000),
+                            rawOutput: String((result && result.rawOutput) || '').slice(0, 80000)
+                        });
+                    } catch (e) { /* ignore */ }
+                    return result;
+                } catch (err) {
+                    lastErr = err;
+                    channelErr = err;
+                    if (o.signal && o.signal.aborted) throw err;
+                    if (err && err.name === 'AbortError') throw err;
+                    const kind = sdtClassifyChannelFailure(err, o.signal);
+                    // 配置缺失属于用户设置问题，换渠道也没意义，原样抛出
+                    if (kind === 'config') throw err;
+                    if (kind === 'tool') channelToolUnsupported = true;
+                    if (kind === 'empty') channelEmpty = true;
+                    const brief = sdtBriefError(err);
+                    const line = channel.name + ' · ' + model + ' 第' + a + '次: ' + brief;
+                    attemptLog.push(line);
+                    console.warn('[' + PLUGIN_NAME + '] ' + line);
+                    // 漫画协议错误换渠道也没用，原样抛；其余（401/403/限流/网络）只放弃本渠道，继续走后一条
+                    if (/^MANGA_/.test(String(err.code || ''))) throw err;
+                    if (!sdtIsRetryableError(err, o.signal)) break;
+                }
+            }
+            if (budgetHit) break;
+            if (ci < models.length - 1) {
+                console.warn(`[${PLUGIN_NAME}] ${model} 连续失败，切换到 ${models[ci + 1]}`);
+                if (typeof toastr !== 'undefined' && typeof toastr.warning === 'function') {
+                    toastr.warning(`${model} 连续失败，切换到 ${models[ci + 1]}`, PLUGIN_NAME);
+                }
             }
         }
-        if (budgetHit) break;
-        if (ci < chain.length - 1) {
-            console.warn(`[${PLUGIN_NAME}] ${model} 连续失败，切换到 ${chain[ci + 1]}`);
+        const channelBrief = channelErr ? sdtBriefError(channelErr) : '未知错误';
+        const channelHint = channelToolUnsupported ? '（不支持工具调用）' : (channelEmpty ? '（响应为空，多为 Max Tokens 被思维链占满）' : '');
+        channelLog.push('渠道「' + channel.name + '」（' + (channel.baseUrl || '') + ' / ' + (channel.model || '') + '）：' + channelBrief + channelHint);
+        reportChannelResult(store, channel.id, false, {
+            error: channelBrief,
+            latencyMs: Date.now() - channelStart,
+            toolSupport: channelToolUnsupported ? 'no' : '',
+        });
+        if (!budgetHit && chi < channels.length - 1) {
+            const nextChannel = channels[chi + 1];
+            console.warn('[' + PLUGIN_NAME + '] 渠道「' + channel.name + '」全部模型失败，切换到「' + nextChannel.name + '」');
             if (typeof toastr !== 'undefined' && typeof toastr.warning === 'function') {
-                toastr.warning(`${model} 连续失败，切换到 ${chain[ci + 1]}`, PLUGIN_NAME);
+                toastr.warning('渠道「' + channel.name + '」失败，切换到「' + nextChannel.name + '」', PLUGIN_NAME);
             }
         }
     }
+
     const secs = Math.round((Date.now() - startedAt) / 1000);
+    const multi = channels.length > 1;
+    const scope = multi ? (channels.length + ' 条渠道 / ' + modelCount + ' 个模型') : (modelCount + ' 个模型');
     const head = budgetHit
-        ? `tagger API 全部渠道失败：已用满 ${Math.round(SDT_RETRY_BUDGET_MS / 1000)}s 重试预算（${report.length} 次尝试 / ${chain.length} 个模型，耗时 ${secs}s）`
-        : `tagger API 全部渠道失败（${report.length} 次尝试 / ${chain.length} 个模型，耗时 ${secs}s）`;
-    const body = report.map((r, i) => `  ${i + 1}. ${r}`).join('\n');
-    const err = new Error(head + '\n' + body);
+        ? 'tagger API 全部渠道失败：已用满 ' + Math.round(SDT_RETRY_BUDGET_MS / 1000) + 's 重试预算（' + attemptCount + ' 次尝试 / ' + scope + '，耗时 ' + secs + 's）'
+        : 'tagger API 全部渠道失败（' + attemptCount + ' 次尝试 / ' + scope + '，耗时 ' + secs + 's）';
+    const body = attemptLog.map(function (item, index) { return '  ' + (index + 1) + '. ' + item; }).join('\n');
+    const channelSection = multi
+        ? '\n\n【每条渠道的最终判定】\n' + channelLog.map(function (item, index) { return '  ' + (index + 1) + '. ' + item; }).join('\n')
+        : '';
+    const err = new Error(head + '\n' + body + channelSection);
     err.code = 'SDT_ALL_MODELS_FAILED';
-    err.rawOutput = report.join('\n\n');
+    err.rawOutput = attemptLog.join('\n\n');
     err.retryError = lastErr;
+    err.channels = channelLog;
     try {
         sdtDiagHandle && sdtDiagHandle.add('tagger-fail', {
             trigger: String(trigger || ''),
             messageId: messageId,
-            primaryModel: chain[0] || '',
-            chain: chain,
+            primaryModel: (channels[0] && channels[0].model) || '',
+            channels: channels.map(function (item) { return { id: item.id, name: item.name, model: item.model, toolSupport: item.toolSupport }; }),
             elapsedMs: Date.now() - sdtDiagT0,
             budgetHit: budgetHit,
-            attempts: report,
-            message: String(head + '\n' + body).slice(0, 6000),
+            attempts: attemptLog,
+            channelVerdicts: channelLog,
+            message: String(head + '\n' + body + channelSection).slice(0, 6000),
             lastRawOutput: String((lastErr && lastErr.rawOutput) || '').slice(0, 20000),
             lastMessage: String((lastErr && lastErr.message) || '').slice(0, 4000)
         });
@@ -13827,7 +14679,7 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
 }
 /* ===== [END LOCAL PATCH] ===== */
 
-async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook = false, promptSnapshot = null, forceJsonMode = false, modelOverride = '' } = {}) {
+async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook = false, promptSnapshot = null, forceJsonMode = false, modelOverride = '', channel = null } = {}) {
         const liveStore = getStore();
         let layeredSnapshot = promptSnapshot || (liveStore.enhancedContext === 'v_manga_layered_v1'
             ? captureLayeredMangaPromptSnapshot(liveStore) : null);
@@ -13837,10 +14689,13 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         }
         const baseStore = layeredSnapshot?.storeSnapshot || liveStore;
         const store = forceJsonMode ? { ...baseStore, toolCallMode: false } : baseStore;
-        const url = normalizeBaseUrl(store.openaiBaseUrl);
+        // 6.5.58 多渠道：URL / 密钥 / 模型都取自当前渠道；没传渠道时退回主渠道（等价于 6.5.57 的单渠道行为）
+        const channelTarget = channel || sdtPrimaryChannelTarget(store) || null;
+        const url = normalizeBaseUrl(channelTarget && channelTarget.baseUrl);
         if (!url) throw new Error('请先填写 OpenAI 兼容接口 Base URL');
-        const modelName = modelOverride || (store.openaiModelCustom || '').trim() || store.openaiModel;
+        const modelName = modelOverride || String((channelTarget && channelTarget.model) || '').trim() || (store.openaiModelCustom || '').trim() || store.openaiModel;
         if (!modelName) throw new Error('请先填写模型名称');
+        const channelApiKey = String((channelTarget && channelTarget.apiKey) || store.openaiApiKey || '').trim();
         checkUrlSafety(url);
         const { payload, rawLorebooks, requestContext, promptBundle } = buildRequestPayload(messageId, trigger, { skipLorebook: retryWithoutLorebook, promptSnapshot: layeredSnapshot });
         logTaggerPayload('tagger request body', payload);
@@ -13911,7 +14766,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             signal,
             headers: {
                 'Content-Type': 'application/json',
-                ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {}),
+                ...(channelApiKey ? { Authorization: `Bearer ${channelApiKey}` } : {}),
             },
         }, reqBody);
         if (!response.ok) {
@@ -13922,7 +14777,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 console.warn(`[${PLUGIN_NAME}] ⚠️ HTTP ${response.status} 命中 Google 前置输入审核，正在自动剥离世界书发起纯净正文自愈重试...`);
                 toastr.warning('世界书触发 Google 敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                 assertMangaRequestContext(requestContext);
-                return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
+                return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride, channel });
             }
             throw new Error(`tagger API 请求失败: HTTP ${response.status} ${errText}`);
         }
@@ -13951,7 +14806,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') toastr.info('模型没按工具调用返回，已自动改用普通模式重试', PLUGIN_NAME);
             try {
                 return { result: await callOpenAiCompatibleOnce(messageId, trigger, {
-                    signal, retryWithoutLorebook, promptSnapshot: promptSnapshot || layeredSnapshot, forceJsonMode: true, modelOverride }) };
+                    signal, retryWithoutLorebook, promptSnapshot: promptSnapshot || layeredSnapshot, forceJsonMode: true, modelOverride, channel }) };
             } catch (retryErr) {
                 if (retryErr?.name === 'AbortError' || signal?.aborted
                     || /^(?:SDT_TOOL_RESPONSE_BLOCKED|SDT_TOOL_RESPONSE_TRUNCATED|SDT_RELAY_ERROR_TEXT)$/.test(String(retryErr?.code || ''))
@@ -14016,7 +14871,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                             console.warn(`[${PLUGIN_NAME}] ⚠️ 检测到触发 Google 官方前置输入审核熔断 (${safetyDetail})。判定为世界书/角色卡中存在受限词，正在自动剥离世界书发起纯净正文自愈重试...`);
                             toastr.warning('世界书触发 Google 敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                             assertMangaRequestContext(requestContext);
-                            return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
+                            return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride, channel });
                         }
 
                         const err = new Error(`大模型/中转代理触发了官方前置内容安全审查拦截 (${safetyDetail})。大模型拒绝生成内容并终止了工具调用。`);
@@ -14138,7 +14993,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     console.warn(`[${PLUGIN_NAME}] ⚠️ 非流式检测到触发内容审查拦截 (${safetyDetail})，正在自动剥离世界书发起自愈重试...`);
                     toastr.warning('世界书触发敏感词审核，正在自动剥离世界书保底重试...', PLUGIN_NAME);
                     assertMangaRequestContext(requestContext);
-                    return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride });
+                    return await callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWithoutLorebook: true, promptSnapshot: layeredSnapshot, forceJsonMode, modelOverride, channel });
                 }
                 const err = new Error(`大模型/中转代理触发了官方前置内容安全审查拦截 (${safetyDetail})。大模型拒绝生成内容并终止了工具调用。`);
                 err.code = 'SDT_TOOL_RESPONSE_BLOCKED';
@@ -14288,10 +15143,11 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         return { verdict: 'unsupported', message: `模型只回了普通文字，没有返回工具调用：「${text.slice(0, 80)}${text.length > 80 ? '…' : ''}」` };
     }
 
-    async function probeToolCallSupport(store, { signal = null, fetchFn = null } = {}) {
-        const url = normalizeBaseUrl(store.openaiBaseUrl);
+    // 6.5.58 多渠道：target 为空时用老字段（等价 6.5.57），传渠道则用渠道自己的地址/Key/模型
+    async function probeToolCallSupport(store, { signal = null, fetchFn = null, target = null } = {}) {
+        const url = normalizeBaseUrl((target && target.baseUrl) || store.openaiBaseUrl);
         if (!url) return { verdict: 'error', message: '请先填写 OpenAI 兼容接口 Base URL。' };
-        const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
+        const modelName = String((target && target.model) || '').trim() || (store.openaiModelCustom || '').trim() || store.openaiModel;
         if (!modelName) return { verdict: 'error', message: '请先选择或填写模型。' };
         try { checkUrlSafety(url); } catch (err) { return { verdict: 'error', message: err.message || String(err) }; }
         // Same shape SDT uses for real tool-mode requests: forced tool_choice, stream=true, thinking params.
@@ -14308,13 +15164,14 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             tool_choice: { type: 'function', function: { name: TOOL_PROBE_TOOL.function.name } },
         };
         let response;
+        const probeApiKey = String((target && target.apiKey) || store.openaiApiKey || '').trim();
         try {
             response = await callApiWithJsonFallback(url, {
                 method: 'POST',
                 signal,
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {}),
+                    ...(probeApiKey ? { Authorization: `Bearer ${probeApiKey}` } : {}),
                 },
             }, reqBody, fetchFn || smartFetch);
         } catch (err) {
@@ -14353,7 +15210,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         }
     }
 
-    async function callStructuredCompletion({
+    // 6.5.58 多渠道：单次执行体（渠道由外层 callStructuredCompletion 注入）
+    async function callStructuredCompletionOnce({
         messages,
         tool = null,
         temperature = 0.2,
@@ -14361,13 +15219,16 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         customStore = null,
         fetchFn = null,
         onProgress = null,
-        _toolFallbackRetried = false
+        _toolFallbackRetried = false,
+        channel = null
     }) {
         const store = customStore || getStore();
-        const url = normalizeBaseUrl(store.openaiBaseUrl);
+        const channelTarget = channel || sdtPrimaryChannelTarget(store) || null;
+        const url = normalizeBaseUrl(channelTarget && channelTarget.baseUrl);
         if (!url) throw new Error('请先填写 OpenAI 兼容接口 Base URL');
-        const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
+        const modelName = String((channelTarget && channelTarget.model) || '').trim() || (store.openaiModelCustom || '').trim() || store.openaiModel;
         if (!modelName) throw new Error('请先填写模型名称');
+        const channelApiKey = String((channelTarget && channelTarget.apiKey) || store.openaiApiKey || '').trim();
         checkUrlSafety(url);
 
         const myFetch = fetchFn || smartFetch;
@@ -14398,7 +15259,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             signal,
             headers: {
                 'Content-Type': 'application/json',
-                ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {}),
+                ...(channelApiKey ? { Authorization: `Bearer ${channelApiKey}` } : {}),
             },
         }, reqBody, myFetch);
 
@@ -14559,8 +15420,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     else retryMessages.push({ role: 'user', content: formatNote });
                     let retry;
                     try {
-                        retry = await callStructuredCompletion({
-                            messages: retryMessages, tool, temperature, signal, fetchFn, onProgress,
+                        retry = await callStructuredCompletionOnce({
+                            messages: retryMessages, tool, temperature, signal, fetchFn, onProgress, channel,
                             customStore: { ...store, toolCallMode: false }, _toolFallbackRetried: true,
                         });
                     } catch (retryErr) {
@@ -14594,6 +15455,16 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             model: modelName,
             endpoint: url
         };
+    }
+
+    // 6.5.58 多渠道：工具调用 / 普通 JSON 都按渠道链切换；单渠道时与 6.5.57 等价
+    async function callStructuredCompletion(options) {
+        const opts = options || {};
+        const store = opts.customStore || getStore();
+        const useTool = !!store.toolCallMode && !!opts.tool;
+        return await sdtWithChannelChain(store, '大模型结构化调用', async function (target) {
+            return await callStructuredCompletionOnce(Object.assign({}, opts, { channel: target }));
+        }, { signal: opts.signal, toolCall: useTool });
     }
 
     async function callDrawSpecCompletion(messages, store, promptBundle = null, taskInput = null, requestTool = null) {
@@ -17322,6 +18193,25 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     </div>
                 </div>
 
+                <!-- 多渠道路由与故障切换 -->
+                <div class="rbq-sdt-card-group" data-rbq-sdt-provider="openai">
+                    <div class="rbq-sdt-card-header">
+                        <span class="rbq-sdt-card-title"><i class="fa-solid fa-shuffle" style="color:#38bdf8;"></i> 多渠道路由</span>
+                    </div>
+                    <div style="padding:0 2px 4px;">
+                        <div style="font-size:12px;opacity:0.72;line-height:1.6;margin-bottom:8px;">
+                            按「优先级 → 工具调用支持 → 冷却状态」自动排序切换；某条渠道连续失败 2 次会进入冷却，冷却期内优先用别的渠道。默认渠道跟随上方 Base URL / Key / 模型，新增渠道可各自填写。工具 ✅/❌/❓ 由「全部自检」实测得出（带思维链的模型自检会消耗较多 token）。
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+                            <button id="rbq-sdt-channel-add" class="menu_button" type="button" style="width:auto;">➕ 新增渠道</button>
+                            <button id="rbq-sdt-channel-test-all" class="menu_button" type="button" style="width:auto;">🩺 全部自检</button>
+                            <label class="st-scene-trigger-field" style="margin:0;display:inline-flex;align-items:center;gap:6px;" title="渠道连续失败后进入冷却的时长；全部渠道都在冷却时会强试最早恢复的那条"><span style="margin:0;white-space:nowrap;">冷却 (分钟)</span><input id="rbq-sdt-channel-cooldown" type="number" min="1" max="120" step="1" value="10" style="width:78px;"></label>
+                        </div>
+                        <div id="rbq-sdt-channel-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                        <div id="rbq-sdt-channel-status" style="font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:6px;opacity:0.85;"></div>
+                    </div>
+                </div>
+
                 <!-- 思维链推演强度 (Thinking) -->
                 <div class="rbq-sdt-card-group" data-rbq-sdt-provider="openai">
                     <div class="rbq-sdt-card-header">
@@ -17648,6 +18538,18 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             : `${presetLabel} · 本地 v${store.systemPromptVersion} / 内置 v${DEFAULT_SYSTEM_PROMPT_VERSION}`;
         document.getElementById('rbq-sdt-system-prompt-version').textContent = promptVersionText;
         updateProviderVisibility();
+        // 6.5.58 多渠道：回填冷却时长、渲染渠道列表、绑定渠道卡事件
+        try {
+            const channelCooldownEl = document.getElementById('rbq-sdt-channel-cooldown');
+            if (channelCooldownEl) {
+                const cooldownMinutes = Math.max(1, Math.min(120, Math.round(Number(store.channelCooldownMinutes) || 10)));
+                channelCooldownEl.value = String(cooldownMinutes);
+            }
+            bindChannelPanelEvents();
+            renderChannelList();
+        } catch (channelPanelError) {
+            sdtSetChannelStatus('渠道面板初始化失败：' + (channelPanelError && channelPanelError.message ? channelPanelError.message : channelPanelError));
+        }
         bindSwitch('rbq-sdt-enabled-field', 'rbq-sdt-enabled');
         // enhanced-context is now a <select>, no bindSwitch needed
         bindSwitch('rbq-sdt-debug-field', 'rbq-sdt-debug');
@@ -17975,6 +18877,14 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             s.openaiApiKey = val('rbq-sdt-openai-key').trim();
             s.openaiModel = val('rbq-sdt-openai-model').trim();
             s.openaiModelCustom = val('rbq-sdt-openai-model-custom').trim();
+            // 6.5.58 多渠道：渠道行落库（默认渠道跟随上面这些老字段），再回写镜像与冷却时长
+            try {
+                sdtApplyChannelRows(false);
+                sdtMirrorPrimaryChannel(s);
+                s.channelCooldownMinutes = Math.max(1, Math.min(120, Math.round(Number(val('rbq-sdt-channel-cooldown')) || 10)));
+            } catch (_channelSaveError) {
+                /* 渠道行读取失败不阻断其它设置的保存 */
+            }
             s.thinkingEffort = val('rbq-sdt-thinking-effort') || 'default';
             s.thinkingBudget = Math.max(0, Number(val('rbq-sdt-thinking-budget')) || 2048);
             s.geminiJailbreak = checked('rbq-sdt-gemini-jailbreak');
@@ -18785,17 +19695,14 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             } else if (store.toolCallMode) {
                 json = await callDrawSpecCompletion(messages, store, promptBundle, manualPayload, requestTool);
             } else {
-                const url = normalizeBaseUrl(store.openaiBaseUrl);
-                if (!url) throw new Error('请先填写 OpenAI 兼容接口 Base URL');
-                const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
-                if (!modelName) throw new Error('请先填写模型名称');
-                checkUrlSafety(url);
-                const response = await callApiWithJsonFallback(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {}) },
-                }, { model: modelName, temperature: 0.2, response_format: { type: 'json_object' }, stream: false, messages, ...buildThinkingParams(store) });
-                if (!response.ok) throw new Error(`tagger API 请求失败: HTTP ${response.status}`);
-                json = await safeReadJsonResponse(response);
+                // 6.5.58 多渠道：手工生图的普通 JSON 模式走渠道链
+                json = await sdtRequestTaggerJson(store, messages, {
+                    label: 'tagger API',
+                    temperature: 0.2,
+                    body: { response_format: { type: 'json_object' } },
+                    missingUrlMessage: '请先填写 OpenAI 兼容接口 Base URL',
+                    missingModelMessage: '请先填写模型名称',
+                });
             }
 
             let normalized;
@@ -20374,17 +21281,14 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         } else if (store.toolCallMode) {
             json = await callDrawSpecCompletion(messages, store, promptBundle, manualPayload, requestTool);
         } else {
-            const url = normalizeBaseUrl(store.openaiBaseUrl);
-            if (!url) throw new Error('请先填写 OpenAI 兼容接口 Base URL');
-            const modelName = (store.openaiModelCustom || '').trim() || store.openaiModel;
-            if (!modelName) throw new Error('请先填写模型名称');
-            checkUrlSafety(url);
-            const response = await callApiWithJsonFallback(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(store.openaiApiKey ? { Authorization: `Bearer ${store.openaiApiKey}` } : {}) },
-            }, { model: modelName, temperature: 0.2, response_format: { type: 'json_object' }, stream: false, messages, ...buildThinkingParams(store) });
-            if (!response.ok) throw new Error(`tagger API 请求失败: HTTP ${response.status}`);
-            json = await safeReadJsonResponse(response);
+            // 6.5.58 多渠道：生图测试的普通 JSON 模式走渠道链
+            json = await sdtRequestTaggerJson(store, messages, {
+                label: 'tagger API',
+                temperature: 0.2,
+                body: { response_format: { type: 'json_object' } },
+                missingUrlMessage: '请先填写 OpenAI 兼容接口 Base URL',
+                missingModelMessage: '请先填写模型名称',
+            });
         }
 
         let normalized;
