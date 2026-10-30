@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.66';
+    const PLUGIN_VERSION = '6.5.67';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2305,6 +2305,9 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 反历史惯性：严禁模仿 recentMessages 中既有分镜的机位与构图。
 
 ══ 模块二：角色规格、服装签名与微观动作 (Character & Action) ══
+【字段语言铁律 · 高于本文所有示例】
+base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中文、禁止整句、禁止介词短语（sitting on sofa → sitting；hand on her waist、looking at partner 这类直接删）；同一概念只留一次，下划线与空格两种形态不许并存（fair_skin 与 fair skin 择一，white_thighhighs 与 white thigh highs 择一）；单字段 ≤ 12 个 tag。
+中文感受只写进 reason，要它上画面就换 tag：余韵→after_sex、呼吸急促→heavy_breathing、颤抖→trembling、脸红→blush、被抱起→princess_carry、脱力瘫软→after_sex, trembling。本文示例里的英文散句只是示意，落地必须收敛成 tag。
 1.【7 维外貌防伪矩阵】base 字段纯净无临时服装与动作。
    ① 性别：girl / boy（严禁带数字，防人数干扰）
    ② 面相族裔：japanese, delicate_face（日系必带，防欧美化）/ caucasian / western
@@ -12367,6 +12370,50 @@ SCHEMA:
         'amazing quality', 'good quality', 'high quality', 'ultra detailed',
         'incredibly absurdres', 'newest', 'year 2024', 'year 2025',
     ]);
+    /* 6.5.67 词面清洗：中文/全角标点一律不进 NAI（CLIP 里没有对应概念，只会摊薄权重）；
+       同义重复（下划线形态与空格形态）只留第一次出现；1.3::...:: 权重组原样保留，避免拆坏权重语法。 */
+    const SDT_CJK_RE = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
+    function sdtStripCjk(text) {
+        return String(text || '').replace(SDT_CJK_RE, ' ').replace(/\s{2,}/g, ' ').trim();
+    }
+    function sdtCaptionClean(text) {
+        const raw = String(text || '');
+        if (!raw) return { text: '', zh: 0, dup: 0 };
+        let zh = 0;
+        const s = raw.replace(SDT_CJK_RE, (m) => { zh += m.length; return ' '; });
+        const groups = [];
+        let i = 0;
+        while (i < s.length) {
+            const wm = /^\s*(\d+(?:\.\d+)?)::/.exec(s.slice(i));
+            if (wm) {
+                const end = s.indexOf('::', i + wm[0].length);
+                if (end > 0) {
+                    const g = s.slice(i, end + 2).replace(/\s{2,}/g, ' ').trim();
+                    if (g.replace(/^\d+(?:\.\d+)?::/, '').replace(/::$/, '').trim()) groups.push({ text: g, key: null });
+                    i = end + 2;
+                    if (s[i] === ',') i += 1;
+                    continue;
+                }
+            }
+            const comma = s.indexOf(',', i);
+            const chunk = (comma < 0 ? s.slice(i) : s.slice(i, comma)).replace(/\s{2,}/g, ' ').trim();
+            if (chunk) groups.push({ text: chunk, key: chunk.toLowerCase().replace(/[_\-\s]+/g, ' ').replace(/[()\[\]{}]/g, '').trim() });
+            if (comma < 0) break;
+            i = comma + 1;
+        }
+        const seen = Object.create(null);
+        const out = [];
+        let dup = 0;
+        for (const g of groups) {
+            if (g.key) {
+                if (seen[g.key]) { dup++; continue; }
+                seen[g.key] = true;
+            }
+            out.push(g.text);
+        }
+        return { text: out.join(', '), zh: zh, dup: dup };
+    }
+
     function deduplicateQualityTags(scene) {
         if (!scene) return '';
         return scene.split(',')
@@ -12441,7 +12488,7 @@ SCHEMA:
                 manga: true, textCompiled: segmentResult.mangaTextCompiled === true || (typeof segmentResult.mangaPage === 'object' && segmentResult.mangaPage !== null),
                 useCoords: !!segmentResult.mangaUseCoords, negative: getSegmentNegative(segmentResult),
                 renderSettings: { ...(segmentResult.mangaRenderSettings || RBQ.api.mangaProtocol?.captureRenderSettings?.()) },
-                characters: (segmentResult.characters || []).map(c => ({ name: c.name || c._rawName, caption: c.caption,
+                characters: (segmentResult.characters || []).map(c => ({ name: c.name || c._rawName, caption: sdtCaptionClean(c.caption).text,
                     center: typeof c.center === 'object' && c.center ? { ...c.center } : c.center, uc: c.uc || '' }))
             };
         }
@@ -12464,7 +12511,7 @@ SCHEMA:
                     }
                 }
                 return {
-                    caption: c.caption || [c._rawName, c._rawAction].filter(Boolean).join(', '),
+                    caption: sdtCaptionClean(c.caption || [c._rawName, c._rawAction].filter(Boolean).join(', ')).text,
                     center: typeof c.center === 'object' && c.center ? { ...c.center } : c.center || { x: 0.5, y: 0.5 },
                     uc,
                 };
@@ -12509,10 +12556,16 @@ SCHEMA:
 
         // 6.5.65 坐标兜底：两个角色都缺 center 会同时落到 C3(0.5,0.5) → V4 把两人画在同一点（崩图主因）
         const coordList = sdtResolveCenters(characters, useCoords);
-        const charCaptions = characters.map((c, i) => ({
-            char_caption: c.caption,
-            centers: [coordList[i] || sdtParseCoord(c.center)],
-        }));
+        // 6.5.67 词面清洗：中文一律剥掉（NAI 只吃英文 tag），同义重复只留一次
+        let cleanZh = 0, cleanDup = 0;
+        const charCaptions = characters.map((c, i) => {
+            const cc = sdtCaptionClean(c.caption);
+            cleanZh += cc.zh; cleanDup += cc.dup;
+            return {
+                char_caption: cc.text,
+                centers: [coordList[i] || sdtParseCoord(c.center)],
+            };
+        });
         const negCharCaptions = characters.map((c, i) => ({
             char_caption: c.uc || '',
             centers: [coordList[i] || sdtParseCoord(c.center)],
@@ -12526,7 +12579,14 @@ SCHEMA:
         try { sdtPoseGateApply(payload); } catch (e) { /* ignore */ }
 
         // Retain the host prompt and any prefixes assembled by earlier hooks.
-        const baseCaptionFinal = payload.input;
+        // 6.5.67：中文不进 NAI —— 基础 caption 里的中文段落同样剥掉
+        const baseCaptionRaw = String(payload.input || '');
+        const baseStripped = sdtStripCjk(baseCaptionRaw);
+        if (baseStripped !== baseCaptionRaw) {
+            cleanZh += baseCaptionRaw.length - baseStripped.length;
+            try { payload.input = baseStripped; } catch (e) { /* ignore */ }
+        }
+        const baseCaptionFinal = baseStripped;
 
         // 【优化】根据官方文档：生成 H 内容时，需从 UC 中移除 nsfw，否则内容会被抑制
         if (/(nsfw|sex|vaginal|penis|pussy|nudity)/i.test(baseCaptionFinal)) {
@@ -12567,8 +12627,11 @@ SCHEMA:
                 negative_prompt: String(dp.negative_prompt || '').slice(0, 4000),
                 v4_prompt: dp.v4_prompt,
                 v4_negative_prompt: dp.v4_negative_prompt,
-                characters: characters.map(c => ({ name: c.name, caption: c.caption, uc: c.uc, center: c.center }))
+                characters: characters.map(c => ({ name: c.name, caption: c.caption, uc: c.uc, center: c.center })),
+                cleanZh: cleanZh,
+                cleanDup: cleanDup
             });
+            if (cleanZh || cleanDup) sdtDiag().add('caption-clean', { zh: cleanZh, dup: cleanDup, chars: characters.length });
         } catch (e) { /* ignore */ }
         debugInfo(`NAI V4 多角色直注: ${characters.length} 个角色, base="${baseCaptionFinal.slice(0, 80)}..."`);
         if (!context) pendingNaiCharData = null; // legacy callers only
@@ -15254,6 +15317,12 @@ function sdtRoundInspectLines() {
                 const far = new Set(pts).size === pts.length;
                 lines.push(`【坐标】${pts.join(' / ')}${far ? '' : ' ⚠️ 有角色落在同一点（会互相污染体型）'}`);
             }
+        }
+        const cleans = recs.slice(lastIdx + 1).filter(r => r.type === 'caption-clean');
+        if (cleans.length) {
+            const zhSum = cleans.reduce((n, c) => n + (Number(c.zh) || 0), 0);
+            const dupSum = cleans.reduce((n, c) => n + (Number(c.dup) || 0), 0);
+            lines.push(`【词面清洗】剔除中文 ${zhSum} 字符｜去重 ${dupSum} 个重复词${zhSum ? '（中文进 NAI 等于无效，已丢弃）' : ''}`);
         }
         const gates = recs.slice(lastIdx + 1).filter(r => r.type === 'pose-gate');
         if (gates.length) lines.push(`【词法闸门】补回体位词 ${gates.length} 张（${gates.map(g => g.className + ' ' + g.added).join(' / ')}）`);
