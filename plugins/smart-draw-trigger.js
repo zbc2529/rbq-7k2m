@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.59';
+    const PLUGIN_VERSION = '6.5.60';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14448,6 +14448,7 @@ function sdtDiag() {
                 records.push(rec);
                 if (records.length > SDT_DIAG_MAX_RECORDS) records.splice(0, records.length - SDT_DIAG_MAX_RECORDS);
                 persist();
+                try { if (typeof window.__SDT_ROUND_REFRESH === 'function') window.__SDT_ROUND_REFRESH(); } catch (e) { /* ignore */ }
                 return rec;
             } catch (e) { return null; }
         },
@@ -14549,6 +14550,67 @@ function sdtDiagTaggerBits() {
     } catch (e) { return { diagCtx: null }; }
 }
 
+/** 6.5.60 本轮体检：把「姿势变量 / 体位锁定 / 世界书预算 / 出图重复」压成几行纯文本。
+ *  手机端没有控制台，面板上要能直接看到这一轮到底带了什么。 */
+function sdtRoundInspectLines() {
+    const lines = [];
+    let poseLive = null;
+    try {
+        const ctx = (typeof window !== 'undefined' && window.SillyTavern && typeof window.SillyTavern.getContext === 'function')
+            ? window.SillyTavern.getContext() : null;
+        const vars = (ctx && ctx.chatMetadata && ctx.chatMetadata.variables) || null;
+        poseLive = (vars && vars['姿势引擎']) || null;
+    } catch (e) { poseLive = null; }
+    const st = (poseLive && poseLive['状态']) || null;
+    const cur = (st && Array.isArray(st['当前'])) ? st['当前'] : null;
+    lines.push(`【姿势变量】${poseLive ? '✅ 读得到' : '❌ 读不到（世界书没跑 / 不在当前聊天）'}`);
+    if (cur && cur.length) lines.push(`  当前 ${cur[0]} · 主类 ${cur[1] || '?'} ${cur[2] || ''}`.trimEnd());
+    if (st) {
+        const cross = st['越界'];
+        lines.push(`  场次 ${st['场次'] ?? '-'}｜剩余 ${st['剩余'] ?? '-'}｜越界 ${cross === true ? 'true（无视场景抽中）' : (cross ?? '-')}`);
+    }
+    let dc = null;
+    try { dc = (typeof window !== 'undefined' && window.__SDT_DIAG_CTX) || null; } catch (e) { dc = null; }
+    if (dc) {
+        lines.push(`【体位锁定】${dc.poseLockInPrompt ? '✅ 已进 system prompt' : '❌ 没进 prompt'}（prompt ${dc.systemPromptLen || 0} 字符）`);
+        const lb = dc.lorebook || {};
+        const budget = Number(lb.budget) || 0;
+        const chars = Number(lb.chars) || 0;
+        const tight = budget > 0 && chars >= Math.floor(budget * 0.95);
+        lines.push(`【世界书】${lb.enabled ? '开' : '关'}｜命中 ${lb.activated || 0} 条 / ${chars} 字｜预算 ${budget}${tight ? '（⚠️ 顶满预算，靠后的条目被丢掉了）' : ''}`);
+        if (Array.isArray(lb.titles) && lb.titles.length) {
+            lines.push(`  标题：${lb.titles.slice(0, 6).join(' / ')}${lb.titles.length > 6 ? ' …' : ''}`);
+        }
+        if (Array.isArray(lb.ejsEntries) && lb.ejsEntries.length) {
+            lines.push(`  ⚠️ ${lb.ejsEntries.length} 条含 EJS 源码被塞进 prompt（本该排除）`);
+        }
+    } else {
+        lines.push('【体位锁定】本次会话还没有生成记录');
+    }
+    try {
+        const recs = sdtDiag().records || [];
+        let lastIdx = -1;
+        for (let i = recs.length - 1; i >= 0; i--) {
+            if (recs[i].type === 'tagger-ok' || recs[i].type === 'tagger-fail') { lastIdx = i; break; }
+        }
+        const last = lastIdx >= 0 ? recs[lastIdx] : null;
+        if (last) {
+            lines.push(`【上一轮】${last.type === 'tagger-ok' ? '✅ 出了规格' : '❌ 失败'}｜渠道 ${last.channel || '-'}｜模型 ${last.model || '-'}｜${last.elapsedMs || 0} ms`);
+        }
+        const payloads = recs.slice(lastIdx + 1).filter(r => r.type === 'nai-payload');
+        if (payloads.length) {
+            const seen = new Set();
+            let dup = 0;
+            for (const p of payloads) {
+                const key = String(p.input || '');
+                if (seen.has(key)) dup++; else seen.add(key);
+            }
+            lines.push(`【出图】${payloads.length} 张${dup ? `，⚠️ ${dup} 张与前面完全重复` : '，无重复'}`);
+        }
+    } catch (e) { /* ignore */ }
+    return lines;
+}
+
 function sdtIsRetryableError(err, signal) {
     if (signal && signal.aborted) return false;
     if (!err) return true;
@@ -14630,7 +14692,7 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
                     reportChannelResult(store, channel.id, true, { latencyMs: Date.now() - channelStart, toolSupport: (useTool && result && result.isToolCall === true) ? 'yes' : '' });
                     try {
                         sdtDiagHandle && sdtDiagHandle.add('tagger-ok', {
-                            trigger: String(trigger || ''),
+                            trigger: (typeof trigger === 'string' ? trigger : JSON.stringify(trigger || '')),
                             messageId: messageId,
                             channel: channel.name,
                             channelId: channel.id,
@@ -14711,7 +14773,7 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     err.channels = channelLog;
     try {
         sdtDiagHandle && sdtDiagHandle.add('tagger-fail', {
-            trigger: String(trigger || ''),
+            trigger: (typeof trigger === 'string' ? trigger : JSON.stringify(trigger || '')),
             messageId: messageId,
             primaryModel: (channels[0] && channels[0].model) || '',
             channels: channels.map(function (item) { return { id: item.id, name: item.name, model: item.model, toolSupport: item.toolSupport }; }),
@@ -18496,6 +18558,20 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
 
                 <div class="rbq-sdt-card-group">
                     <div class="rbq-sdt-card-header">
+                        <span class="rbq-sdt-card-title"><i class="fa-solid fa-stethoscope" style="color:#22c55e;"></i> 本轮体检（这一轮到底带了什么）</span>
+                    </div>
+                    <div style="font-size:12px;opacity:.75;line-height:1.6;margin:2px 0 8px 0;">
+                        不用控制台：本轮姿势变量、体位锁定有没有进提示词、世界书命中几条、发出去的图有几张（含重复）。每轮生成后自动刷新。
+                    </div>
+                    <div id="rbq-sdt-round-inspect" style="font-size:12px;line-height:1.75;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.18);border-radius:6px;padding:8px 10px;margin:0 0 8px 0;">尚无记录：先让它生一张图。</div>
+                    <div class="st-scene-trigger-buttons" style="margin: 4px 0 8px 0; display:flex; flex-wrap:wrap; gap:8px;">
+                        <button id="rbq-sdt-round-refresh" class="menu_button" type="button"><i class="fa-solid fa-rotate"></i> 刷新体检</button>
+                        <button id="rbq-sdt-round-copy" class="menu_button" type="button"><i class="fa-solid fa-copy"></i> 复制体检摘要</button>
+                    </div>
+                </div>
+
+                <div class="rbq-sdt-card-group">
+                    <div class="rbq-sdt-card-header">
                         <span class="rbq-sdt-card-title"><i class="fa-solid fa-clipboard-list" style="color:#f59e0b;"></i> 生图诊断日志</span>
                     </div>
                     <div style="font-size:12px;opacity:.75;line-height:1.6;margin:2px 0 8px 0;">
@@ -19261,6 +19337,27 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         }
         refreshSdtDiagCount();
         setTimeout(refreshSdtDiagCount, 50);
+
+        // 6.5.60 本轮体检：与本页绑定，生成结束后由 sdtDiag().add 自动回调刷新
+        const refreshSdtRoundInspect = () => {
+            const el = document.getElementById('rbq-sdt-round-inspect');
+            if (!el) return;
+            try { el.textContent = sdtRoundInspectLines().join('\n'); }
+            catch (e) { el.textContent = `体检失败：${e?.message || e}`; }
+        };
+        try { window.__SDT_ROUND_REFRESH = refreshSdtRoundInspect; } catch (e) { /* ignore */ }
+        refreshSdtRoundInspect();
+        setTimeout(refreshSdtRoundInspect, 50);
+        document.getElementById('rbq-sdt-round-refresh')?.addEventListener('click', () => {
+            refreshSdtRoundInspect();
+            try { toastr.info('已刷新本轮体检', PLUGIN_NAME); } catch (e) { /* ignore */ }
+        });
+        document.getElementById('rbq-sdt-round-copy')?.addEventListener('click', async () => {
+            try {
+                await copyToClipboard(sdtRoundInspectLines().join('\n'));
+                toastr.success('体检摘要已复制', PLUGIN_NAME);
+            } catch (e) { toastr.error(`复制失败：${e?.message || e}`, PLUGIN_NAME); }
+        });
 
         document.getElementById('rbq-sdt-export-diag')?.addEventListener('click', () => {
             try {
