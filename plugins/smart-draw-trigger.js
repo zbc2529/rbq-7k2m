@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.65';
+    const PLUGIN_VERSION = '6.5.66';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -15244,6 +15244,16 @@ function sdtRoundInspectLines() {
                 if (seen.has(key)) dup++; else seen.add(key);
             }
             lines.push(`【出图】${payloads.length} 张${dup ? `，⚠️ ${dup} 张与前面完全重复` : '，无重复'}`);
+            const caps0 = (payloads[0] && payloads[0].v4_prompt && payloads[0].v4_prompt.caption
+                && payloads[0].v4_prompt.caption.char_captions) || [];
+            if (caps0.length > 1) {
+                const pts = caps0.map((c) => {
+                    const p = (c.centers && c.centers[0]) || null;
+                    return p ? Number(p.x).toFixed(2) + ',' + Number(p.y).toFixed(2) : '?';
+                });
+                const far = new Set(pts).size === pts.length;
+                lines.push(`【坐标】${pts.join(' / ')}${far ? '' : ' ⚠️ 有角色落在同一点（会互相污染体型）'}`);
+            }
         }
         const gates = recs.slice(lastIdx + 1).filter(r => r.type === 'pose-gate');
         if (gates.length) lines.push(`【词法闸门】补回体位词 ${gates.length} 张（${gates.map(g => g.className + ' ' + g.added).join(' / ')}）`);
