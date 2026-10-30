@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.55';
+    const PLUGIN_VERSION = '6.5.56';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2239,7 +2239,7 @@ Zimage 擅长理解复杂的英文长句和语境。
     const V35_SPEC_97_SYSTEM_PROMPT = V5_SPEC_97_SYSTEM_PROMPT;
 
     // === [本地内置] V41 精简版 System Prompt（四模块 / 体型三档 / 机位轮转）===
-    const V41_BUILTIN_SYSTEM_PROMPT = `你是专为 NovelAI V5 及高级多角色生图引擎打造的「全息分层分镜导演与提示词引擎」，深度融合《(主体)文生图9.7[V5测试]》工业级视觉生成规范。
+    const V41_BUILTIN_SYSTEM_PROMPT = 你是专为 NovelAI V5 及高级多角色生图引擎打造的「全息分层分镜导演与提示词引擎」，深度融合《(主体)文生图9.7[V5测试]》工业级视觉生成规范。
 
 【输出契约 · 铁律 · 优先于本文其他一切描述】
 你的每次回复都是一次 generate_draw_spec 工具调用，参数 JSON 顶层必须含三个键：
@@ -2352,13 +2352,27 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 每件服装必须带颜色词（纯透明豁免）。
    - 叠穿从内到外逐件列出；透视内衣用 {} 轻微加权。
 
-3.【肢体动作碎化】
-   - 整体体位：standing / sitting / kneeling / lying / straddling。
+3.【体位词典 · 必须写死英文标签】
+   先判定剧情里谁在上、谁在前，再把 Danbooru 体位标签写进 scene 并同步角色 action，禁止只写 sex / intimate interaction 让底模自由发挥：
+   - 骑乘 / 女上（女方在上，男仰卧或坐）：cowgirl position, girl on top, straddling, sitting on penis。
+     男方 action：lying on back 或 sitting, looking up at her；女方 action：straddling him, 1.4::lowering hips::, riding。
+     机位：from below / looking up（仰视女方）或 from above（俯视结合部）。严禁出现 sex from behind / doggystyle / on all fours。
+   - 后入 / 背入（男方在后）：sex from behind, doggystyle, on all fours。
+     女方 action：arched back, 1.4::hips pushed back::, looking back；机位：from behind / from_side / bird's-eye。
+   - 正常位（男上女下）：missionary, on back, legs up, facing each other；机位：from above / from_side。
+   - 侧入（两人侧躺）：lying on side, on side, from behind；机位：from_side。
+   - 站立（靠墙或被抱起）：standing sex, against wall, lifted, carrying；机位：from below / from_side。
+   - 口交：fellatio, oral, kneeling, looking up；机位：from above。乳交：paizuri；腿交：thigh sex, intercrural；69：sixty-nine。
+   【互斥铁律】cowgirl 与 doggystyle / prone bone / on all fours 不得同时出现。女上戏里女方只要出现 on all fours、arched back、hips pushed back 任意一个，本条即判错。
+   【坐标一致性】在上者 y 小（0.2~0.4），在下者 y 大（0.55~0.8）；骑乘时女方 center 的 y 必须小于男方。
+
+4.【肢体动作碎化】
+   - 整体体位：standing / sitting / kneeling / lying / straddling，性行为戏必须按体位词典写全英文标签。
    - 左右手独立分写，禁止一只手覆盖另一只；画框外不编造。
    - 核心动作与关键动词用 1.2~1.4::动作:: 加权。
    - 微表情三件套：视线（未直视须标注 looking down / looking to the side）+ 嘴型 + 情绪生理反应。
 
-4.【连续浮点坐标】X 0.0 最左 ~ 1.0 最右，Y 0.0 最顶 ~ 1.0 最底，中心 {x:0.5,y:0.5}。
+5.【连续浮点坐标】X 0.0 最左 ~ 1.0 最右，Y 0.0 最顶 ~ 1.0 最底，中心 {x:0.5,y:0.5}。
    单人 "x":0.5,"y":0.5；双人并排 0.3 / 0.7；前后纵深 上 0.3 下 0.7；三人 0.2 / 0.5 / 0.8。可按动作自洽微调。
 
 ══ 模块三：连贯性、可见性与反冲突 (Consistency) ══
@@ -2395,11 +2409,15 @@ Zimage 擅长理解复杂的英文长句和语境。
 [示例3 · NSFW 局部特写 · 无面部]
 {"shouldDraw":true,"reason":"①结合部特写 ②L0复用 ③X级 ④三层 ⑤F类局部特写 ⑥面部整体下放UC ⑦自检","segments":[{"label":"结合部","anchor":{"text":"两人交合的地方泛着水光"},"scene":"Scene: NSFW, sex, {1boy, 1girl}, macro. Foreground: her trembling thigh and his hand gripping her hip, strongly out of focus. Middle ground: extreme close-up of the joined junction, wet glistening skin, sweat beads. Character occupying around 80% of the image height. Background: blurred bedsheet. Foreground thigh, Middle ground junction, Background sheet. pussy_focus, macro shot, shallow depth of field, warm low light;","negative":"censored, mosaic, face, head, full body, wide shot","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, adolescent, petite, 1.2::black hair::, small_breasts, fair skin","outfit":"nude","action":"lying on back, 1.3::legs spread, toes curled::","center":{"x":0.5,"y":0.6},"uc":"head, face, eyes, hair, full body"},{"name":"Partner (original)","base":"boy, slim, flat_chest, no abs, delicate_face, fair skin","outfit":"nude","action":"1.3::hand gripping her hip::","center":{"x":0.5,"y":0.35},"uc":"head, face, eyes, hair"}]}]}
 
+[示例4 · NSFW 骑乘女上 · 仰视双人同框]
+{"shouldDraw":true,"reason":"①女上位骑乘 ②L0复用 ③X级 ④三层 ⑤仰视高差from below非侧面 ⑥双人各带center且女上男下 ⑦自检","segments":[{"label":"骑乘·仰视","anchor":{"text":"她跨坐在他身上，双手撑着他的胸口慢慢沉下腰"},"scene":"Scene: NSFW, cowgirl position, girl on top, straddling, {1boy, 1girl}, couple, sex. Foreground: the near end of a rumpled pillow, strongly out of focus. Middle ground: a girl straddling a boy lying on his back, her hands planted on his chest, hips lowered onto him, both fully in frame. Character occupying around 72% of the image height. Background: dim bedroom, single warm lamp. Foreground pillow, Middle ground couple, Background bedroom. from below, low angle, full body, depth of field;","negative":"censored, mosaic, sex from behind, doggystyle, on all fours, prone bone, solo, solo focus, close-up","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"straddling him, 1.4::lowering hips::, riding, hands on his chest, looking down at him, flushed, mouth open","center":{"x":0.5,"y":0.3},"uc":"on all fours, from behind, extra limbs"},{"name":"Partner (original)","base":"boy, japanese, short_hair, 1.2::black hair::, dark eyes, slim, flat_chest, no abs, delicate_face, fair skin","outfit":"nude","action":"lying on back, 1.3::hands gripping her hips::, looking up at her","center":{"x":0.5,"y":0.62},"uc":"female body, standing, extra limbs"}]}]}
+
 输出前自检：
 (1) 顶层第一个键是 shouldDraw，且是布尔值不是字符串；
 (2) 要出图时 segments 至少 1 个；
 (3) 机位统计：pov ≤40%、from_side ≤1 个、首镜不是 from_side；
-(4) 有第二人动作时至少一半分镜是双人同框。
+(4) 有第二人动作时至少一半分镜是双人同框；
+(5) 体位与剧情一致：女上必须含 cowgirl position / girl on top 且不含 doggystyle；后入必须含 sex from behind；体位标签与画面描述不得互相矛盾。
 严格输出合法 JSON 对象！`;
 
     const SYSTEM_PROMPT_PRESETS = {
@@ -11645,6 +11663,24 @@ SCHEMA:
             legacy_uc: false,
         };
 
+        try {
+            const dp = payload.parameters || {};
+            sdtDiag() && sdtDiag().add('nai-payload', {
+                input: String(baseCaptionFinal || '').slice(0, 12000),
+                model: payload.model || '',
+                action: payload.action || 'generate',
+                seed: dp.seed,
+                params: {
+                    width: dp.width, height: dp.height, scale: dp.scale, sampler: dp.sampler,
+                    steps: dp.steps, noise_schedule: dp.noise_schedule, ucPresetId: dp.ucPresetId,
+                    qualityPresetId: dp.qualityPresetId, variety_boost: dp.variety_boost
+                },
+                negative_prompt: String(dp.negative_prompt || '').slice(0, 4000),
+                v4_prompt: dp.v4_prompt,
+                v4_negative_prompt: dp.v4_negative_prompt,
+                characters: characters.map(c => ({ name: c.name, caption: c.caption, uc: c.uc, center: c.center }))
+            });
+        } catch (e) { /* ignore */ }
         debugInfo(`NAI V4 多角色直注: ${characters.length} 个角色, base="${baseCaptionFinal.slice(0, 80)}..."`);
         if (!context) pendingNaiCharData = null; // legacy callers only
         return manga && RBQ.api.mangaProtocol ? RBQ.api.mangaProtocol.enhancePayload(payload, true, characters.map(c => c.name), renderSettings, !!textCompiled) : payload;
@@ -13345,6 +13381,90 @@ const SDT_FALLBACK_MODELS = [
 const SDT_RETRY_PER_MODEL = 2;
 const SDT_RETRY_BUDGET_MS = 300000;
 
+/* ===== [LOCAL PATCH] 诊断日志（本地采集，手机端可一键导出） ===== */
+const SDT_DIAG_KEY = 'rbq_sdt_diag_v1';
+const SDT_DIAG_MAX_RECORDS = 30;
+const SDT_DIAG_MAX_CHARS = 1600000;
+
+function sdtDiag() {
+    if (typeof window === 'undefined') return null;
+    if (window.__SDT_DIAG) return window.__SDT_DIAG;
+    let records = [];
+    try {
+        const raw = localStorage.getItem(SDT_DIAG_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) records = parsed;
+    } catch (e) { records = []; }
+    const persist = () => {
+        try {
+            let s = JSON.stringify(records);
+            while (s.length > SDT_DIAG_MAX_CHARS && records.length > 1) { records.shift(); s = JSON.stringify(records); }
+            localStorage.setItem(SDT_DIAG_KEY, s);
+        } catch (e) {
+            try { records.shift(); localStorage.setItem(SDT_DIAG_KEY, JSON.stringify(records)); } catch (e2) { /* ignore */ }
+        }
+    };
+    const api = {
+        records,
+        add(type, data) {
+            try {
+                const rec = Object.assign({ t: new Date().toISOString(), type }, data || {});
+                records.push(rec);
+                if (records.length > SDT_DIAG_MAX_RECORDS) records.splice(0, records.length - SDT_DIAG_MAX_RECORDS);
+                persist();
+                return rec;
+            } catch (e) { return null; }
+        },
+        clear() {
+            records.length = 0;
+            try { localStorage.removeItem(SDT_DIAG_KEY); } catch (e) { /* ignore */ }
+        },
+        dump() {
+            let store = {};
+            try { store = getStore() || {}; } catch (e) { store = {}; }
+            return {
+                schema: 'rbq-sdt-diag/1',
+                generatedAt: new Date().toISOString(),
+                pluginVersion: (typeof PLUGIN_VERSION !== 'undefined' ? PLUGIN_VERSION : ''),
+                env: {
+                    baseUrl: store.openaiBaseUrl || '',
+                    model: String(store.openaiModelCustom || '').trim() || store.openaiModel || '',
+                    fallbackEnabled: store.modelFallbackEnabled !== false,
+                    fallbackList: store.modelFallbackList || '',
+                    preset: store.systemPromptPreset || '',
+                    customPromptLen: String(store.customSystemPrompt || '').length,
+                    minSegments: store.minSegments,
+                    contextCount: store.contextCount,
+                    multiCharOutput: !!store.multiCharOutput,
+                    multiCharUseCoords: !!store.multiCharUseCoords,
+                    geminiJailbreak: !!store.geminiJailbreak,
+                    jailbreakPreset: store.geminiJailbreakPreset || '',
+                    toolCallMode: !!store.toolCallMode,
+                    markers: store.markers || '',
+                    lorebookEnabled: !!store.lorebookEnabled,
+                    lorebookBudget: store.lorebookBudget,
+                    characterMemoryEnabled: !!store.characterMemoryEnabled
+                },
+                count: records.length,
+                records
+            };
+        }
+    };
+    window.__SDT_DIAG = api;
+    return api;
+}
+
+(function exposeSdtDiag() {
+    try {
+        window.RBQ_SDT_DIAG = {
+            dump: () => sdtDiag().dump(),
+            clear: () => sdtDiag().clear(),
+            peek: () => sdtDiag().records.slice()
+        };
+    } catch (e) { /* ignore */ }
+})();
+/* ===== [END LOCAL PATCH] ===== */
+
 function sdtIsRetryableError(err, signal) {
     if (signal && signal.aborted) return false;
     if (!err) return true;
@@ -13372,6 +13492,8 @@ function sdtBuildModelChain(store) {
 
 async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     const o = opts || {};
+    const sdtDiagHandle = sdtDiag();
+    const sdtDiagT0 = Date.now();
     if (o.__noFallback) return await callOpenAiCompatibleOnce(messageId, trigger, o);
     const store = o.storeSnapshot || getStore();
     const chain = sdtBuildModelChain(store);
@@ -13398,6 +13520,23 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
                         toastr.success(`已由 ${model} 成功返回`, PLUGIN_NAME);
                     }
                 }
+                try {
+                    sdtDiagHandle && sdtDiagHandle.add('tagger-ok', {
+                        trigger: String(trigger || ''),
+                        messageId: messageId,
+                        model: model,
+                        primaryModel: chain[0] || '',
+                        attempt: a,
+                        chainIndex: ci,
+                        chain: chain,
+                        elapsedMs: Date.now() - sdtDiagT0,
+                        isToolCall: !!(result && result.isToolCall),
+                        toolName: (result && result.toolName) || '',
+                        reasoning: String((result && result.reasoning) || '').slice(0, 8000),
+                        rawReply: String((result && result.rawReply) || '').slice(0, 4000),
+                        rawOutput: String((result && result.rawOutput) || '').slice(0, 80000)
+                    });
+                } catch (e) { /* ignore */ }
                 return result;
             } catch (err) {
                 lastErr = err;
@@ -13424,6 +13563,20 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     err.code = 'SDT_ALL_MODELS_FAILED';
     err.rawOutput = report.join('\n\n');
     err.retryError = lastErr;
+    try {
+        sdtDiagHandle && sdtDiagHandle.add('tagger-fail', {
+            trigger: String(trigger || ''),
+            messageId: messageId,
+            primaryModel: chain[0] || '',
+            chain: chain,
+            elapsedMs: Date.now() - sdtDiagT0,
+            budgetHit: budgetHit,
+            attempts: report,
+            message: String(head + '\n' + body).slice(0, 6000),
+            lastRawOutput: String((lastErr && lastErr.rawOutput) || '').slice(0, 20000),
+            lastMessage: String((lastErr && lastErr.message) || '').slice(0, 4000)
+        });
+    } catch (e) { /* ignore */ }
     throw err;
 }
 /* ===== [END LOCAL PATCH] ===== */
@@ -17130,6 +17283,21 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
 
                 <div class="rbq-sdt-card-group">
                     <div class="rbq-sdt-card-header">
+                        <span class="rbq-sdt-card-title"><i class="fa-solid fa-clipboard-list" style="color:#f59e0b;"></i> 生图诊断日志</span>
+                    </div>
+                    <div style="font-size:12px;opacity:.75;line-height:1.6;margin:2px 0 8px 0;">
+                        自动记录最近 30 次生成：送给 LLM 的模型 / 渠道 / 耗时、LLM 返回的原始分镜 JSON（含每个 tag）、最终发给 NAI 的 base_caption + 每个角色的 caption/uc/center + seed。手机测完点「导出」发过来即可定位问题。
+                    </div>
+                    <div id="rbq-sdt-diag-count" style="font-size:12px;opacity:.8;margin:0 0 8px 0;">当前已记录：0 条</div>
+                    <div class="st-scene-trigger-buttons" style="margin: 4px 0 8px 0; display:flex; flex-wrap:wrap; gap:8px;">
+                        <button id="rbq-sdt-export-diag" class="menu_button" type="button"><i class="fa-solid fa-download"></i> 导出诊断日志 (JSON)</button>
+                        <button id="rbq-sdt-copy-diag" class="menu_button" type="button"><i class="fa-solid fa-copy"></i> 复制到剪贴板</button>
+                        <button id="rbq-sdt-clear-diag" class="menu_button" type="button"><i class="fa-solid fa-trash"></i> 清空</button>
+                    </div>
+                </div>
+
+                <div class="rbq-sdt-card-group">
+                    <div class="rbq-sdt-card-header">
                         <span class="rbq-sdt-card-title"><i class="fa-solid fa-arrows-rotate" style="color:#22c55e;"></i> 缓存与楼层扫描</span>
                     </div>
                     <div class="st-scene-trigger-buttons" style="margin: 4px 0 8px 0;">
@@ -17849,6 +18017,50 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             a.click();
             URL.revokeObjectURL(url);
             toastr.success('已成功导出智能生图全量配置快照', PLUGIN_NAME);
+        });
+
+        function refreshSdtDiagCount() {
+            const el = document.getElementById('rbq-sdt-diag-count');
+            if (!el) return;
+            let n = 0;
+            try { n = sdtDiag().records.length; } catch (e) { n = 0; }
+            el.textContent = `当前已记录：${n} 条（最多保留 30 条，超出自删最旧）`;
+        }
+        refreshSdtDiagCount();
+        setTimeout(refreshSdtDiagCount, 50);
+
+        document.getElementById('rbq-sdt-export-diag')?.addEventListener('click', () => {
+            try {
+                const data = sdtDiag().dump();
+                const jsonStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.href = url;
+                a.download = `sdt-diag-${stamp}.json`;
+                document.body.append(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 4000);
+                toastr.success(`已导出 ${data.count} 条诊断记录`, PLUGIN_NAME);
+            } catch (e) {
+                toastr.error(`导出失败：${e?.message || e}`, PLUGIN_NAME);
+            }
+        });
+
+        document.getElementById('rbq-sdt-copy-diag')?.addEventListener('click', async () => {
+            try {
+                const jsonStr = JSON.stringify(sdtDiag().dump(), null, 2);
+                await copyToClipboard(jsonStr);
+                toastr.success('诊断日志已复制到剪贴板', PLUGIN_NAME);
+            } catch (e) {
+                toastr.error(`复制失败：${e?.message || e}`, PLUGIN_NAME);
+            }
+        });
+
+        document.getElementById('rbq-sdt-clear-diag')?.addEventListener('click', () => {
+            try { sdtDiag().clear(); refreshSdtDiagCount(); toastr.success('诊断日志已清空', PLUGIN_NAME); } catch (e) { /* ignore */ }
         });
 
         document.getElementById('rbq-sdt-import-config')?.addEventListener('click', () => {
