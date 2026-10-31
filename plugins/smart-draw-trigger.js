@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.68';
+    const PLUGIN_VERSION = '6.5.69';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -3843,6 +3843,7 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
                 + '      <button type="button" class="menu_button" data-ch-act="up" title="上移（优先级更高）" style="width:auto;">↑</button>'
                 + '      <button type="button" class="menu_button" data-ch-act="down" title="下移" style="width:auto;">↓</button>'
                 + '      <button type="button" class="menu_button" data-ch-act="test" title="测活 + 工具调用检测" style="width:auto;">🩺 测试</button>'
+                + (String(record.toolSupport) === 'no' ? '      <button type="button" class="menu_button" data-ch-act="resetTool" title="清除「不支持工具调用」标记并解除冷却，重新参与路由（不改 Base URL / Key / 模型）" style="width:auto;">♻ 重置工具</button>' : '')
                 + (isDefault ? '' : '      <button type="button" class="menu_button" data-ch-act="del" title="删除该渠道" style="width:auto;">✕</button>')
                 + '    </span>'
                 + '  </div>'
@@ -3955,6 +3956,22 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
     }
 
+    // 6.5.69：手动清除被毒化的工具能力位（历史上一次 5xx 会被误判成「不支持工具」并永久封链）
+    function sdtResetChannelToolSupport(id) {
+        const store = getStore();
+        if (!store.channelHealth || typeof store.channelHealth !== 'object') store.channelHealth = {};
+        const record = (store.channelHealth[id] && typeof store.channelHealth[id] === 'object')
+            ? store.channelHealth[id]
+            : (store.channelHealth[id] = sdtEmptyChannelHealth());
+        record.toolSupport = 'unknown';
+        record.failCount = 0;
+        record.cooldownUntil = 0;
+        record.lastError = '';
+        try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+        renderChannelList();
+        sdtSetChannelStatus('已把渠道「' + id + '」的工具能力清回 unknown 并解除冷却，下一轮会重新尝试它。');
+    }
+
     function sdtSetChannelStatus(text) {
         const statusEl = document.getElementById('rbq-sdt-channel-status');
         if (statusEl) statusEl.textContent = text || '';
@@ -4011,6 +4028,7 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
                 else if (action === 'down') sdtMoveChannel(id, 1);
                 else if (action === 'del') sdtDeleteChannel(id);
                 else if (action === 'test') { sdtTestChannelById(id); }
+                else if (action === 'resetTool') { sdtResetChannelToolSupport(id); }
             };
             listEl.onchange = function (event) {
                 const field = event.target && event.target.getAttribute ? event.target.getAttribute('data-ch-field') : '';
@@ -15149,6 +15167,21 @@ SCHEMA:
             } else {
                 let errText = '';
                 try { errText = await autoRes.text(); } catch (_) {}
+                // 6.5.69：只有报文明确指向「工具/函数不支持」才改写渠道能力位。纯 5xx（中转抖动 / 超时 / 我方截断）
+                // 与「带报文但没提工具」的拒绝，一律按可切换的服务端错误处理——否则一次抖动会把渠道写成
+                // toolSupport:'no' 并永久封链（toolCallMode 下整条链被跳过，只能手点「全部自检」才恢复）。
+                const SDT_TOOL_HINT_RE = /tool|function|tool_choice|不支持|unsupported|not support/i;
+                const looksToolUnsupported = SDT_TOOL_HINT_RE.test(String(errText || ''));
+                const bodyEmpty = !String(errText || '').trim();
+                const serverSide = Number(autoRes.status) >= 500;
+                if (!looksToolUnsupported && (serverSide || !bodyEmpty)) {
+                    const genericErr = new Error(`大模型接口拒绝请求或被中转站拦截 (HTTP ${autoRes.status})：${String(errText || '').replace(/\s+/g, ' ').slice(0, 300) || '（无响应体）'}`);
+                    genericErr.code = 'SDT_CHANNEL_REQUEST_REJECTED';
+                    genericErr.status = autoRes.status;
+                    genericErr.responseText = errText;
+                    genericErr.rawOutput = `【错误】: 请求被渠道拒绝 (HTTP ${autoRes.status})\n【服务端返回报文】:\n${errText || '（无响应体）'}\n\n【说明】: 报文未提及工具调用，因此不改写该渠道的「工具能力」判定，仅按可切换的服务端/网关错误处理。`;
+                    throw genericErr;
+                }
                 const err = new Error(`大模型接口不支持工具调用 (Tool Call / Function Calling)。请在设置中关闭「结构化工具调用 (Tool Call)」开关，或更换支持 Tool Calling 的中转渠道。(HTTP ${autoRes.status})`);
                 err.code = 'SDT_TOOLS_UNSUPPORTED';
                 err.status = autoRes.status;
@@ -15537,7 +15570,30 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     if (!channels.length) throw sdtChannelChainEmptyError(store);
     const useTool = !!store.toolCallMode;
     // 工具调用模式下全部渠道都明确「不支持」时直接报错，禁止静默降级成普通 JSON 解析
-    if (useTool && channels.every(function (item) { return item.toolSupport === 'no'; })) throw sdtChannelNoToolError(channels);
+    if (useTool && channels.every(function (item) { return item.toolSupport === 'no'; })) {
+        const noToolErr = sdtChannelNoToolError(channels);
+        // 6.5.69：抛错前必须落一条诊断记录，否则用户导诊断包看到的是一片空白（只有 console.error 没人看得见）
+        try {
+            sdtDiagHandle && sdtDiagHandle.add('tagger-fail', {
+                trigger: (typeof trigger === 'string' ? trigger : JSON.stringify(trigger || '')),
+                messageId: messageId,
+                primaryModel: (channels[0] && channels[0].model) || '',
+                channels: channels.map(function (item) {
+                    const health = (store.channelHealth && store.channelHealth[item.id]) || {};
+                    return { id: item.id, name: item.name, model: item.model, toolSupport: item.toolSupport, failCount: Number(health.failCount) || 0, cooldownUntil: Number(health.cooldownUntil) || 0, lastError: String(health.lastError || '') };
+                }),
+                elapsedMs: Date.now() - sdtDiagT0,
+                budgetHit: false,
+                ...sdtDiagTaggerBits(),
+                attempts: [],
+                channelVerdicts: ['未发出任何请求：渠道链上全部渠道的工具能力位都是「不支持」'],
+                message: '所有渠道均不支持工具调用 → 未发出任何请求。修复：面板点「🩺 全部自检」重新实测，或对误判的渠道点「♻ 重置工具」把能力位清回 unknown。',
+                lastRawOutput: '',
+                lastMessage: String(noToolErr.message || '')
+            });
+        } catch (e) { /* ignore */ }
+        throw noToolErr;
+    }
     const startedAt = Date.now();
     const attemptLog = [];
     const channelLog = [];
