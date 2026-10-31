@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.70';
+    const PLUGIN_VERSION = '6.5.71';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2949,6 +2949,10 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         return preset?.prompt || DEFAULT_SYSTEM_PROMPT;
     }
 
+    /* 6.5.71 世界书注入预算默认值：8000 字符是早期单本世界书的经验值，现在的常驻模板（49 条）
+       自己就要 1.2 万字符以上，预算一顶满，靠后的「按关键词命中」模板全部被丢——那正是 tag 造词的源头断供。 */
+    const DEFAULT_LOREBOOK_BUDGET = 28000;
+
     const DEFAULTS = {
         enabled: false,
         mode: 'hybrid', // off | marker | auto | hybrid
@@ -2981,7 +2985,7 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         lorebookWafRetry: false,
         lorebookCurrentFloorOnly: false,
         lorebookContextDepth: 5,
-        lorebookBudget: 8000,
+        lorebookBudget: DEFAULT_LOREBOOK_BUDGET,
         lorebookSources: [],
         showLorebookHitBadge: false,
         showCharCoordBadge: false,
@@ -3025,6 +3029,8 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         cooldownState: new Map(),
     };
     const lorebookMemoryCache = new Map(); // sourceId -> Array of normalized entries
+    // 6.5.71 最近一次世界书匹配的账：激活 / 入选 / 字符 / 预算。体检要能一眼看出「预算顶满丢了几条」
+    let sdtLorebookStats = null;
 
     // Temp state for passing structured char data to buildNaiV4Payload hook
     let pendingNaiCharData = null;
@@ -4105,6 +4111,14 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
 
         // 6.5.58 多渠道：老存档没有 channels 时在这里迁移出「默认渠道」，并补齐 channelHealth（toolSupport 一律 unknown）
         try { sdtEnsureChannels(store); } catch (e) { /* 渠道迁移失败不得打断请求构造 */ }
+
+        // 6.5.71 一次性抬世界书预算：老存档里躺着的 8000 刚好被常驻模板吃满，按关键词命中的模板
+        // 一条都进不来（tag 造词的主要来源断供）。抬到 DEFAULT_LOREBOOK_BUDGET，并打标记位保证只抬一次——
+        // 用户之后自己调小（哪怕调回 8000）不会被反复改写。
+        if (!store.lorebookBudgetMigrated) {
+            if (!(Number(store.lorebookBudget) > 8000)) store.lorebookBudget = DEFAULT_LOREBOOK_BUDGET;
+            store.lorebookBudgetMigrated = true;
+        }
 
         return store;
     }
@@ -8306,7 +8320,7 @@ ${getCharacterMemoryTagSpecification()}
             return (b.order || 0) - (a.order || 0);
         });
 
-        const budget = Math.max(500, Number(store.lorebookBudget) || 8000);
+        const budget = Math.max(500, Number(store.lorebookBudget) || DEFAULT_LOREBOOK_BUDGET);
         let totalLen = 0;
         const budgeted = afterGroup.filter(entry => {
             const len = (entry.content || '').length;
@@ -8315,6 +8329,7 @@ ${getCharacterMemoryTagSpecification()}
             return true;
         });
 
+        sdtLorebookStats = { activated: afterGroup.length, selected: budgeted.length, chars: totalLen, budget: budget };
         debugInfo(`世界书匹配: ${afterGroup.length} 条激活, ${budgeted.length} 条入选 (预算 ${totalLen}/${budget} 字符)`);
         return budgeted;
     }
@@ -15483,7 +15498,10 @@ function sdtRoundInspectLines() {
         const budget = Number(lb.budget) || 0;
         const chars = Number(lb.chars) || 0;
         const tight = budget > 0 && chars >= Math.floor(budget * 0.95);
-        lines.push(`【世界书】${lb.enabled ? '开' : '关'}｜命中 ${lb.activated || 0} 条 / ${chars} 字｜预算 ${budget}${tight ? '（⚠️ 顶满预算，靠后的条目被丢掉了）' : ''}`);
+        const matched = Number(lb.activated) || 0;
+        const picked = Number.isFinite(Number(lb.selected)) ? Number(lb.selected) : matched;
+        const cut = matched - picked;
+        lines.push(`【世界书】${lb.enabled ? '开' : '关'}｜命中 ${matched} 条 → 入选 ${picked} 条${cut > 0 ? `（⚠️ 预算挤掉 ${cut} 条，关键词命中的模板进不来）` : ''} / ${chars} 字｜预算 ${budget}${tight ? '（⚠️ 顶满预算，靠后的条目被丢掉了）' : ''}`);
         if (Array.isArray(lb.titles) && lb.titles.length) {
             lines.push(`  标题：${lb.titles.slice(0, 6).join(' / ')}${lb.titles.length > 6 ? ' …' : ''}`);
         }
@@ -15785,7 +15803,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 lorebook: {
                     enabled: !!(store && store.lorebookEnabled),
                     budget: store && store.lorebookBudget,
-                    activated: lbList.length,
+                    activated: (sdtLorebookStats && Number(sdtLorebookStats.activated)) || lbList.length,
+                    selected: (sdtLorebookStats && Number(sdtLorebookStats.selected)) || lbList.length,
                     chars: lbChars,
                     ejsEntries: lbEjs.map(e => ({ uid: e.uid, source: e.sourceName || '', len: String((e && e.content) || '').length })),
                     titles: lbList.slice(0, 40).map(e => String((e && e.comment) || '').slice(0, 32)),
@@ -19468,7 +19487,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                         <div id="rbq-sdt-lorebook-current-floor-field" class="st-scene-trigger-field switch" title="仅从当前要生图的楼层中检索世界书关键词，彻底杜绝前文退场角色的幽灵入侵与历史特征污染。"><span>仅匹配当前楼层</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-lorebook-current-floor" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <div id="rbq-sdt-lorebook-badge-field" class="st-scene-trigger-field switch" title="在聊天消息中的生图卡片下方，显示本次触发命中的世界书词条徽章（如：📚 命中世界书: 校服-小学生）"><span>显示世界书命中徽章</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-lorebook-badge" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <label id="rbq-sdt-lorebook-depth-wrap" class="st-scene-trigger-field"><span>世界书扫描深度</span><input id="rbq-sdt-lorebook-depth" type="number" min="1" max="50" step="1"></label>
-                        <label class="st-scene-trigger-field"><span>世界书注入预算（字符）</span><input id="rbq-sdt-lorebook-budget" type="number" min="500" step="500"></label>
+                        <label class="st-scene-trigger-field" title="常驻模板自己就要 1.2 万字符以上；预算顶满时靠后的条目被整条丢掉，按关键词命中的模板就永远进不来（表现为 tag 变薄、造词突然变准或变糊）。默认 28000。"><span>世界书注入预算（字符）</span><input id="rbq-sdt-lorebook-budget" type="number" min="500" step="500"></label>
                     </div>
                     <div class="st-scene-trigger-buttons" style="margin:10px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                         <button id="rbq-sdt-import-lorebook" class="menu_button" type="button"><i class="fa-solid fa-file-import"></i> 选择世界书文件</button>
@@ -19610,7 +19629,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         document.getElementById('rbq-sdt-lorebook-waf-retry').checked = !!store.lorebookWafRetry;
         document.getElementById('rbq-sdt-char-coord-badge').checked = store.showCharCoordBadge !== false;
         document.getElementById('rbq-sdt-lorebook-depth').value = store.lorebookContextDepth;
-        document.getElementById('rbq-sdt-lorebook-budget').value = store.lorebookBudget || 8000;
+        document.getElementById('rbq-sdt-lorebook-budget').value = store.lorebookBudget || DEFAULT_LOREBOOK_BUDGET;
         document.getElementById('rbq-sdt-provider').value = store.provider;
         document.getElementById('rbq-sdt-openai-base').value = store.openaiBaseUrl;
         document.getElementById('rbq-sdt-openai-key').value = store.openaiApiKey;
@@ -19973,7 +19992,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             s.lorebookWafRetry = checked('rbq-sdt-lorebook-waf-retry');
             s.showCharCoordBadge = checked('rbq-sdt-char-coord-badge');
             s.lorebookContextDepth = Math.max(1, Math.min(50, Number(val('rbq-sdt-lorebook-depth')) || 5));
-            s.lorebookBudget = Math.max(500, Number(val('rbq-sdt-lorebook-budget')) || 8000);
+            s.lorebookBudget = Math.max(500, Number(val('rbq-sdt-lorebook-budget')) || DEFAULT_LOREBOOK_BUDGET);
             s.provider = val('rbq-sdt-provider');
             s.openaiBaseUrl = val('rbq-sdt-openai-base').trim();
             s.openaiApiKey = val('rbq-sdt-openai-key').trim();

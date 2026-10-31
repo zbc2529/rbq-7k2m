@@ -2,9 +2,9 @@
   {
     "id": "rbq-smart-draw-trigger",
     "name": "智能生图触发器 (Smart Draw Trigger)",
-    "description": "智能生图触发 · 内置 V41 提示词(体位词典/机位轮转/体型六档) · 多渠道路由/故障切换+工具调用能力自检 · 诊断日志导出 · 姿势引擎桥接(storyFacts+体位锁定) · 服装状态桥接+机位肢势互斥 · 坐标兜底+体位硬闸门+中文词面清洗 · 饰品/湿损/形变走矩阵(C18 补 amazon·wheelbarrow) · 渠道工具位防毒化(纯5xx不判不支持/一键重置/未发请求也留诊断)",
-    "version": "6.5.70",
+    "description": "智能生图触发 · 内置 V41 提示词(体位词典/机位轮转/体型六档) · 多渠道路由/故障切换+工具调用能力自检 · 诊断日志导出 · 姿势引擎桥接(storyFacts+体位锁定) · 服装状态桥接+机位肢势互斥 · 坐标兜底+体位硬闸门+中文词面清洗 · 饰品/湿损/形变走矩阵(C18 补 amazon·wheelbarrow) · 渠道工具位防毒化(纯5xx不判不支持/一键重置/未发请求也留诊断) · 世界书预算默认 28000+老存档一次性抬升(tag 造词不再断供)",
+    "version": "6.5.71",
     "author": "TTWP-09",
-    "main": "plugins/smart-draw-trigger.js?v=6.5.70"
+    "main": "plugins/smart-draw-trigger.js?v=6.5.71"
   }
 ]
