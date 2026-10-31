@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.69';
+    const PLUGIN_VERSION = '6.5.70';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -13670,13 +13670,19 @@ SCHEMA:
                     }
                     const hit = others.filter(function (t) { return sdtTagHasLoose(input, t); });
                     const sexish = SDT_GATE_SEX_RE.test(input);
-                    if (hit.length || sexish) {
+                    // 6.5.70：分镜自己声明了 SFW（base 里 Scene: SFW）时，别的主类 tag（如 standing / sitting）只是构图词，
+                    // 不代表「模型换类」。此时强行补体位词会把一张 SFW 图变味（实测：窗边站立的日常镜头被塞进 paizuri）。
+                    // switch 分支加 SFW 门；sexish（正文明确性行为/裸露）优先，不受此限。
+                    const sfwScene = /scene\s*[:：]\s*sfw/i.test(String(input));
+                    if (sexish || (hit.length && !sfwScene)) {
                         const add = main.slice(0, 2).join(', ');
                         input = input + ', 1.3::' + add + '::';
                         rec.added = add;
                         rec.switched = hit.slice(0, 6);
                         rec.gateWhy = hit.length ? 'switch' : 'sexish';
                         hasOwn = true;
+                    } else if (hit.length && sfwScene) {
+                        rec.skippedSfw = hit.slice(0, 4);
                     }
                 }
                 // ①b 变体触发（6.5.65）：体位名/正文命中变体 zh 关键词（如「六九」→ 69）→ 追加该变体 tags
