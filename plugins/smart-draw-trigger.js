@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.72';
+    const PLUGIN_VERSION = '6.5.73';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -306,6 +306,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
   · anchor: {"text": "逐字原样摘自正文该分镜对应段落的10~40字原文"}
   · scene: 分层空间结构与环境总览字符串
   · negative: 全场通用负面排除词（Scene UC，包含分级底线词如 nude, completely nude 等，与角色私属 UC 隔离）
+  · pose: {"class": "C0x 或 null", "variant": "变体名或空串", "word": "逐字摘自本分镜 anchor.text 的体位词", "source": "text|caption|null"}。**本分镜的体位由你判定**：看本分镜的正文怎么写，从 [体位主类表] 里挑最贴的一个；正文没写清姿势就填 {"class": null}，不要猜、不要沿用上一分镜默认值
   · characters[i]:
     - name: 精确角色名。已建档角色必须逐字复制档案 name_tag（无则复制档案名），不翻译、不追加作品名；新同人角色带作品全称如 "Kaguya Shinomiya (Kaguya-sama: Love Is War)"（引擎自动加权为 2::Name::）；同人皮肤用 "2::Name (Series) (skin name)::"；原创用 "Ami (original)"；配角用 "faceless male"
     - base: 7维外貌防伪特征（纯净无服装动作）
@@ -2139,6 +2140,7 @@ Zimage 擅长理解复杂的英文长句和语境。
      · anchor: {"text": "逐字原样摘自正文该分镜所在段落的10~40字原文"}
      · scene: 分层空间结构与环境总览字符串
      · negative: 全场通用负面排除词（Scene UC）
+     · pose: {"class": "C0x 或 null", "variant": "变体名或空串", "word": "逐字摘自本分镜 anchor.text 的体位词", "source": "text|caption|null"}。**本分镜的体位由你判定**：看本分镜正文怎么写，从 [体位主类表] 挑最贴的一个；正文没写清姿势就填 {"class": null}，不要猜、不要沿用上一分镜默认值
      · characters[j]: 数组。name（名称与作品）, base（7维外貌防伪）, outfit（四要素签名服装）, action（碎化动作+权重+表情）, center（空间连续浮点坐标对象 {"x": 0.5, "y": 0.5} 或 "X, Y"）, uc（该角色专属负面）
 
 ══ 经典实战分镜示例 ══
@@ -12597,6 +12599,13 @@ SCHEMA:
     let legacyImageQueue = Promise.resolve();
     function generateSdtImage(segment, prompt, reason, meta = {}, onProgress = null) {
         if (onSdtNaiPayload.disposed) return Promise.reject(new Error('智能生图插件已卸载，请刷新后重试'));
+        // 6.5.73：本张图对应的分镜（含 AI 判的 pose）先落到通道，闸门据此判类。
+        // 注意：这里的 segment 常是「合成对象」（只带 characters/manga 字段，见 runImageGenerationForWrapper），
+        // 它没有 anchor/pose —— 那种情况不许覆盖调用方登记的**真实分镜**，否则 AI 判类会被静默冲掉。
+        try {
+            const looksReal = !!(segment && (segment.anchor || segment.pose));
+            if (looksReal) sdtSetCurrentSeg(segment, meta && meta.segIndex);
+        } catch (e) { /* ignore */ }
         const data = buildNaiCharData(segment);
         if (RBQ.api.generationContextVersion >= 1) {
             return RBQ.api.generateImage(prompt, reason, { ...meta, sdtCharacterData: data }, onProgress);
@@ -13017,6 +13026,15 @@ SCHEMA:
                 ...(result.mangaTextCompiled === true ? { mangaTextCompiled: true } : {}),
                 ...(result.mangaRenderSettings ? { mangaRenderSettings: { ...result.mangaRenderSettings } } : {}) } : {}),
             anchor: result.anchor || { type: 'bottom' },
+            // 6.5.73：AI 在该分镜里判的体位（sanitize 白名单漏了它 → 编辑一次分镜就把判类丢掉）
+            ...(result.pose && typeof result.pose === 'object' ? {
+                pose: {
+                    ...(result.pose.class !== undefined ? { class: String(result.pose.class || '').slice(0, 16) } : {}),
+                    ...(result.pose.variant !== undefined ? { variant: String(result.pose.variant || '').slice(0, 40) } : {}),
+                    ...(result.pose.word !== undefined ? { word: String(result.pose.word || '').slice(0, 40) } : {}),
+                    ...(result.pose.source !== undefined ? { source: String(result.pose.source || '').slice(0, 12) } : {}),
+                },
+            } : {}),
             reason: String(result.reason || '').slice(0, 500),
             thinkContent: String(result.thinkContent || '').slice(0, 1000),
             segments: Array.isArray(result.segments) ? result.segments : [],
@@ -13480,6 +13498,9 @@ SCHEMA:
             // 6.5.72：正文主导模式才追加分镜骨架——引擎主导 / 无剧本 → 一个键都不加（payload 逐字节不变）
             const factsMode = sdtPoseMode(store, engine);
             const factsSegs = (factsMode === 'body') ? sdtNormalizeSegments(engine) : [];
+            // 6.5.73：正文主导模式下即使世界书还没写剧本，也必须走「建议非锁定」的引导段。
+            // 旧条件要求 factsSegs.length>0，导致「正文主导 + 无剧本」时退回引擎锁定措辞（真机事故：C17 定稿写进 prompt）。
+            // 6.5.73：无剧本仍不写 facts（G9/K14/S1 零改动契约）——AI 判类不依赖 prompt 里的体位块
             if (factsMode === 'body' && factsSegs.length && !(store && store.poseBodyFirst === false)) {
                 facts.poseMode = 'body';
                 facts.segments = sdtSegmentsForFacts(factsSegs);
@@ -13522,6 +13543,34 @@ SCHEMA:
             const cap = typeof max === 'number' && max > 0 ? max : 200;
             return flat.length > cap ? flat.slice(0, cap) : flat;
         } catch (e) { return ''; }
+    }
+
+    /** 6.5.73：18 个主类的紧凑清单，注入 tagger 工具描述，让 AI 在清单里选而不是靠猜 */
+    function sdtPoseClassMenu() {
+        try {
+            const list = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX.poses : [];
+            const out = [];
+            for (let i = 0; i < list.length; i++) {
+                const p = list[i] || {};
+                if (!p.code) continue;
+                out.push(String(p.code) + ' ' + sdtFactText(p.label || '', 16));
+            }
+            return out.join(' / ');
+        } catch (e) { return ''; }
+    }
+
+    /** 6.5.73：把主类清单挂到工具描述上（只改克隆体，绝不动共享常量） */
+    function sdtWithPoseMenu(tool) {
+        try {
+            if (!tool || !tool.function) return tool;
+            const menu = sdtPoseClassMenu();
+            if (menu) {
+                tool.function.description = String(tool.function.description || '')
+                    + '\n[POSE CLASS TABLE] ' + menu
+                    + '\n每个 segment 必须在 pose.class 里给出该镜的体位主类，只能取自上表；判不出就留空，禁止套用引擎掷骰或上一镜的类。';
+            }
+            return tool;
+        } catch (e) { return tool; }
     }
 
     /** 6.5.61：按主类 code 取词面条目（C11 / c11 / 11 都认；找不到返回 null） */
@@ -13804,6 +13853,69 @@ SCHEMA:
     }
 
     /** 剧本 → 分镜数组（容忍 JSON 字符串 / 多种键名；每项归一成 {index,pose,place,tier,anchorText,texts}） */
+    /** 6.5.73：把 tagger 输出的 segments 归一成与 sdtNormalizeSegments 同形状。
+     *  存在意义：让「本镜是什么姿势」由 AI 在生成 tag 时一并判定（seg.pose.ai=true），
+     *  而不是等插件拿中文词表去正文里猜。世界书剧本存在时仍以剧本为准（作者显式覆盖）。 */
+    function sdtSegmentsFromPayload(payload) {
+        try {
+            let list = (payload && Array.isArray(payload.segments)) ? payload.segments : [];
+            // 6.5.73：宿主拼的 payload 通常不带 segments → 回落到「本张图的分镜」（generateSdtImage 写入）
+            if (!list.length && SDT_CURRENT_SEG) {
+                const one = (SDT_CURRENT_SEG.index === undefined) ? { ...SDT_CURRENT_SEG, index: SDT_CURRENT_SEG_IDX } : SDT_CURRENT_SEG;
+                list = [one];
+            }
+            if (!list.length) return [];
+            const out = [];
+            for (let i = 0; i < list.length && i < 64; i++) {
+                const s = list[i];
+                if (!s || typeof s !== 'object') continue;
+                const poseSrc = (s.pose && typeof s.pose === 'object') ? s.pose : null;
+                const clsRaw = poseSrc ? ((poseSrc.class !== undefined && poseSrc.class !== null) ? poseSrc.class : poseSrc.className) : '';
+                const ent = sdtPoseMatrixEntry(clsRaw);
+                const anchorText = sdtFactText((s.anchor && (s.anchor.text !== undefined ? s.anchor.text : s.anchor.content)) || '', 1200);
+                const texts = [];
+                const bodyTexts = [];
+                const push = function (v, isBody) {
+                    const t = sdtFactText(v, 1200);
+                    if (!t) return;
+                    if (texts.indexOf(t) < 0) texts.push(t);
+                    if (isBody && bodyTexts.indexOf(t) < 0) bodyTexts.push(t);
+                };
+                push(anchorText, true);
+                if (Array.isArray(s.characters)) {
+                    for (let k = 0; k < s.characters.length && k < 4; k++) {
+                        const c = s.characters[k];
+                        if (!c || typeof c !== 'object') continue;
+                        push(c.action, true);
+                        push(c.outfit, false);
+                        push(c.base, false);
+                    }
+                }
+                push(s.scene, false);
+                out.push({
+                    index: i,
+                    seq: i,
+                    pose: {
+                        class: ent ? ent.code : '',
+                        className: ent ? ent.code : '',
+                        label: ent ? sdtFactText(ent.label, 40) : '',
+                        variant: (ent && poseSrc && poseSrc.variant !== undefined && poseSrc.variant !== null) ? String(poseSrc.variant) : '',
+                        ai: !!ent,                                  // AI 亲自判出的主类：优先于插件词表
+                        aiRaw: (poseSrc && poseSrc.class) ? sdtFactText(poseSrc.class, 16) : '',
+                        word: poseSrc ? sdtFactText(poseSrc.word, 40) : '',
+                        aiSrc: poseSrc ? sdtFactText(poseSrc.source, 12) : '',
+                    },
+                    place: null,
+                    tier: (s.outfit && s.outfit.tier !== undefined) ? s.outfit.tier : (s.tier !== undefined ? s.tier : null),
+                    anchorText: anchorText,
+                    texts: texts,
+                    bodyTexts: bodyTexts,
+                });
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+
     function sdtNormalizeSegments(engine) {
         try {
             if (!engine) return [];
@@ -13952,6 +14064,11 @@ SCHEMA:
             // 一旦正文另有主类实词（后入/side 等）→ 以主类实词定类，变体名只作几何描述
             const variantAmb = !!(hitVariant && sdtVariantAmbiguous(hitVariant.variant));
             const useVariant = !!(hitVariant && !(variantAmb && hitText && hitText.class !== hitVariant.class));
+            const aiPose = (segPose && segPose.ai && segPose.class) ? sdtPoseMatrixEntry(segPose.class) : null;
+            // 词表与 AI 判决不一致 → 只记账上屏，按 AI 执行（用户 6.5.73 口径：判定权在 AI，词表只做交叉校验）
+            const aiConflict = (aiPose && hitText && hitText.class && hitText.class !== aiPose.code)
+                ? { ai: aiPose.code, dict: String(hitText.class), word: String(hitText.word || '') }
+                : null;
             let ent = null;
             let source = '';
             // 分支链顺序即裁决优先级（静态断言 segment.resolveOrder 依赖这三行的先后）：
@@ -13959,7 +14076,10 @@ SCHEMA:
             //   b) else if (hitText   正文主类实词
             //   c) else if (declared) 段声明
             // F03 只加「跨类变体名但正文另有主类实词」的降级条件（useVariant），顺序不变。
-            if (hitVariant && useVariant) { ent = sdtPoseMatrixEntry(hitVariant.class); source = 'body'; }
+            // 6.5.73：分支 0 —— AI 在分镜里亲自判的主类。它读的是整段正文，比约 80 词的中文表强得多；
+            // 词表退为交叉校验（aiConflict 只记账上屏，不改判）。判不出（ai=false）才继续走 a/b/c。
+            if (aiPose) { ent = aiPose; source = 'ai'; }
+            else if (hitVariant && useVariant) { ent = sdtPoseMatrixEntry(hitVariant.class); source = 'body'; }
             else if (hitText) { ent = sdtPoseMatrixEntry(hitText.class); source = 'body'; }
             else if (declared) { ent = declared; source = 'director'; }
             else {
@@ -13968,8 +14088,9 @@ SCHEMA:
                 if (carryCls) { const ce = sdtPoseMatrixEntry(carryCls); if (ce) { ent = ce; source = 'carry'; } }
             }
             const declaredCls = (segPose && segPose.class) ? String(segPose.class).toUpperCase() : '';
-            const variant = useVariant ? String(hitVariant.variant)
-                : ((declaredCls && ent && declaredCls === ent.code && segPose.variant) ? String(segPose.variant) : '');
+            const variant = (aiPose && segPose && segPose.variant && ent && aiPose.code === ent.code) ? String(segPose.variant)
+                : (useVariant ? String(hitVariant.variant)
+                    : ((declaredCls && ent && declaredCls === ent.code && segPose.variant) ? String(segPose.variant) : ''));
             const tags = [];
             if (ent) {
                 const mains = Array.isArray(ent.main) ? ent.main.map(String) : [];
@@ -13994,9 +14115,12 @@ SCHEMA:
                 protected: tags.slice(0, 8),
                 source: source,
                 hitSrc: hitSrc,
+                aiDeclared: !!aiPose,
+                aiConflict: aiConflict,
                 segIndex: seg ? seg.index : null,
-                word: useVariant ? hitVariant.word : (hitText ? hitText.word : ''),
-                hitWord: useVariant ? hitVariant.word : (hitText ? hitText.word : ''),
+                // 6.5.73：AI 判类时，体检行显示的原词必须是 AI 从 anchor.text 逐字引的那一个（不是词表的近义词）
+                word: aiPose ? (segPose.word || '') : (useVariant ? hitVariant.word : (hitText ? hitText.word : '')),
+                hitWord: aiPose ? (segPose.word || '') : (useVariant ? hitVariant.word : (hitText ? hitText.word : '')),
                 declared: (segPose && segPose.class) ? String(segPose.class).toUpperCase() : '',
                 carry: source === 'carry',
                 fallback: !ent,
@@ -14465,7 +14589,13 @@ SCHEMA:
             if (gateMode === 'off') { SDT_GATE_LAST = { phase: negOnly ? 'neg' : 'input', gateMode: 'off', why: 'gate-off' }; return null; }   // 闸门总开关
             const poseMode = sdtPoseMode(poseStore, engine);
             const bodyFirstOn = !(poseStore && poseStore.poseBodyFirst === false);
-            const segs = (poseMode === 'body') ? sdtNormalizeSegments(engine) : [];
+            // 6.5.73：分镜来源两路——世界书剧本（作者显式写）优先，缺剧本时改用 tagger 自己分出的 segments。
+            // 后者是修「正文写了抱着、插件词表不认识、引擎 C17 顶上去」的关键：AI 在写 tag 时已顺带判了主类。
+            const segs = (poseMode === 'body') ? (function () {
+                const fromBook = sdtNormalizeSegments(engine);
+                if (fromBook.length) return fromBook;
+                return sdtSegmentsFromPayload(payload);
+            })() : [];
             const segPick = segs.length ? sdtPickSegmentForPayload(payload, segs, engine) : { seg: null, index: -1, why: 'legacy' };
             const seg = segPick.seg;
             // 无剧本（剧本变量缺失）→ 不做正文判定，整段与 6.5.71 一致
@@ -14475,12 +14605,13 @@ SCHEMA:
             else if (poseMode === 'body' && seg && !(bodyPose && bodyPose.className)) rec.gateWhy = 'fallback';
             // 该分镜正文/剧本已声明主类 → 不补、不改写、不跨类补（引擎类不再当渲染指令源）
             // 6.5.72 rev3：只有「正文显式给出主类」才锁；仅段声明（正文无线索）时走引擎兜底补词一次
-            const bodyLock = !!(bodyPose && bodyPose.source === 'body');
+            // 6.5.73：source='ai' 是 AI 在分镜里判的主类 —— 与正文同权，锁死补词与换类。
+            const bodyLock = !!(bodyPose && (bodyPose.source === 'body' || bodyPose.source === 'ai'));
             // F08（6.5.72）：补词条件看「本镜是否已有可判定的正文主类」——段声明（director）或判不出主类都算没有，
             // 仍然要兜底补一次引擎主类；只有正文真的定了一个主类时才禁止补词（旧码用 !classMismatch 代替，与规格冲突3 不符）。
             // F08：只有「正文真写了主类」（source body / carry）才锁死补词；分镜声明类不算正文证据，
             // 否则声明 C11 而 input 缺 fellatio 时该镜的词面永远补不上（K9）。
-            const bodyPoseLive = (bodyPose && bodyPose.className && (bodyPose.source === 'body' || bodyPose.source === 'carry')) ? bodyPose : null;
+            const bodyPoseLive = (bodyPose && bodyPose.className && (bodyPose.source === 'body' || bodyPose.source === 'carry' || bodyPose.source === 'ai')) ? bodyPose : null;
             // 6.5.72 rev5（问题②）：保护集合 = 体位锚词（正文显式定类时） ∪ 正文点名的服装/配件词（任何模式都算）
             // 口径：让细节让位前，先看它是不是用户点名的；宁可不删，不许静默删。
             const poseProt = bodyLock ? bodyPose.protected.slice() : [];
@@ -14641,6 +14772,8 @@ SCHEMA:
                     if (!Array.isArray(rec.skippedLong)) rec.skippedLong = [];
                     rec.skippedLong.push('main:' + (entry.code || '') + '@' + input.length);
                 }
+                // 6.5.73：这里仍是 L2 兜底（规格 docs/22 §2）——只有「正文、分镜、AI 都没给主类」时才补一次引擎主类；
+                // 真机上「抱着」被补成 C17 bondage 的根因不是这条兜底，而是 AI 从未被问过姿势（已由分镜 pose 字段修掉）。
                 if (main.length && !hasOwn && entry && input.length <= 1800 && !bodyPoseLive && !classMismatch) {
                     const all = Array.isArray(M.poses) ? M.poses : [];
                     const others = [];
@@ -14892,6 +15025,8 @@ SCHEMA:
                 segIndex: segPick.index, segWhy: segPick.why,
                 bodyClass: bodyPose ? bodyPose.className : '', bodySource: bodyPose ? bodyPose.source : '',
                 bodyWord: bodyPose ? bodyPose.word : '', l1Class: entry ? entry.code : '',
+                // 6.5.73：AI 判类要被看见 —— aiDeclared 回答「本镜主类是不是 AI 判的」，aiConflict 回答「词表当时怎么说」
+                aiDeclared: !!(bodyPose && bodyPose.aiDeclared), aiConflict: (bodyPose && bodyPose.aiConflict) ? bodyPose.aiConflict : null,
                 added: rec.added, dropped: rec.dropped.slice(0, 16), uc: rec.uc.slice(0, 16),
                 mixedDropped: rec.mixedDropped || [], protectedKept: rec.protectedKept || [],
                 outfitConflict: rec.outfitConflict || null, conflictSkipped: rec.conflictSkipped || [],
@@ -15232,6 +15367,17 @@ SCHEMA:
     let SDT_OUTFIT_DIAG = { tierRaw: null, tierSrc: 'none', rowName: '', rowIndex: -1, rowWhy: '', d: null, outfitSet: '', outfitSetVar: '' };
     // F01：最近一次过闸的 payload —— 体检行（桥接块外）拿不到 gate 的局部变量，靠这条通道读 payload.meta.segIndex
     let SDT_LAST_PAYLOAD = null;
+    // 6.5.73：AI 判类的分镜载体。真机上闸门拿到的 payload 是宿主（RBQ）拼的，里面没有 segments ——
+    // 分镜对象在 generateSdtImage 的入参上，所以在这里压一条通道：每张图生成前把「本张对应的分镜」
+    // 放进来，闸门缺 segments 时用它（逐图各判各的，不串台）。声明放在桥接块内，闸门与体检行都能直接用。
+    let SDT_CURRENT_SEG = null;
+    let SDT_CURRENT_SEG_IDX = 0;
+    /** 6.5.73：登记「本张图的分镜」（由 generateSdtImage 调用；手动/测试通道同样生效） */
+    function sdtSetCurrentSeg(seg, idx) {
+        SDT_CURRENT_SEG = (seg && typeof seg === 'object') ? seg : null;
+        const n = Number(idx);
+        SDT_CURRENT_SEG_IDX = (isFinite(n) && n >= 0) ? Math.floor(n) : 0;
+    }
 // 6.5.72（F09）：闸门最后一次结论——即使 payload 一字未改，面板也要能看见「为什么没改」
 let SDT_GATE_LAST = null;
 
@@ -15806,6 +15952,8 @@ function sdtOutfitRuleNoteLines(probeText) {
                 accentResidue: outfitResidueList, accessoryTags: sdtAccessoryTags, wetnessFromText: sdtWetnessFromText,
                 formTag: sdtFormTag, formConflicts: sdtFormConflicts, ruleGate: sdtOutfitRuleGate,
                 poseMode: sdtPoseMode, poseSegments: sdtNormalizeSegments, segmentsForFacts: sdtSegmentsForFacts,
+                segmentsFromPayload: sdtSegmentsFromPayload,
+            setCurrentSeg: sdtSetCurrentSeg, poseClassMenu: sdtPoseClassMenu,
                 pickSegment: sdtPickSegmentForPayload, resolveSegmentPose: sdtResolveSegmentPose,
                 dropAllGuarded: sdtDropAllGuarded, skeletonLine: sdtSegmentSkeletonLine, variantHit: sdtVariantHitInText,
                 crossClassTags: sdtCrossClassTags, adviceText: sdtAdviceText,
@@ -15886,6 +16034,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                     {
                         label: 'string (5~15字中文分镜名，如 分镜01·登场/前奏/特定视觉节点)',
                         anchor: { text: 'string exact copy from currentMessage (该画面所在段落10~40字逐字原文)' },
+                        pose: { class: 'string (C01~C18 之一；判不出留空字符串，禁止猜)', variant: 'string (该主类变体键，可选)', word: 'string (anchor.text 里逐字出现的中文原词，2~10字)', source: 'text | implied | none' },
                         scene: 'string danbooru tags, NO quality tags, NO character tags',
                         characters: [
                             { name: 'string stable archive name', name_tag: 'optional English/romanized drawing identity for a non-English name; reuse saved name_tag', base: 'string fixed appearance', outfit: 'string current clothing', action: 'string current pose/expression', center: 'string e.g. C3', uc: 'string negative' }
@@ -15894,6 +16043,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                     {
                         label: 'string (如 分镜02·后续动作演进/高潮互动，所有该生图的节点均各建独立分镜)',
                         anchor: { text: 'string exact copy from currentMessage (后续画面所在段落逐字原文)' },
+                        pose: { class: 'string (C01~C18 之一；判不出留空字符串，禁止猜)', variant: 'string (该主类变体键，可选)', word: 'string (anchor.text 里逐字出现的中文原词，2~10字)', source: 'text | implied | none' },
                         scene: 'string tags',
                         characters: [
                             { name: 'string stable archive name', name_tag: 'optional English/romanized drawing identity for a non-English name; reuse saved name_tag', base: 'string fixed appearance', outfit: 'string current clothing', action: 'string current pose/expression', center: 'string e.g. C3', uc: 'string negative' }
@@ -15903,6 +16053,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                     {
                         label: 'string (5~15字中文分镜名，如 分镜01·动作画面；支持自适应输出1个或多个分镜)',
                         anchor: { text: 'string exact copy from currentMessage (10~40字逐字原文)' },
+                        pose: { class: 'string (C01~C18 之一；判不出留空字符串，禁止猜)', variant: 'string (该主类变体键，可选)', word: 'string (anchor.text 里逐字出现的中文原词，2~10字)', source: 'text | implied | none' },
                         scene: 'string danbooru tags, NO quality tags, NO character tags',
                         characters: [
                             { name: 'string stable archive name', name_tag: 'optional English/romanized drawing identity for a non-English name; reuse saved name_tag', base: 'string fixed appearance', outfit: 'string current clothing', action: 'string current pose/expression', center: 'string e.g. C3', uc: 'string negative' }
@@ -16480,6 +16631,16 @@ function sdtOutfitRuleNoteLines(probeText) {
                                 },
                                 scene: { type: 'string', description: 'Layered scene and environment tags' },
                                 negative: { type: 'string', description: 'Scene negative prompt (Scene UC)' },
+                                pose: {
+                                    type: 'object',
+                                    description: '本分镜的体位判定。通读正文后自行判断并填写；判不出来就整块省略（或 class 留空）。禁止套用引擎/世界书掷骰结果，也禁止为了填满而猜。',
+                                    properties: {
+                                        class: { type: 'string', description: '体位主类代号，必须取自 C01~C18（清单见本工具描述里的 CLASS 表）。判不出留空字符串。' },
+                                        variant: { type: 'string', description: '该主类下的变体键（英文 snake_case，例如 prone_bone / against_wall）。不确定就留空。' },
+                                        word: { type: 'string', description: '判定依据：anchor.text 中逐字出现的原词（2~10字），必须能在 anchor.text 里原样找到。不允许改写或概括。' },
+                                        source: { type: 'string', description: 'text=正文明确写了该姿势；implied=正文没直写但动作序列只有一种合理解读；none=判不出。' }
+                                    }
+                                },
                                 characters: {
                                     type: 'array',
                                     items: {
@@ -16533,7 +16694,9 @@ function sdtOutfitRuleNoteLines(probeText) {
                     tool.function.parameters.properties.reason.description = 'Frame feature telemetry summary; brief technical decomposition note.';
                 }
                 tool.function.parameters.required = ['shouldDraw', 'segments'];
-            } else tool = DRAW_SPEC_TOOL;
+                // 6.5.73：这条分支（geminiJailbreak 系列）同样要挂主类清单，否则 AI 有 pose 字段却不知道可选值
+                tool = sdtWithPoseMenu(tool);
+            } else tool = sdtWithPoseMenu(JSON.parse(JSON.stringify(DRAW_SPEC_TOOL)));
         } else {
             tool = JSON.parse(JSON.stringify(DRAW_SPEC_TOOL));
             tool.function.parameters.properties.reason.description = 'Brief summary of selected story beats, actual page count and page allocation; no extended reasoning.';
@@ -16598,7 +16761,10 @@ function sdtOutfitRuleNoteLines(probeText) {
 
     const DRAW_SPEC_TOOL_INPUT_MESSAGE = '请读取 generate_draw_spec 工具说明中的本次任务输入，按系统规则分析并通过该工具提交结果。';
     const DRAW_SPEC_TOOL_REORGANIZED_SYSTEM_PROMPT = '【结构化工具调用引导】\n你是一个专业视觉分镜分析与提取管道。请直接调用 generate_draw_spec 工具：先完整阅读工具说明（description）中声明的分镜视觉分析规范（VISUAL_ANALYSIS_GUIDELINES）与本次任务输入数据包（Task Input JSON），遵照规范提取角色、服装、动作及场景分镜，并通过工具 parameters 结构化提交结果。严禁在工具调用外输出任何自然语言解释、道歉、拒答或多余文字。';
-    const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。';
+    const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。'
+        + '\n3. 【体位判定归你】每个 segment 都要在 pose 里给出该镜的体位主类（C01~C18）、变体键、以及判定依据原词 word（必须是 anchor.text 里逐字出现的中文词）。'
+        + '\n4. 【判不出就留空】正文没有体位线索时 pose.class 留空，绝不猜测、绝不套用任何引擎/世界书掷骰结果或上一镜的类；宁可空着，也不许为了填满而编。'
+        + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。';
 
     function getReorganizedSystemPrompt(store) {
         if (store?.geminiJailbreak && store?.geminiJailbreakPreset === 'kami_gase') {
@@ -17229,10 +17395,14 @@ function sdtRoundInspectLines() {
             lines.push('【闸门】' + modeTxt + '｜权威 ' + authTxt + '｜镜 #' + segTxt + '（' + (gl.segWhy || '-') + '）｜' + (gl.changed ? '本轮有改动' : '本轮未改 input'));
             // 6.5.72（F05/F07）：闸门模式是从旧档迁移来的、以及补词判据，都要留痕（不许静默改语义）
             if (gl.gateModeMigrated) lines.push('  闸门模式迁移 ' + String(gl.gateModeMigrated) + ' → fill-gap（旧档 enforce 等失效值已回落，语义等同只补缺词）');
-            if (gl.fillWhy) lines.push('  补词判据 ' + String(gl.fillWhy));
+            if (gl.fillWhy) {
+                const fillMap = { sexish: '正文有性行为描写 → 补一次引擎主类（L2 兜底）', switch: '本镜出现别的主类 tag → 按引擎主类改判' };
+                lines.push('  补词判据 ' + (fillMap[String(gl.fillWhy)] || String(gl.fillWhy)));
+            }
             // F06：来源分「正文 / caption」——正文里没写、只在 caption 里出现的英文 tag 不许标成正文（举证要诚实）
             const srcKey = gl.bodyHitSrc || gl.bodySource;
-            const srcTxt = (srcKey === 'body') ? '正文' : ((srcKey === 'caption') ? 'caption（正文没写，只在 caption 里）' : ((srcKey === 'carry') ? '沿用同段前镜' : ((srcKey === 'director') ? '分镜声明' : String(srcKey || '-'))));
+            // 6.5.73：新增第 6 态 'ai' —— AI 在分镜里亲自判的主类（顶层判据，不是词表猜出来的）
+            const srcTxt = (srcKey === 'ai') ? 'AI 判类' : ((srcKey === 'body') ? '正文' : ((srcKey === 'caption') ? 'caption（正文没写，只在 caption 里）' : ((srcKey === 'carry') ? '沿用同段前镜' : ((srcKey === 'director') ? '分镜声明' : String(srcKey || '-')))));
             const bodyWordTxt = (gl.bodyHitWord || gl.bodyWord) ? ('「' + String(gl.bodyHitWord || gl.bodyWord) + '」') : '';
             const bodyTxt = gl.bodyClass ? ('分镜判定 ' + gl.bodyClass + bodyWordTxt + '（来源 ' + srcTxt + '）') : '分镜判定 判不出主类';
             lines.push('  ' + bodyTxt + '｜' + ((gl.authority === 'body') ? '引擎参考 ' : '引擎锁定 ') + (gl.l1Class || '无') + '（世界书只出建议，不判该镜）');
@@ -17249,6 +17419,7 @@ function sdtRoundInspectLines() {
                 const whyMap = { segCarry: '正文没写主类 → 沿用同段前镜（变体连续）', fallback: '正文与前镜都没有主类 → 兜底', 'switch': '正文主类与引擎不同 → 以正文为准', sexish: '正文与引擎都缺 → 补一次引擎主类' };
                 lines.push('  判定说明 ' + (whyMap[gl.gateWhy] || gl.gateWhy));
             }
+            if (gl.aiConflict) lines.push('  词表交叉校验 ' + String(gl.aiConflict.dict || '-') + ' ≠ AI ' + String(gl.aiConflict.ai || '-') + '（正文命中「' + String(gl.aiConflict.word || '') + '」；按 AI 判类执行，词表不改判）');
             if (gl.added) lines.push('  补词 +' + gl.added + '（只补一次）');
             if (gl.switched) lines.push('  跨类改判 ' + String(gl.switched) + '（正文主类覆盖旧锁定类，旧类锚词一并换掉）');
             if (gl.skippedSfw) lines.push('  补词跳过（SFW 场景：宁可不补，也不给日常镜头硬塞体位词）');
@@ -17258,6 +17429,7 @@ function sdtRoundInspectLines() {
             // 现在五个通道一律先看 bodyHitSrc；mixedFrom 只做「文字证据」的最后兜底（bodyHitSrc 缺省时才算），不再是主判据。
             const mixSrcKey = String(gl.bodyHitSrc || '');
             const mixSrcTxt = (mixSrcKey === 'caption') ? 'caption（正文没写，只在 caption 里）'
+                : (mixSrcKey === 'ai') ? 'AI 判类'
                 : (mixSrcKey === 'body') ? '正文'
                     : (mixSrcKey === 'carry') ? '沿用同段前镜'
                         : (mixSrcKey === 'director') ? '分镜声明'
@@ -19086,6 +19258,27 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         wrapper.title = label;
     }
 
+    /** 6.5.73：取「本张图对应的那个分镜」（含 AI 判的 pose），登记到闸门通道。
+     *  分镜真身在消息缓存 entry.segments[] 里（卡片的 dataset 只存 characters 快照），按 -seg-N 索引。 */
+    function sdtRegisterCurrentSegment(wrapper, messageId, baseKey, segmentKey) {
+        try {
+            const key = String(segmentKey || wrapper?.dataset?.rbqSdtSegmentKey || baseKey || '');
+            const bKey = String(baseKey || wrapper?.dataset?.rbqSdtBaseKey || key.split(/-seg-\d+$/)[0]);
+            let entry = null;
+            try { const cache = getStore()?.cache; if (cache && bKey && cache[bKey]) entry = cache[bKey]; } catch (e) { /* ignore */ }
+            if (!entry) { try { entry = getMsgExtraSdt(messageId); } catch (e) { /* ignore */ } }
+            const segs = (entry && Array.isArray(entry.segments) && entry.segments.length) ? entry.segments : null;
+            const m = key.match(/-seg-(\d+)$/);
+            const idx = m ? Number(m[1]) : (segs && segs.length === 1 ? 0 : -1);
+            const seg = (segs && idx >= 0 && segs[idx]) ? segs[idx] : (segs ? segs[0] : (entry || null));
+            if (seg && seg.pose === undefined && segs) {
+                // 缓存里的分镜可能是编辑过的浅拷贝：pose 在原分镜上，取不到就退回 null（闸门按词表判，不瞎猜）
+            }
+            sdtSetCurrentSeg(seg, idx >= 0 ? idx : 0);
+            return seg;
+        } catch (e) { return null; }
+    }
+
     async function runImageGenerationForWrapper(wrapper, messageId, baseKey, segmentKey = '') {
         if (onSdtNaiPayload.disposed) return;
         const finalPrompt = String(wrapper?.dataset?.rbqSdtFinalPrompt || wrapper?.dataset?.prompt || '').trim();
@@ -19105,6 +19298,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             }
             const charDataJson = wrapper?.dataset?.rbqSdtCharData;
             if (charDataJson) segment.characters = JSON.parse(charDataJson);
+            sdtRegisterCurrentSegment(wrapper, messageId, baseKey, segmentKey);
             const image = await generateSdtImage(segment, finalPrompt, 'smart-draw-trigger', { messageId }, (progressText) => {
                 const sub = wrapper.querySelector('.st-scene-trigger-nai-loader-sub');
                 if (sub instanceof HTMLElement) sub.textContent = progressText;
