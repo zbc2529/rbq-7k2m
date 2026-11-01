@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.77';
+    const PLUGIN_VERSION = '6.5.78';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14019,7 +14019,22 @@ SCHEMA:
         return out;
     }
 
-    /** 归属：context 分镜元数据 → payload.segIndex → payload.storyFacts.segIndex → 第 0 镜 */
+    /** 6.5.78：把 payload 里所有能反映「本张图画的是哪一段」的文本拼起来，用于内容归属。 */
+    function sdtPayloadMatchText(p) {
+        if (!p || typeof p !== 'object') return '';
+        const bits = [];
+        const push = function (v) { if (typeof v === 'string' && v) bits.push(v); };
+        push(p.input); push(p.prompt); push(p.caption); push(p.base_caption); push(p.finalPrompt);
+        if (p.meta && typeof p.meta === 'object') { push(p.meta.input); push(p.meta.prompt); }
+        if (Array.isArray(p.characters)) {
+            for (let i = 0; i < p.characters.length; i++) {
+                const c = p.characters[i];
+                if (c && typeof c === 'object') { push(c.caption); push(c.prompt); push(c.defs); }
+            }
+        }
+        return bits.join('\n');
+    }
+    /** 归属：context 分镜元数据 → payload.segIndex → payload.storyFacts.segIndex → 内容匹配 → 第 0 镜 */
     function sdtPickSegmentForPayload(payload, segs, engineArg) {
         try {
             const list = Array.isArray(segs) ? segs : [];
@@ -14057,6 +14072,30 @@ SCHEMA:
             // 6.5.76（真机事故）：宿主拼的 payload 里既没有 meta.segIndex 也没有剧本变量时，旧码一律 return index 0，
             // 于是 5 个分镜全部按第 0 镜的词面清洗/补词（panel 显示「镜 #0（default）」×5），逐镜判定形同失效。
             // runImageGenerationForWrapper 在每张图生成前已登记本张的真实镜号，这里回落到它。
+            // 6.5.78：内容归属 —— 真机（2026-11-01 15:07）宿主批量出 5 张图时既不传 meta.segIndex，
+            // 也不经过 runImageGenerationForWrapper 登记镜号，于是 5 条 gate 记录全是 segIndex:0 / why:'current'；
+            // 但每个 payload 的正文片段本来就来自它自己的分镜（anchor.text / scene 逐字进了 tagger prompt），据此对回。
+            try {
+                const hay = sdtPayloadMatchText(p);
+                if (hay) {
+                    let best = null, bestScore = 0, tie = false;
+                    for (let i = 0; i < list.length; i++) {
+                        const cand = list[i];
+                        const parts = [cand.anchorText, cand.scene, cand.label]
+                            .concat(Array.isArray(cand.texts) ? cand.texts : [])
+                            .concat(Array.isArray(cand.bodyTexts) ? cand.bodyTexts : []);
+                        let score = 0;
+                        for (let k = 0; k < parts.length; k++) {
+                            const t = String(parts[k] || '').trim();
+                            if (t.length < 4) continue;
+                            if (hay.indexOf(t) >= 0) score += Math.min(200, t.length);
+                        }
+                        if (score > bestScore) { bestScore = score; best = { seg: cand, index: i, why: 'content' }; tie = false; }
+                        else if (score > 0 && score === bestScore) { tie = true; }
+                    }
+                    if (best && bestScore >= 12 && !tie) return best;
+                }
+            } catch (e) { /* ignore */ }
             try {
                 if (typeof SDT_CURRENT_SEG !== 'undefined' && SDT_CURRENT_SEG && typeof SDT_CURRENT_SEG_IDX !== 'undefined') {
                     hit = byIndex(SDT_CURRENT_SEG_IDX, 'current');
@@ -15939,7 +15978,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                 const lines = bodyMode ? [
                     '【体位来源优先级 · 先于体位词典执行】',
                     '① 正文（currentMessage / 本镜 anchor.text）写明姿势 → 以正文为唯一权威：写了什么主类就画什么，允许本组不同分镜用不同主类；',
-                    '② 正文没有姿势线索 → 采用世界书掷骰建议（下方「素材建议」），它只是候选，不是定稿；',
+                    '② 正文没有姿势线索 → pose.class 留空（null），不要用世界书掷骰的类填空（下方只给环境与着装事实，不给答案）；兜底由插画侧做；',
                     '③ 正文与建议都没有 → 才允许按剧情推测（兜底）。',
                     '【只锁一镜，不锁一组】同一镜内不得并列两个主类的 main tag（同镜混类即判错）；不同分镜换主类是合法的。',
                     '【机位与景别 · 需求驱动】后入/趴姿的第三人称镜 → 选 from_side（侧面客观机位）；pov 只在正文明确第一人称时出现，不与 from_side / from_behind / profile 并用（正文没写第一人称就删 pov，别删侧面）。景别按本镜需求选：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 → 必须 full_body（禁 close-up / cowboy_shot / upper_body），Char uc 不得写 feet, shoes；没有足部需求时才允许 close-up / cowboy_shot 优先。【点名保护】正文点名写下的服装/配件词不被任何冲突规则删除，冲突时删的是没点名的细节。',
@@ -15953,11 +15992,14 @@ function sdtOutfitRuleNoteLines(probeText) {
                 ];
                 // 6.5.64 F1/F4：id 与整行都过清洗 —— id 带换行会把这一行拆成多行（注入面缺口）
                 // 6.5.72：正文主导时同一行降级为「建议」，措辞不再声称优先级高于正文
-                const headLine = bodyMode ? '【素材建议（可被正文推翻）】本轮建议：' : '本轮：';
+                const headLine = bodyMode ? '' : '本轮：';
                 const headId = pose ? sdtFactText(pose.id, 24) : ('#' + String(segIdxNow) + (segNow && segNow.variant ? '·' + String(segNow.variant) : ''));
-                lines.push(sdtFactText(headLine + headId + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress, 320));
+                // 6.5.78：正文主导时**不投递主类**——真机诊断证明 AI 会照抄世界书掷骰的 C17，与本镜正文无关，随后又被 caption 改判，三方打架。
+                lines.push(sdtFactText(bodyMode
+                    ? ('【环境与着装事实】场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress)
+                    : (headLine + headId + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress), 320));
                 if (bodyMode) {
-                    if (storyFacts.advice) lines.push('【世界书建议 · 候选（可被正文推翻）】' + storyFacts.advice);
+                    if (storyFacts.advice) lines.push('【世界书素材 · 只取场地与服装事实，里面出现的姿势类名一律不得抄进 pose.class】' + storyFacts.advice);
                     const skel = (storyFacts.poseSegmentHint === false) ? '' : sdtSegmentSkeletonLine(storyFacts.segments);
                     if (skel) lines.push(skel);
                 }
@@ -16793,7 +16835,10 @@ function sdtOutfitRuleNoteLines(probeText) {
 
     const DRAW_SPEC_TOOL_INPUT_MESSAGE = '请读取 generate_draw_spec 工具说明中的本次任务输入，按系统规则分析并通过该工具提交结果。';
     const DRAW_SPEC_TOOL_REORGANIZED_SYSTEM_PROMPT = '【结构化工具调用引导】\n你是一个专业视觉分镜分析与提取管道。请直接调用 generate_draw_spec 工具：先完整阅读工具说明（description）中声明的分镜视觉分析规范（VISUAL_ANALYSIS_GUIDELINES）与本次任务输入数据包（Task Input JSON），遵照规范提取角色、服装、动作及场景分镜，并通过工具 parameters 结构化提交结果。严禁在工具调用外输出任何自然语言解释、道歉、拒答或多余文字。';
-    const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。'
+    // 6.5.78：判定规则单一真源 —— 工具路径与文本路径共用同一份。
+    // 真机事故（2026-11-01 15:07）：isToolCall:false 时本常量的规则 3/6/7/8/9 从不投递，
+    // AI 照样写 boy / adolescent，内裤只进 action，一镜写两个景别。
+    const DRAW_SPEC_HARD_RULES = '\n\n[体位与画面硬规则 · 每一镜都必须遵守]'
         + '\n3. 【体位判定归你】每个 segment 都要在 pose 里给出该镜的体位主类（C01~C18）、变体键、以及判定依据原词 word（必须是 anchor.text 里逐字出现的中文词）。'
         + '\n4. 【判不出就留空】正文没有体位线索时 pose.class 留空，绝不猜测、绝不套用任何引擎/世界书掷骰结果或上一镜的类；宁可空着，也不许为了填满而编。'
         + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。'
@@ -16801,6 +16846,10 @@ function sdtOutfitRuleNoteLines(probeText) {
         + '\n7. 【年龄性别照角色卡】characters[i].base 的年龄段按以下口径：正文里的「你」「我」就是用户本人 → 成年男性 man / 1boy（严禁 boy / shota / adolescent / 正太）；除用户本人以外的男性角色 → 少年档 bishounen / slim / no abs / narrow shoulders，正文明确写正太或幼男才升 shota；成年女性 woman / mature_female，儿童 child / petite。角色卡写明大叔或壮汉才加 mature_male / muscular；绝不擅自给用户本人降龄，也绝不把儿童升龄；同一个角色在一组分镜里年龄段必须始终一致。'
         + '\n9. 【景别与机位每镜各只写一个】同一 segment 只写一个景别（close-up / cowboy_shot / upper_body / full_body / wide_shot 选一）与一个机位（pov / from_side / from_behind / profile / from_above / from_below 选一）；足部、鞋、袜履、脚背等细节可见时用 full_body（或 wide_shot），不要用 close-up。肢势词要自洽：写 arm_support 必须同时写 all_fours / prone_bone / bent_over 之一；standing 与 lying、on_back 与 on_stomach 不能同时出现。'
         + '\n8. 【正文点名的衣物必须落成 tag】正文写到具体衣物（内裤 / 胸罩 / 长筒袜 / 裙摆 / 围裙 / 和服 / 外套…）及其状态（褪到膝弯、拉到腰上、解开、只挂一边、湿透、撕破）时，必须在 characters[i].outfit 或 action 里出现对应英文 tag（例：内裤褪到膝弯 → panties 仍在 + 动作 pulling down，或只挂一条腿 → panties_around_one_leg；裙摆推到腰上 → skirt_lift / clothes_lift），不得只写 partially_undressed 糊过去；正文没脱的绝不给 nude / bottomless。';
+        + '\n10. 【穿着状态要写全】characters[i].outfit 必须列出该角色此刻身上还穿着的全部部件（上装 / 下装 / 内裤 / 袜履 / 配饰），内裤没脱就得写 panties 或 panties_around_one_leg，不许只写 partially_undressed 蒙过去。'
+        + '\n11. 【看得见才算数】本镜要表现的衣物状态必须在画面里可见：内裤 / 袜履 / 膝部动作 / 足部细节时用 full_body 或 wide_shot，不要用 close-up 把关键部位切出画外。';
+    const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。'
+        + DRAW_SPEC_HARD_RULES;
 
     function getReorganizedSystemPrompt(store) {
         if (store?.geminiJailbreak && store?.geminiJailbreakPreset === 'kami_gase') {
@@ -17772,7 +17821,9 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         // Keep system directives together at the start of the request.
         // [阶段1·桥接] 体位锁定段落套在组装点：layered manga 的 instructionText 在 getSystemPromptWithPresets 提前 return，套这里才能全通道覆盖
         SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
+        // 6.5.78：工具路径已把硬规则拼进 toolRule，文本路径必须在这里补，否则规则 3~9 一条都到不了 AI。
+        const hardRule = (!promptBundle && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
 
         // [6.5.59 诊断自证] 把「桥接是否真的生效 / 世界书是否真的进了 prompt」落进诊断包：
         // 之前的 dump 只有模型回包，无法回答「姿势变量读到了吗」「世界书命中几条」「是不是把 EJS 源码塞进了 prompt」。
@@ -22811,9 +22862,11 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const systemPrompt = promptBundle ? promptBundle.instructionText : getSystemPromptWithPresets(store, !!manualPayload.characterCardInfo);
             const ecSysPrompt = promptBundle ? '' : getEnhancedContextSystemPrompt(getRequestEnhancedContext(store));
             const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
+            // 6.5.78：文本路径（未走工具）在这里补硬规则，否则规则 3~11 一条都到不了 AI
+            const hardRule = (!promptBundle && store.provider !== 'custom' && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
             // [阶段1·桥接] 手动补画通道同样带体位锁定段落
             SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
             const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
             let messages = standardRequest?.messages;
             let requestTool = standardRequest?.tool;
@@ -24399,9 +24452,11 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 : '仅输出符合 schema 格式的纯 JSON，绝对禁止在 JSON 外输出任何分析文字或 Markdown 代码块标记（如 ```json ）。'}`;
 
         const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
+        // 6.5.78：同上，测试通道也补硬规则
+        const hardRule = (!promptBundle && store.provider !== 'custom' && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
         // [阶段1·桥接] 生图测试通道同样带体位锁定段落
         SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
         let messages = standardRequest?.messages;
         let requestTool = standardRequest?.tool;
