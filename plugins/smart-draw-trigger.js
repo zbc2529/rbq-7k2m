@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.85';
+    const PLUGIN_VERSION = '6.5.86';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2981,6 +2981,9 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         minSegments: 0,
         // 6.5.76：默认关闭一切自动重试/降级（用户 m03049：一次失败只吃一次额度，换模型由人决定）
         autoRetry: false,
+        // 6.5.86：与 autoRetry 拆开。「模型没走工具调用」时用同一个模型、同一个渠道再问一次纯文本 JSON。
+        // 不换模型、不重试 3 次、不多吃额度以外的钱；只在用户明确关掉它时才彻底不回落。
+        toolJsonFallback: true,
         manualDrawEnabled: false,
         comicDrawerFloatingEnabled: true,
         systemPromptPreset: DEFAULT_SYSTEM_PROMPT_PRESET,
@@ -17554,6 +17557,7 @@ function sdtDiag() {
                     baseUrl: store.openaiBaseUrl || '',
                     model: String(store.openaiModelCustom || '').trim() || store.openaiModel || '',
                     autoRetry: store.autoRetry === true,
+                    toolJsonFallback: store.toolJsonFallback !== false,
                     fallbackEnabled: store.modelFallbackEnabled !== false,
                     fallbackList: store.modelFallbackList || '',
                     preset: store.systemPromptPreset || '',
@@ -17912,6 +17916,14 @@ function sdtAutoRetryOn(store) {
     return s.autoRetry === true;
 }
 
+// 6.5.86：工具调用回落开关（默认开，与 autoRetry 无关）。
+// 只管一件事：模型这次没按 tool_calls 返回（finish_reason: stop 这类），就原地用同一个模型、
+// 同一个渠道、把 tools 摘掉再问一次纯文本 JSON。不换模型、不加尝试次数、不跨渠道。
+function sdtToolJsonFallbackOn(store) {
+    const s = store || {};
+    return s.toolJsonFallback !== false;
+}
+
 function sdtBuildModelChain(store, target) {
     // 6.5.58 多渠道：模型名优先取渠道自己的，渠道没填才退回全局字段
     const primary = String((target && target.model) || '').trim() || String((store.openaiModelCustom || '').trim() || store.openaiModel || '').trim();
@@ -18263,9 +18275,10 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 throw signal.reason && typeof signal.reason.message === 'string'
                     ? signal.reason : Object.assign(new Error('大模型请求已取消'), { name: 'AbortError' });
             }
-            // 6.5.76：自动重试关闭时不再「去掉 tools 用普通 JSON 再打一次」——那一次同样吃额度，直接失败交给用户换模型
-            if (!sdtAutoRetryOn(store)) {
-                const noToolErr = new Error('大模型没有按工具调用返回分镜' + (finishReason ? ` (finish_reason: ${finishReason})` : '') + '。自动重试已按设置关闭，不会再用普通 JSON 模式重试。请手动换一个支持工具调用的模型/渠道，或打开「自动重试/降级」。');
+            // 6.5.86：这里以前绑在 autoRetry 上，导致「换模型重试」和「原地转 JSON」被一起关掉。
+            // 现在只由 toolJsonFallback 决定：它与换模型、重试次数完全无关。
+            if (!sdtToolJsonFallbackOn(store)) {
+                const noToolErr = new Error('大模型没有按工具调用返回分镜' + (finishReason ? ` (finish_reason: ${finishReason})` : '') + '。「工具调用失败自动转 JSON」已按设置关闭，不会再用普通 JSON 模式重试。请手动换一个支持工具调用的模型/渠道，或打开「工具失败自动转 JSON」。');
                 noToolErr.code = 'SDT_NO_TOOL_NO_RETRY';
                 noToolErr.rawOutput = String(rawText || '').slice(0, 4000);
                 throw noToolErr;
@@ -18878,8 +18891,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                             ? signal.reason : Object.assign(new Error('大模型请求已取消'), { name: 'AbortError' });
                     }
                     if (_toolFallbackRetried) throw makeToolFallbackError(finishReason, rawReply || rawOutput, true);
-                    // 6.5.76：自动重试关闭时不再「去 tools 普通 JSON 再打一次」
-                    if (!sdtAutoRetryOn(store)) throw makeToolFallbackError(finishReason, rawReply || rawOutput, false);
+                    // 6.5.86：只由 toolJsonFallback 决定（与换模型/重试次数无关）
+                    if (!sdtToolJsonFallbackOn(store)) throw makeToolFallbackError(finishReason, rawReply || rawOutput, false);
                     console.warn(`[${PLUGIN_NAME}] ⚠️ 模型未返回 ${toolName} 工具调用参数${finishReason ? ` (finish_reason: ${finishReason})` : ''}，自动去掉 tools 改用普通 JSON 模式重试一次`);
                     if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') toastr.info('模型没按工具调用返回，已自动改用普通模式重试', PLUGIN_NAME);
                     const schemaText = (() => { try { return JSON.stringify(tool?.function?.parameters || {}); } catch (_) { return '{}'; } })();
@@ -21807,7 +21820,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                         <label class="st-scene-trigger-field"><span>监听消息</span><select id="rbq-sdt-target-role"><option value="assistant">仅角色消息</option><option value="user">仅用户消息</option><option value="all">全部消息</option></select></label>
                         <div id="rbq-sdt-auto-generate-field" class="st-scene-trigger-field switch" title="tagger 分析完成后自动调用生图 API，无需手动点击生成按钮"><span>分析完自动生图</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-auto-generate" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <div id="rbq-sdt-autorun-field" class="st-scene-trigger-field switch" title="酒馆正文输出完毕后，自动对最新楼层调用 tagger API 解析。不会影响历史楼层，刷新/切卡也不会触发。"><span>自动调用 tagger API</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-autorun" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
-                        <div id="rbq-sdt-auto-retry-field" class="st-scene-trigger-field switch" title="关闭（默认）：tagger 只用首选模型请求一次，失败就直接报错，换模型/换渠道由你手动决定——一次失败只吃一次额度。打开：旧行为，自动按模型链逐个试、每个模型重试 2~3 次，还会在「没拿到工具调用」时自动改普通 JSON 再打一次（很耗额度）。"><span>自动重试/降级（耗额度）</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-auto-retry" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
+                        <div id="rbq-sdt-auto-retry-field" class="st-scene-trigger-field switch" title="关闭（默认）：tagger 只用首选模型请求一次，失败就直接报错，换模型/换渠道由你手动决定——一次失败只吃一次额度。打开：旧行为，自动按模型链逐个试、每个模型重试 2~3 次（很耗额度）。注意：它只管「换模型」，不管「工具调用失败转 JSON」——那个是下面独立的开关。"><span>自动重试/降级（耗额度）</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-auto-retry" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
+                        <div id="rbq-sdt-tool-json-fallback-field" class="st-scene-trigger-field switch" title="打开（默认）：模型没走工具调用（finish_reason 是 stop 这类「说完了但没装进工具壳」）时，用同一个模型、同一个渠道、把 tools 摘掉再问一次纯文本 JSON。只多一次请求，不换模型、不重试 3 次。关闭：一次格式不对就直接报错，由你手动换模型。"><span>工具失败自动转 JSON</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-tool-json-fallback" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <div id="rbq-sdt-manual-draw-field" class="st-scene-trigger-field switch" title="在悬浮球菜单中添加‘手动描述生图’按钮，点击后可输入自定义场景描述，由 tagger 生成 tag 并出图"><span>悬浮球手动生图按钮</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-manual-draw" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                     </div>
                 </div>
@@ -22006,6 +22020,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         document.getElementById('rbq-sdt-min-segments').value = store.minSegments || 0;
         document.getElementById('rbq-sdt-card-position').value = store.cardPosition || 'bottom';
         document.getElementById('rbq-sdt-auto-retry').checked = store.autoRetry === true;
+        document.getElementById('rbq-sdt-tool-json-fallback').checked = store.toolJsonFallback !== false;
         document.getElementById('rbq-sdt-manual-draw').checked = !!store.manualDrawEnabled;
         document.getElementById('rbq-sdt-comic-drawer-floating').checked = store.comicDrawerFloatingEnabled !== false;
         const validPresetKeys = Object.keys(SYSTEM_PROMPT_PRESETS);
@@ -22071,6 +22086,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         bindSwitch('rbq-sdt-autorun-field', 'rbq-sdt-autorun');
         bindSwitch('rbq-sdt-auto-generate-field', 'rbq-sdt-auto-generate');
         bindSwitch('rbq-sdt-auto-retry-field', 'rbq-sdt-auto-retry');
+        bindSwitch('rbq-sdt-tool-json-fallback-field', 'rbq-sdt-tool-json-fallback');
         bindSwitch('rbq-sdt-manual-draw-field', 'rbq-sdt-manual-draw');
         bindSwitch('rbq-sdt-lorebook-field', 'rbq-sdt-lorebook-enabled');
         bindSwitch('rbq-sdt-lorebook-current-floor-field', 'rbq-sdt-lorebook-current-floor');
@@ -22373,6 +22389,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             s.minSegments = Math.max(0, Math.min(10, Number(val('rbq-sdt-min-segments')) || 0));
             s.cardPosition = val('rbq-sdt-card-position') || 'bottom';
             s.autoRetry = checked('rbq-sdt-auto-retry');
+            s.toolJsonFallback = checked('rbq-sdt-tool-json-fallback');
             s.manualDrawEnabled = checked('rbq-sdt-manual-draw');
             s.comicDrawerFloatingEnabled = checked('rbq-sdt-comic-drawer-floating');
             s.systemPromptPreset = val('rbq-sdt-system-preset') || DEFAULT_SYSTEM_PROMPT_PRESET;
