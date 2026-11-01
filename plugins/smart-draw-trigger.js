@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.71';
+    const PLUGIN_VERSION = '6.5.72';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -261,8 +261,8 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 - 配角：faceless male / faceless female
 - 7 维外貌矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（日系二次元必带，锁定动漫秀气五官，防止欧美化漂移）/ caucasian / western 等
-  ③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
   ⑥ 胸型体态：如 large breasts, slender, petite, tall
@@ -499,8 +499,8 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 characters[i].base 是角色外貌的底层唯一身份标识，专用于「角色外貌跨图记忆缓存（Character Memory）」，严禁写入临时着装与动作：
 - 7 维全息矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（日系二次元必带，锁定动漫秀气五官，防止欧美化漂移）/ caucasian / western 等
-  ③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
   ⑥ 胸型体态：如 large breasts, slender, petite, tall
@@ -730,8 +730,8 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 严格按 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 面相/族裔：japanese, delicate_face（日系二次元必带，锁定动漫面相）/ caucasian / western 等
-③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
 ⑥ 胸型体态：如 large_breasts, slender, petite, tall
@@ -896,8 +896,8 @@ Scene 字段是整幅画面的空间坐标基座与全场总纲。严禁平面�
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 必须严格按照 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相：japanese, delicate_face（日系二次元必带，锁定精致二次元面相）/ caucasian / western 等
-③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+② 族裔/面相：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定精致二次元面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
 ⑥ 胸型体态：如 large_breasts, slender, petite, tall
@@ -1072,8 +1072,8 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系二次元必带 japanese 或 delicate_face 锚定动漫美学面相）
-③ 年龄段（adolescent, teenager, young_girl, mature_female 等）
+② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系或未写明族裔时默认带 japanese 或 delicate_face 锚定动漫美学面相，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, blonde_hair, twin_tails）
 ⑤ 瞳色眼型（如 blue_eyes, tsurime, large_eyes）
 ⑥ 胸型体态（如 large_breasts, slender, petite）
@@ -1200,8 +1200,8 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 ══ 角色外貌防伪码（Base 7 维矩阵，100% 锁死不变脸）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系二次元必带 japanese 或 delicate_face）
-③ 年龄段（adolescent, teenager, young_girl, mature_female 等）
+② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系或未写明族裔时默认带 japanese 或 delicate_face，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, 1.2::pink_hair::, twin_tails）
 ⑤ 瞳色眼型（如 red_eyes, tsurime, large_eyes）
 ⑥ 胸型体态（如 large_breasts, slender, petite）
@@ -1339,7 +1339,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 1. 镜头景别裁切（镜框外的部位绝对禁写，且必须打入负面）：
    · 面部特写 close-up：正向只写面部表情/眼神/发型；⛔严禁颈部以下服装与动作；Char uc 写入 feet, shoes, legs, lower_body
    · 胸部近景 bust_shot：正向写面部/发型/上衣/胸型/手势；⛔严禁腰部以下任何描述；Char uc 写入 feet, shoes, legs
-   · 中景 cowboy_shot：正向写腰/膝以上；⛔严禁小腿与鞋袜；Char uc 写入 feet, shoes
+   · 中景 cowboy_shot：正向写腰/膝以上；⛔严禁小腿与鞋袜；Char uc 写入 feet, shoes（⚠例外：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 时本镜禁用 cowboy_shot，景别改用 full_body 或 wide_shot，Char uc 不得写 feet, shoes）
    · 局部特写 (hand_focus / pussy_focus / feet_focus / 局部道具)：正向只写该局部接触与质感；⛔严禁任何面部表情、发色、瞳色、泪痣；Char uc 必须写入 face, eyes, head（防止模型在旁边偷画出一颗头！）
 
 2. 状态与物理互斥（不可共存，前项存在时后项绝对剔除）：
@@ -1368,8 +1368,8 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 2. **base**（外貌防伪码，跨图锁定）：
    - 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
      ① 性别：girl / boy（禁带数字，1girl/1boy 属于 scene）
-     ② 族裔/国籍/面相（必须推断填写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系二次元角色必须带 japanese 或 delicate_face 锚定动漫萌系面相；西方角色带 caucasian 或 western）
-     ③ 年龄阶段（必须填写：adolescent, teenager, young_girl, mature_female, child 等）
+     ② 族裔/国籍/面相（必须推断填写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系角色或未写明族裔时默认带 japanese 或 delicate_face 锚定动漫萌系面相（默认值，正文写明别的族裔必须让位）；西方角色带 caucasian 或 western）
+     ③ 年龄阶段（必须填写：adolescent, teenager, mature_female, child 等；young_girl 仅正文明确幼态时取）
      ④ 发型发色（发长+发型+发色，如 long_hair, blonde_hair, twin_tails）
      ⑤ 瞳色眼型（如 green_eyes, tareme/tsurime/large_eyes）
      ⑥ 胸型体态（如 large_breasts, slender/curvy/petite）
@@ -1450,7 +1450,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 1. 镜头出画裁切（出画部位正向严禁出现，且必须打入负面）：
    · 面部特写 close-up：正向只写面部表情/眼神/发型；⛔严禁颈部以下服装与动作；Char uc 写入 feet, shoes, legs, lower_body, 3d model artifact, poor topology
    · 上半身近景 bust_shot：正向写面部/发型/上衣/胸型/手势；⛔严禁腰部以下任何描述；Char uc 写入 feet, shoes, legs
-   · 中景 cowboy_shot：正向写腰/膝以上；⛔严禁小腿与鞋袜；Char uc 写入 feet, shoes
+   · 中景 cowboy_shot：正向写腰/膝以上；⛔严禁小腿与鞋袜；Char uc 写入 feet, shoes（⚠例外：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 时本镜禁用 cowboy_shot，景别改用 full_body 或 wide_shot，Char uc 不得写 feet, shoes）
    · 局部特写 (hand_focus / pussy_focus / feet_focus / 局部道具)：正向只写该局部接触与质感；⛔严禁任何面部表情、发色、瞳色、泪痣；Char uc 必须写入 face, eyes, head
 2. 状态与物理互斥（不可共存，前项存在时后项绝对剔除）：
    · 无头/身首分离 headless / decapitation：正向只写无头躯体与颈部断面(neck_stump, bloody_neck_stump)；⛔严禁输出任何面相/发型/瞳色/泪痣/面部动作（如 blood from mouth, crying）；Char uc 必须填入 1.6::head, face, eyes, hair, mouth::, head_attached, alive
@@ -1469,7 +1469,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 **characters[i] 字段**：
 1. **name**：精确角色标识。
 2. **base**（外貌防伪码，跨图锁定）：
-   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(japanese, delicate_face, caucasian等) ③年龄(adolescent, young_girl, mature_female) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
+   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(japanese, delicate_face, caucasian等；写明族裔按明写落词，未写明默认 japanese, delicate_face) ③年龄(adolescent, teenager, mature_female；young_girl 仅正文明确幼态时取) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
 3. **outfit**（当前服装，拆解到部件）：主服装款式材质 → 次要配饰鞋袜 → 穿着状态(open/lifted) → 裸露梯度
 4. **action**（当前姿态动作）：朝向(facing_another, profile) → 基础姿态(sitting, kneeling) → 肢体动作与持有物 → [细腻微表情] → 视线(looking_at_partner, eye_contact) → 3D物理体液(sweat, blush, cum)
 5. **center**：空间网格坐标 A1~E5
@@ -1555,7 +1555,7 @@ lorebook: payload.lorebook 含匹配到的 Tag 模板库（服装/场景/多角�
 ⛔ 禁填中文名 ⛔ 禁省略作品名/original后缀 ⛔ 禁在 base 中重复填写姓名
 
 **base**（→ char_caption 外貌防伪码，跨图绝对锁定不变）
-顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；默认日系二次元角色自动追加 japanese 或 delicate_face 锁定日系动漫面相) → 年龄段(teenager/mature_female) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 胸围(flat_chest/large_breasts) → 体格(petite/tall) → 肤色 → 标志修饰(mole/scar/tattoo)
+顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 年龄段(teenager/mature_female) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 胸围(flat_chest/large_breasts) → 体格(petite/tall) → 肤色 → 标志修饰(mole/scar/tattoo)
 ⚠️ 穷举所有维度，缺失则推断！遗漏任何维度=角色变脸！
 ⚠️ 原创角色差异化: 基本特征之外追加 5~10 专属 Tag（标志性发型/异色瞳/专属配饰/身体特征）作为视觉防伪码
 ⛔ 禁在此处写服装/动作/表情——属于 outfit/action，混入会污染记忆
@@ -1653,7 +1653,7 @@ DNA锁定: 首次出场建立 base+outfit，跨图锁定。仅文本明确描述
 }`;
 
     const CONSISTENT_SYSTEM_PROMPT_V22 = CONSISTENT_SYSTEM_PROMPT_V23.replace(
-        '顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；默认日系二次元角色自动追加 japanese 或 delicate_face 锁定日系动漫面相) → 年龄段(teenager/mature_female)',
+        '顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 年龄段(teenager/mature_female)',
         '顺序: girl/boy(不带数字) → 年龄段(teenager/mature_female)'
     );
 
@@ -1683,7 +1683,7 @@ lorebook: payload.lorebook 含匹配到的 Tag 模板库（服装/场景/多角�
 ⚠️ pov 模式: 男主身体部位(large_penis, veiny_penis 等)写入 scene 作为环境道具
 
 **base**（→ char_caption 固定部分，跨图锁定不变）
-顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；默认日系二次元角色自动追加 japanese 或 delicate_face 锁定日系动漫面相) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 体型+罩杯 → 肤色 → 修饰(痣/疤/纹身)
+顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 体型+罩杯 → 肤色 → 修饰(痣/疤/纹身)
 
 **outfit**（→ char_caption 服装部分，随场景变化）
 顺序: 主要服装(款式+颜色+细节) → 次要服装/配饰 → 穿着状态(open/off/half-off) → 裸露部位+细节
@@ -2057,8 +2057,8 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 命名标准（仅资产库外的新角色；已建档角色逐字复制档案 name_tag）：同人角色 2::Name (Series)::；同人官方皮肤 2::Name (Series) (skin name)::；原创 OC (original)；配角 faceless male / faceless female。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（日系二次元必带，锁定动漫秀气五官，防欧美化漂移）/ caucasian / western 等
-     ③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
      ⑥ 胸型体态：如 large breasts, slender, petite, tall
@@ -2310,7 +2310,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
 中文感受只写进 reason，要它上画面就换 tag：余韵→after_sex、呼吸急促→heavy_breathing、颤抖→trembling、脸红→blush、被抱起→princess_carry、脱力瘫软→after_sex, trembling。本文示例里的英文散句只是示意，落地必须收敛成 tag。
 1.【7 维外貌防伪矩阵】base 字段纯净无临时服装与动作。
    ① 性别：girl / boy（严禁带数字，防人数干扰）
-   ② 面相族裔：japanese, delicate_face（日系必带，防欧美化）/ caucasian / western
+   ② 面相族裔：japanese, delicate_face（仅正文/角色卡写明日系才带；未写明默认带，正文写别的族裔即让位）/ caucasian / western
    ③ 判定顺序＝性别 → 年龄 → 体型，三步走完再落笔。禁止默认女性、禁止默认幼态。
       判定依据优先级：角色卡正文 → 角色档案 base → 世界书 → 剧情上下文 → 代词与称谓。
       ── 第一步 性别（决定后面整套标签，判错全盘皆错）：
@@ -2320,7 +2320,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
       ── 第二步 年龄档：幼态 / 少年少女 / 成熟，跨性别通用。
       ── 第三步 性别 × 年龄 选标签组，只允许下列六种组合：
       ▸ 女·幼态（loli / 幼女 / 萝莉 / 女童）：loli, petite, child 中≥2 + short stature + flat_chest 或 small_breasts
-        肉感默认开启：chubby, soft belly, wide hips, thick thighs —— 肉嘟嘟的幼女必须至少带 wide hips / soft belly / chubby 其中之一，不允许干瘦骨感
+        肉感默认关闭：仅正文写明 chubby、肉嘟嘟、微胖、丰满 才落 chubby, soft belly, wide hips, thick thighs；未写明按 ⑥ 补全
       ▸ 女·少女（teenager / 学生 / JK）：petite 或 slender + small_breasts 或 medium breasts + medium height；可带 wide hips, thick thighs
       ▸ 女·成熟（mature_female / milf / 人妻 / 熟女）：mature_female + curvy 或 voluptuous + large breasts + wide hips, thick thighs + narrow waist
       ▸ 男·正太（shota / 正太 / 幼男）：shota 或 boy + slim 或 petite + flat_chest + no abs + short stature + delicate_face, beautiful face, clear skin, narrow shoulders
@@ -2344,7 +2344,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
    ⑦ 肤色与永久特征：fair skin, mole under eye, freckles, fangs
    - 纯净法则：base 严禁混入衣服或姿势。
     - 体型档位强化（按 ③ 的判定结果套用，不得跨档混写）：
-      女·幼态 → 锚定「年龄感 + 小个头 + 平或小胸」三件事，缺一项就会被画成成年女性。组合：loli, petite, child, flat_chest 或 small_breasts, short stature；再叠加 wide hips 或 soft belly 或 chubby 才有肉嘟嘟质感，纯干瘦是错误读法。
+      女·幼态 → 锚定「年龄感 + 小个头 + 平或小胸」三件事，缺一项就会被画成成年女性。组合：loli, petite, child, flat_chest 或 small_breasts, short stature；肉感仅正文写明才叠加 wide hips / soft belly / chubby（默认不加，纯干瘦不算错）。
       女·少女 → slender 或 petite, small_breasts 或 medium breasts, 不写 loli / child。
       女·成熟 → 锚定「曲线 + 腰胯 + 丰满」，缺一项就会被画成单薄少女。组合：curvy 或 voluptuous, large breasts, wide hips, thick thighs, narrow waist。这是「魔鬼身材」的标准写法，voluptuous 单写强度不够，必须配 wide hips 与 thick thighs 才出沙漏比例。
       男·正太 / 男娘 / 少年 → 锚定「瘦 + 平 + 无肌」三件事：slim 或 slender, flat_chest, no abs 必写；缺 no abs 会自己长出肌肉块。男娘另加 androgynous 或 otokonoko，正太另加 shota, short stature。
@@ -2357,27 +2357,27 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
 
 【体位来源优先级 · 铁律 · 先于体位词典执行】
 体位只有一个来源，按下列顺序取，取到即止：
-① 上下文中存在【本场姿势】P-xxx（或 payload.storyFacts.pose）→ 该体位主类即定稿，不得推翻，不得改写成近邻体位（骑乘≠背入，后入≠正常位）。
-② 无标记但正文有明确动作描写（谁在上、骨盆朝向、谁压着谁、支撑面）→ 按正文提取主类，禁止「美化」成更好画或更常见的体位。
-③ 连正文动作线索也没有 → 才允许按剧情推测。
-【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（正文与标记冲突时以标记为准）。
+① 正文写明姿势（谁在上、骨盆朝向、谁压着谁、支撑面）→ 以正文为唯一权威：写了什么主类就画什么，不得改写成近邻体位（骑乘≠背入，后入≠正常位）。
+② 正文没有姿势线索但上下文有【本场姿势】P-xxx（或 payload.storyFacts.pose）→ 该主类只是候选，可被正文推翻，不得当定稿。
+③ 正文与候选都没有 → 才允许按剧情推测（兜底）。
+【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（正文与标记冲突时以正文为准）。
 【回退阶梯】只有上一级拿不到才下降，任何一级都不得更换主类：
 L1 该体位有对应变体 → 直接用它的 tag 组；
-L2 变体判不出 → 用该主类的标签组：词典有该主类取词典首行，没有就查主类速查表；组内只留最贴合的 2-4 个；该组本身不足 2 个就全用。绝不跨主类；
+L2 变体判不出 → 用该主类的标签组：词典有该主类取词典首行，没有就查主类速查表。绝不跨主类；
 L2b 主类已判出但词典与速查表都没有（未知 code）→ 直接用 L3 维度拼装，主类照抄引擎给的中文名，不造 tag；
-L3 主类也判不出 → 维度拼装：方向/接触（sex_from_behind / missionary / girl_on_top）+ 姿态（lying / on_side / bent_over）+ 支撑（arm_support / against_wall）+ 局部（legs_up）+ 视角（pov / from_side / from_behind）。宁可粗，也不要输出空段或错误体位。
+L3 主类也判不出 → 维度拼装：方向（sex_from_behind / missionary / girl_on_top）+ 姿态（lying / on_side / bent_over）+ 支撑（arm_support / against_wall）+ 局部（legs_up）+ 视角（pov / from_side / from_behind）。宁可粗，也别输出空段或错体位。
 【着装状态优先级 · 与服装签名同层】
-storyFacts.outfit 存在时，着装档位 D0 隔衣 / D1 半褪 / D2 局部敞开 / D3 仅剩内衬 / D4 无遮 以变量为定稿：档位词由状态侧出（clothed_sex / partially_undressed / clothing_aside / undressing / completely_nude），正文只补形变细节（拉扯、滑落、褶皱、贴身、湿润），不改档、不上下平移；档位只升不自动降。
+storyFacts.outfit 存在时，着装档位 D0 隔衣 / D1 半褪 / D2 局部敞开 / D3 仅剩内衬 / D4 无遮 以变量为定稿：档位词由状态侧出（clothed_sex / partially_undressed / clothing_aside / undressing / completely_nude），正文只补形变（拉扯、滑落），不改档、不详述；档位只升不自动降。
 【禁止堆叠】状态词不是服装本体：D0 的正向是 clothed_sex，不是再叠一层 dressed；D1~D3 写「半褪的下装」「敞开的衬衫」，不同时写 dressed 与 nude。
 【D4 × 穿着底线 L6】露到极限仍留可用物：「只余饰品与器具」（choker / thigh_strap / bodysuit 这类残留），不是一无所有。
 【签名隔离】状态词不进服装签名——签名只写颜色+材质+款式核心词+长度；D 档与 L6 只是内部代号，禁止出现在 prompt 正文。
 【变体 → 肢体几何】
-变体命中后，用该变体自己的 tags 展开肢体与角度（legs_up / bent_over / arm_support / spread_legs / on_side 等），不新造体位大类词；变体只改几何，不改主类，变体键名本身也不是 tag。
+变体命中后，用该变体自己的 tags 展开肢体与角度（legs_up / bent_over / arm_support 等），不新造体位大类词；变体只改几何，不改主类，变体键名本身也不是 tag。
 变体判不出 → 用【主类速查表】锁定主类，再从正文取几何（谁压谁、骨盆朝向、支撑面、腿的朝向）。
 一组分镜至少有一张同时带主类 main 全 tag，其余分镜只留该变体的几何子集，单镜几何 tags 不超过 3 个。
-【机位与肢势互斥 · 每组只取一格】
-水平机位 pov / from_side / from_behind / profile 四选一，垂直机位 from_above / from_below 二选一、不许并用，景别整组只取一个；pov 不与 profile、也不与 from_behind 并用（pov 已含观察者视点）。
-肢势互斥：standing 不与 lying / sitting 并用；arm_support 只跟随 all_fours / prone_bone / bent_over；spread_legs 只跟随 lying / sitting / on_back。
+【机位与肢势互斥 · 逐镜各取一格】
+水平机位 pov / from_side / from_behind / profile 四选一，垂直机位 from_above / from_below 二选一、不许并用；景别逐镜只取一个（同镜不得并列），整组覆盖 ≥2 种且至少 1 镜 full_body / cowboy_shot；pov 不与 profile、也不与 from_behind 并用。
+standing 不与 lying / sitting 并用；arm_support 只跟随 all_fours / prone_bone / bent_over；spread_legs 只跟随 lying / sitting / on_back。
 越界即判错：同组出现两个水平机位、两个垂直机位或任一上述非法组合，重排后再输出。
 【主类速查表 · 引擎总类 code → 主标签组（全部活词，永不造词）】
 C01 正常位 missionary,on_back
@@ -2398,7 +2398,8 @@ C15 肛交 anal,anus
 C16 多人 group_sex,threesome
 C17 束缚 bondage,restrained
 C18 特殊高杠杆 mating_press,top-down_bottom-up
-【永不造词】只输出体位词典、主类速查表或上列维度表里出现过的 tag；低热 tag（画作数 <3000，如 mutual_masturbation 1,177；阈值取自矩阵 thresholds.heatOk=3000）只作点睛不作主体，底模无此词（如 suspended_sex）一律走 L3。回退时直接给 tag 组，不写解释文字。
+（C18 非常规主类；mating_press 是 C02/C03 共享几何词，不判 C18。变体名整串优先于单字实词：「压身式后入」判 C02。）
+【永不造词】只输出体位词典、主类速查表或上列维度表里出现过的 tag；低热 tag（画作数 <3000，阈值取矩阵 thresholds.heatOk）只作点睛；底模无此词（如 suspended_sex）一律走 L3。回退时直接给 tag 组，不写解释文字。
 【边界】本铁律与速查表只锁体位主类；变体、机位、视角细节仍从正文取，不得因锁主类而牺牲变体。
 2b.【饰品段 · 独立成段 · 视为上列维度表的延伸】
    饰品写在 outfit 末尾，单独成词、不进服装签名、不改档位、不进 negative。可用词：choker 636,965｜collar 286,025｜thigh_strap 258,789｜garter_straps 115,359｜armband 85,687｜leash 39,967。
@@ -2996,6 +2997,15 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         characterMemoryEnabled: true,
         characterProfiles: {},
         injectCharacterCard: true,
+
+        // 6.5.72：姿势判定下沉到分镜级（正文优先）。poseAuthority='global' 是回滚开关，行为与 6.5.71 逐字节一致。
+        // getStore() 只补 undefined 键，老用户升级即拿到新默认，不写迁移脚本。
+        poseAuthority: 'segment',      // 'segment' 分镜级正文优先 | 'global' 引擎主导（回滚用）
+        poseGateMode: 'fill-gap',      // 'fill-gap' 只补该分镜缺的词（默认）| 'off' 整段不生效；旧值 'enforce' 一律回退 fill-gap（F07）
+        poseBodyFirst: true,           // 正文出现主类词 → 不改写、不删、不跨类补
+        poseSegmentHint: true,         // system prompt 里列分镜骨架（只作提示，不锁一组）
+        outfitSequence: true,          // 一场戏多套服装序列（D0–D4 逐镜）
+        outfitConflictGuard: true,     // 服装冲突时删服装、不删正文体位词
 
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         systemPromptVersion: DEFAULT_SYSTEM_PROMPT_VERSION,
@@ -4763,8 +4773,8 @@ ${globalEntries.map(([k, p]) => formatGlobalCharacterForPrompt(k, p)).join('\n')
      * 次要配角/路人：faceless male / faceless female 或简要外貌，禁止喧宾夺主。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（日系二次元必带，锁定动漫秀气五官，防欧美化漂移）/ caucasian / western 等
-     ③ 年龄段：adolescent, teenager, young_girl, mature_female 等
+     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
      ⑥ 胸型体态：如 large breasts, slender, petite, tall
@@ -13288,7 +13298,7 @@ SCHEMA:
 
     // === [阶段2·体位词面矩阵] Danbooru 词表蒸馏（tools/build-matrix.js 生成，勿手改）===
     // 数据源：plugins/pose-matrix.fragment.js（构建产物）。改词表 → 重建 fragment → node tools/inline-matrix.mjs。
-    const SDT_POSE_MATRIX = {"version":"1.0.0","generatedAt":"2026-10-30T18:15:21.602Z","generator":"tools/build-matrix.js","thresholds":{"heatOk":3000,"heatLow":1},"stats":{"referencedTags":172,"emittedTags":172,"ok":167,"low":5,"dead":0,"deprecated":0,"unknown":0,"aliases":121,"implications":19,"deadFixes":0,"outfits":20,"outfitStates":5,"outfitForms":9,"outfitMaterials":8,"outfitHoisery":6,"accessories":6,"outfitResidue":2,"outfitConflicts":10,"viewRuleGroups":3,"postureRuleGroups":4,"nonTag":1},"tags":{"69":{"post_count":3778,"tier":"ok"},"against_wall":{"post_count":20311,"tier":"ok"},"all_fours":{"post_count":82713,"tier":"ok"},"amazon_position":{"post_count":1582,"tier":"low"},"anal":{"post_count":76858,"tier":"ok"},"anus":{"post_count":173206,"tier":"ok"},"apron":{"post_count":316519,"tier":"ok"},"arched_back":{"post_count":25321,"tier":"ok"},"arm_support":{"post_count":121254,"tier":"ok"},"armband":{"post_count":85687,"tier":"ok"},"bare_shoulders":{"post_count":1430829,"tier":"ok"},"barefoot":{"post_count":513229,"tier":"ok"},"bent_over":{"post_count":86272,"tier":"ok"},"bikini":{"post_count":716537,"tier":"ok"},"blazer":{"post_count":100573,"tier":"ok"},"blindfold":{"post_count":31057,"tier":"ok"},"bloomers":{"post_count":28814,"tier":"ok"},"blouse":{"post_count":50434,"tier":"ok"},"bodysuit":{"post_count":188215,"tier":"ok"},"bondage":{"post_count":76266,"tier":"ok"},"bottomless":{"post_count":125113,"tier":"ok"},"bound_wrists":{"post_count":30919,"tier":"ok"},"bra":{"post_count":283309,"tier":"ok"},"bra_lift":{"post_count":13216,"tier":"ok"},"buttons":{"post_count":223182,"tier":"ok"},"camisole":{"post_count":69853,"tier":"ok"},"cardigan":{"post_count":133079,"tier":"ok"},"carrying":{"post_count":67097,"tier":"ok"},"choker":{"post_count":636866,"tier":"ok"},"close-up":{"post_count":65061,"tier":"ok"},"clothed_sex":{"post_count":55256,"tier":"ok"},"clothing_aside":{"post_count":67613,"tier":"ok"},"coat":{"post_count":392415,"tier":"ok"},"collar":{"post_count":286025,"tier":"ok"},"competition_swimsuit":{"post_count":39186,"tier":"ok"},"completely_nude":{"post_count":302697,"tier":"ok"},"cowboy_shot":{"post_count":875909,"tier":"ok"},"cowgirl_position":{"post_count":57402,"tier":"ok"},"crossed_legs":{"post_count":109216,"tier":"ok"},"cum_on_clothes":{"post_count":17025,"tier":"ok"},"deepthroat":{"post_count":8316,"tier":"ok"},"doggystyle":{"post_count":43115,"tier":"ok"},"double_penetration":{"post_count":14822,"tier":"ok"},"dress":{"post_count":2006407,"tier":"ok"},"dress_shirt":{"post_count":169492,"tier":"ok"},"fellatio":{"post_count":101277,"tier":"ok"},"ffm_threesome":{"post_count":19429,"tier":"ok"},"fishnets":{"post_count":96011,"tier":"ok"},"folded":{"post_count":18564,"tier":"ok"},"footjob":{"post_count":11857,"tier":"ok"},"from_above":{"post_count":149977,"tier":"ok"},"from_behind":{"post_count":337644,"tier":"ok"},"from_below":{"post_count":122852,"tier":"ok"},"from_side":{"post_count":349270,"tier":"ok"},"full_body":{"post_count":1321547,"tier":"ok"},"garter_straps":{"post_count":115359,"tier":"ok"},"girl_on_top":{"post_count":94461,"tier":"ok"},"group_sex":{"post_count":85167,"tier":"ok"},"gym_uniform":{"post_count":43005,"tier":"ok"},"hakama":{"post_count":69095,"tier":"ok"},"handjob":{"post_count":53998,"tier":"ok"},"high_heels":{"post_count":303013,"tier":"ok"},"hoodie":{"post_count":203947,"tier":"ok"},"hugging_own_legs":{"post_count":20038,"tier":"ok"},"indian_style":{"post_count":21628,"tier":"ok"},"irrumatio":{"post_count":8354,"tier":"ok"},"jacket":{"post_count":1536085,"tier":"ok"},"kimono":{"post_count":350341,"tier":"ok"},"kneehighs":{"post_count":171045,"tier":"ok"},"kneeling":{"post_count":160355,"tier":"ok"},"knees_to_chest":{"post_count":7576,"tier":"ok"},"knees_up":{"post_count":84237,"tier":"ok"},"latex":{"post_count":20062,"tier":"ok"},"leaning_forward":{"post_count":167067,"tier":"ok"},"leash":{"post_count":39967,"tier":"ok"},"leg_lift":{"post_count":21767,"tier":"ok"},"leg_up":{"post_count":114657,"tier":"ok"},"leg_wrap":{"post_count":2575,"tier":"low"},"legs_apart":{"post_count":47773,"tier":"ok"},"legs_together":{"post_count":38108,"tier":"ok"},"legs_up":{"post_count":48603,"tier":"ok"},"leotard":{"post_count":325269,"tier":"ok"},"lingerie":{"post_count":68406,"tier":"ok"},"looking_at_viewer":{"post_count":5046690,"tier":"ok"},"looking_back":{"post_count":371737,"tier":"ok"},"looking_down":{"post_count":142876,"tier":"ok"},"looking_up":{"post_count":102851,"tier":"ok"},"lying":{"post_count":638370,"tier":"ok"},"maid":{"post_count":216630,"tier":"ok"},"maid_headdress":{"post_count":213891,"tier":"ok"},"masturbation":{"post_count":52284,"tier":"ok"},"mating_press":{"post_count":6554,"tier":"ok"},"midriff":{"post_count":412617,"tier":"ok"},"miniskirt":{"post_count":395809,"tier":"ok"},"missionary":{"post_count":51116,"tier":"ok"},"mmf_threesome":{"post_count":18892,"tier":"ok"},"mutual_masturbation":{"post_count":1177,"tier":"low"},"necktie":{"post_count":685170,"tier":"ok"},"nude":{"post_count":711298,"tier":"ok"},"nurse":{"post_count":23444,"tier":"ok"},"nurse_cap":{"post_count":35819,"tier":"ok"},"obi":{"post_count":109217,"tier":"ok"},"off_shoulder":{"post_count":353494,"tier":"ok"},"on_back":{"post_count":366844,"tier":"ok"},"on_side":{"post_count":127337,"tier":"ok"},"on_stomach":{"post_count":94562,"tier":"ok"},"one-piece_swimsuit":{"post_count":192276,"tier":"ok"},"open_shirt":{"post_count":153300,"tier":"ok"},"oral":{"post_count":123687,"tier":"ok"},"orgy":{"post_count":9097,"tier":"ok"},"paizuri":{"post_count":61039,"tier":"ok"},"panties":{"post_count":834362,"tier":"ok"},"panties_around_one_leg":{"post_count":27790,"tier":"ok"},"panties_aside":{"post_count":34056,"tier":"ok"},"panty_pull":{"post_count":60156,"tier":"ok"},"pantyhose":{"post_count":753448,"tier":"ok"},"partially_undressed":{"post_count":9891,"tier":"ok"},"playboy_bunny":{"post_count":152138,"tier":"ok"},"pleated_skirt":{"post_count":727641,"tier":"ok"},"pov":{"post_count":207478,"tier":"ok"},"profile":{"post_count":186555,"tier":"ok"},"prone_bone":{"post_count":6839,"tier":"ok"},"qipao":{"post_count":79494,"tier":"ok"},"restrained":{"post_count":72764,"tier":"ok"},"reverse_cowgirl_position":{"post_count":12555,"tier":"ok"},"reverse_upright_straddle":{"post_count":6611,"tier":"ok"},"ribbon":{"post_count":1488901,"tier":"ok"},"rope":{"post_count":73025,"tier":"ok"},"sailor_collar":{"post_count":424696,"tier":"ok"},"school_swimsuit":{"post_count":76887,"tier":"ok"},"school_uniform":{"post_count":1082440,"tier":"ok"},"see-through_clothes":{"post_count":224952,"tier":"ok"},"serafuku":{"post_count":399815,"tier":"ok"},"sex_from_behind":{"post_count":110061,"tier":"ok"},"shibari":{"post_count":25373,"tier":"ok"},"shirt":{"post_count":3034081,"tier":"ok"},"shirt_lift":{"post_count":111710,"tier":"ok"},"shorts":{"post_count":678156,"tier":"ok"},"side_slit":{"post_count":61253,"tier":"ok"},"sitting":{"post_count":1343206,"tier":"ok"},"sitting_on_face":{"post_count":5435,"tier":"ok"},"sitting_on_lap":{"post_count":18908,"tier":"ok"},"skirt":{"post_count":2230728,"tier":"ok"},"skirt_lift":{"post_count":96651,"tier":"ok"},"socks":{"post_count":593850,"tier":"ok"},"solo":{"post_count":7216037,"tier":"ok"},"spooning":{"post_count":3800,"tier":"ok"},"spread_legs":{"post_count":358967,"tier":"ok"},"squatting_cowgirl_position":{"post_count":11663,"tier":"ok"},"stained_clothes":{"post_count":1415,"tier":"low"},"standing":{"post_count":1363886,"tier":"ok"},"standing_sex":{"post_count":24238,"tier":"ok"},"straddling":{"post_count":99758,"tier":"ok"},"string_bikini":{"post_count":69966,"tier":"ok"},"suspension":{"post_count":6123,"tier":"ok"},"sweater":{"post_count":314875,"tier":"ok"},"swimsuit":{"post_count":940727,"tier":"ok"},"thigh_sex":{"post_count":5394,"tier":"ok"},"thigh_strap":{"post_count":258789,"tier":"ok"},"thighhighs":{"post_count":1563204,"tier":"ok"},"threesome":{"post_count":45579,"tier":"ok"},"top-down_bottom-up":{"post_count":29442,"tier":"ok"},"torn_clothes":{"post_count":217598,"tier":"ok"},"track_suit":{"post_count":14944,"tier":"ok"},"trench_coat":{"post_count":8535,"tier":"ok"},"turtleneck":{"post_count":185492,"tier":"ok"},"undressing":{"post_count":69844,"tier":"ok"},"upper_body":{"post_count":1229761,"tier":"ok"},"upright_straddle":{"post_count":8112,"tier":"ok"},"wet_clothes":{"post_count":62772,"tier":"ok"},"wheelbarrow":{"post_count":1195,"tier":"low"},"zipper":{"post_count":58468,"tier":"ok"}},"aliases":{"aerial_view":"from_above","all-fours":"all_fours","anal_penetration":"anal","anal_sex":"anal","ashikoki":"footjob","ass-up_head-down":"top-down_bottom-up","ass_hole":"anus","asshole":"anus","back_turned":"from_behind","back_view":"from_behind","bathing_suit":"swimsuit","bending_over":"bent_over","blindfolded":"blindfold","blow_job":"fellatio","blowjob":"fellatio","bound_hands":"bound_wrists","bunny_suit":"playboy_bunny","bunnysuit":"playboy_bunny","bust":"upper_body","butt_hole":"anus","butthole":"anus","carry":"carrying","cheongsam":"qipao","china_dress":"qipao","chinese_dress":"qipao","closeup":"close-up","completely_naked":"completely_nude","doggy_style":"doggystyle","face_down_ass_up":"top-down_bottom-up","face_fucking":"irrumatio","facefuck":"irrumatio","female_on_top":"girl_on_top","fmm_threesome":"mmf_threesome","forced_blowjob":"irrumatio","forced_fellatio":"irrumatio","from_back":"from_behind","from_behind_position":"sex_from_behind","garter_strap":"garter_straps","groupsex":"group_sex","gym_clothes":"gym_uniform","hand_job":"handjob","hands_and_knees":"all_fours","hands_bound":"bound_wrists","hands_tied":"bound_wrists","in_profile":"profile","intercrural":"thigh_sex","intercrural_sex":"thigh_sex","kosode":"kimono","laying":"lying","laying_down":"lying","looking_over_shoulder":"looking_back","low_angle":"from_below","lying_down":"lying","lying_on_back":"on_back","lying_on_side":"on_side","lying_on_stomach":"on_stomach","male_pov":"pov","masturbate":"masturbation","masturbating":"masturbation","masturbating_each_other":"mutual_masturbation","mff_threesome":"ffm_threesome","missionary_position":"missionary","mizugi":"swimsuit","naked":"nude","naked_socks":"socks","nurse_hat":"nurse_cap","nurse_outfit":"nurse","nurse_uniform":"nurse","on_all_fours":"all_fours","on_belly":"on_stomach","on_front":"on_stomach","on_knees":"kneeling","open_legs":"spread_legs","pantsu":"panties","penetration_from_behind":"sex_from_behind","playboy_bunny_leotard":"playboy_bunny","prone":"on_stomach","reverse_cowgirl":"reverse_cowgirl_position","rope_bondage":"shibari","ropes":"rope","school_girl":"school_uniform","school_uniforms":"school_uniform","schoolgirl":"school_uniform","seifuku":"school_uniform","side":"from_side","side_view":"from_side","sit":"sitting","sitting_down":"sitting","sitting_in_lap":"sitting_on_lap","sock":"socks","spread_leg":"spread_legs","stocking":"thighhighs","stockings":"thighhighs","straddle":"straddling","straddle_penis":"thigh_sex","sucking_cock":"fellatio","sucking_dick":"fellatio","sucking_penis":"fellatio","sumata":"thigh_sex","supine":"on_back","sweatshirt":"sweater","swim_suit":"swimsuit","swimsuits":"swimsuit","taken_from_behind":"sex_from_behind","tekoki":"handjob","thigh_job":"thigh_sex","thighjob":"thigh_sex","tied_hands":"bound_wrists","tied_up_(sexual)":"bondage","tied_wrists":"bound_wrists","tights":"pantyhose","tit_fuck":"paizuri","titfuck":"paizuri","titjob":"paizuri","turning":"looking_back","view_from_above":"from_above","view_from_below":"from_below","viewed_from_above":"from_above","viewed_from_behind":"from_behind","viewed_from_below":"from_below","viewed_from_side":"from_side"},"implies":{"bikini":["swimsuit"],"completely_nude":["nude"],"cowgirl_position":["straddling"],"deepthroat":["fellatio"],"doggystyle":["sex_from_behind"],"fellatio":["oral"],"ffm_threesome":["threesome"],"irrumatio":["fellatio"],"mmf_threesome":["threesome"],"on_back":["lying"],"on_side":["lying"],"on_stomach":["lying"],"orgy":["group_sex"],"pleated_skirt":["skirt"],"qipao":["dress"],"reverse_cowgirl_position":["straddling"],"standing_sex":["standing"],"threesome":["group_sex"],"upright_straddle":["straddling"]},"deadFixes":{},"proseOnly":[],"poses":[{"code":"C01","key":"missionary","label":"正常位","main":["missionary","on_back"],"variants":{"standard":{"tags":["missionary","on_back"],"when":"男上女下，面对面"},"legs_up":{"tags":["legs_up","missionary"],"when":"女方腿被抬起压向胸口"},"spread":{"tags":["spread_legs","missionary"],"when":"双腿大张，几何最清晰"}},"negative":["sex_from_behind","doggystyle","cowgirl_position","girl_on_top"]},{"code":"C02","key":"doggy","label":"后入跪撑","main":["sex_from_behind","doggystyle","all_fours"],"variants":{"standard":{"tags":["all_fours"],"when":"床面或地面四足支撑"},"standing":{"tags":["standing_sex","bent_over"],"when":"女方站立前倾被后入"},"prone":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧被压住下半身"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"男方全身压覆，女方完全在下"},"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立后入"},"carrying":{"tags":["carrying","standing_sex"],"when":"抱起悬空后入"}},"negative":["missionary","cowgirl_position","girl_on_top"]},{"code":"C03","key":"prone","label":"趴位压身","main":["prone_bone","on_stomach"],"variants":{"standard":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧，男方覆压"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆，仅手肘支撑"},"legs_together":{"tags":["prone_bone","legs_together"],"when":"俯卧并腿，双膝与脚踝并拢，几何最稳，优先上"},"legs_apart":{"tags":["prone_bone","legs_apart"],"when":"俯卧双腿张开到最大张角，脊椎下凹、臀线最低"},"knees_up":{"tags":["prone_bone","knees_up"],"when":"俯卧屈膝抬臀，腰臀抬高、胸口贴床"},"folded":{"tags":["prone_bone","folded"],"when":"小腿后折贴向背侧，身体折成两截（folded 是体位词，不是叠衣服）"},"leg_lift":{"tags":["prone_bone","leg_lift"],"when":"俯卧单腿抬起，左右不对称，最不稳，排最后用"}},"negative":["missionary","on_back","cowgirl_position"]},{"code":"C04","key":"cowgirl","label":"骑乘正面","main":["cowgirl_position","girl_on_top","straddling"],"variants":{"standard":{"tags":["cowgirl_position"],"when":"面对面骑乘"},"squatting":{"tags":["squatting_cowgirl_position"],"when":"蹲踞式，手撑膝盖"},"upright":{"tags":["upright_straddle"],"when":"直立相拥，女在上"}},"negative":["sex_from_behind","doggystyle","all_fours","prone_bone"]},{"code":"C05","key":"reverse_cowgirl","label":"骑乘背面","main":["reverse_cowgirl_position","girl_on_top"],"variants":{"standard":{"tags":["reverse_cowgirl_position"],"when":"背对骑乘，反向"},"leaning":{"tags":["reverse_cowgirl_position","leaning_forward"],"when":"背对前倾，手撑床面"}},"negative":["missionary","sex_from_behind","doggystyle"]},{"code":"C06","key":"side","label":"侧入","main":["on_side","lying"],"variants":{"standard":{"tags":["on_side","sex_from_behind"],"when":"两人侧躺，男在后"},"spooning":{"tags":["spooning"],"when":"汤匙式贴身侧卧（低热 tag，仅点睛）"}},"negative":["missionary","cowgirl_position","standing_sex"]},{"code":"C07","key":"sitting","label":"坐姿","main":["sitting","straddling"],"variants":{"standard":{"tags":["sitting","straddling"],"when":"女方跨坐于男方腿上"},"lap":{"tags":["sitting_on_lap"],"when":"正坐怀中"},"crossed_legs":{"tags":["sitting","crossed_legs"],"when":"翘腿交叠坐，膝向一侧，最稳的新增项"},"hugging_legs":{"tags":["sitting","hugging_own_legs"],"when":"抱腿坐，身体前团贴膝（正名 hugging_own_legs，不写 alias 形式）"},"indian_style":{"tags":["sitting","indian_style"],"when":"盘腿正坐，双膝外展、脚掌相对贴于身前"},"legs_apart":{"tags":["sitting","legs_apart"],"when":"开腿坐，膝向两侧（与 C03 同名 tag，组装时按 Set 去重）"},"amazon_position":{"tags":["amazon_position"],"tier":"low","when":"反骑坐（低热度 1,582，仅点缀，不单独成镜）"}},"negative":["standing_sex","prone_bone"]},{"code":"C08","key":"standing","label":"站立","main":["standing_sex","standing"],"variants":{"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立"},"bent_over":{"tags":["bent_over","standing_sex"],"when":"站立前倾"},"in_arms":{"tags":["carrying","standing_sex"],"when":"抱起悬空（lifted 为死词，改用 carrying）"}},"negative":["lying","on_back","on_stomach"]},{"code":"C09","key":"carrying","label":"抱持挂身","main":["carrying"],"variants":{"standard":{"tags":["carrying","standing_sex"],"when":"抱起，女方挂身"},"suspended":{"tags":["suspension"],"when":"完全悬空（suspension 6,123）"}},"negative":["lying","on_back"]},{"code":"C10","key":"sitting_on_face","label":"颜面骑乘","main":["sitting_on_face","girl_on_top"],"variants":{"standard":{"tags":["sitting_on_face"],"when":"女方跨坐面部"}},"negative":["missionary","sex_from_behind"]},{"code":"C11","key":"oral","label":"口交","main":["fellatio","oral"],"variants":{"standard":{"tags":["fellatio","kneeling"],"when":"跪姿口交"},"looking_up":{"tags":["fellatio","looking_up"],"when":"抬眼看向对方"},"deepthroat":{"tags":["deepthroat"],"when":"深喉"},"irrumatio":{"tags":["irrumatio"],"when":"男方主动"},"sixty_nine":{"tags":["69","fellatio"],"when":"六九式：双方同时口交，上下叠位（体位名出现六九/69 时启用）","zh":["六九","69式","69","互相口交"]}},"negative":["sex_from_behind","cowgirl_position","paizuri"]},{"code":"C12","key":"paizuri","label":"乳交","main":["paizuri"],"variants":{"standard":{"tags":["paizuri"],"when":"乳沟夹持"}},"negative":["fellatio","footjob"]},{"code":"C13","key":"leg","label":"足交腿交","main":["footjob","thigh_sex"],"variants":{"footjob":{"tags":["footjob"],"when":"足部夹持"},"thigh_grip":{"tags":["thigh_sex"],"when":"腿间夹持（键名原 intercrural 为死词，已改名）"}},"negative":["paizuri","fellatio"]},{"code":"C14","key":"handjob","label":"手交","main":["handjob","masturbation"],"variants":{"standard":{"tags":["handjob"],"when":"手部刺激"},"mutual":{"tags":["masturbation","mutual_masturbation"],"tier":"low","when":"互相抚慰"}},"negative":["paizuri","footjob"]},{"code":"C15","key":"anal","label":"肛交","main":["anal","anus"],"variants":{"standard":{"tags":["anal","sex_from_behind"],"when":"后入肛交"},"cowgirl":{"tags":["anal","reverse_cowgirl_position"],"when":"骑乘肛交"}},"negative":["missionary"]},{"code":"C16","key":"group","label":"多人","main":["group_sex","threesome"],"variants":{"mmf":{"tags":["mmf_threesome","group_sex"],"when":"两男一女"},"ffm":{"tags":["ffm_threesome","group_sex"],"when":"两女一男"},"orgy":{"tags":["orgy","group_sex"],"when":"群交"},"dp":{"tags":["double_penetration"],"when":"双插"}},"negative":["solo"]},{"code":"C17","key":"bondage","label":"束缚","main":["bondage","restrained"],"variants":{"standard":{"tags":["bondage","bound_wrists"],"when":"腕部束缚"},"shibari":{"tags":["shibari","rope"],"when":"绳缚"},"blindfold":{"tags":["blindfold"],"when":"蒙眼"}},"negative":["solo"]},{"code":"C18","key":"high_leverage","label":"特殊高杠杆","main":["mating_press","top-down_bottom-up"],"variants":{"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆"},"upright_straddle":{"tags":["upright_straddle"],"when":"直立相拥"},"reverse_upright_straddle":{"tags":["reverse_upright_straddle"],"when":"背向直立相拥，与 upright_straddle 同族，方向相反"},"folded":{"tags":["folded","mating_press"],"when":"压覆 + 大腿后折折身，折角最大"},"knees_to_chest":{"tags":["knees_to_chest"],"when":"团身抱膝，身体缩成一团，正面朝向相机"},"leg_lift":{"tags":["mating_press","leg_lift"],"when":"压覆 + 单腿抬起，比 prone 单腿更成立"},"wheelbarrow":{"tags":["wheelbarrow","leg_up"],"tier":"low","when":"推车式（低热度 1,195，仅点缀，不单独成镜）。与 carrying 的区别：carrying 是抱起悬空、上身贴人；wheelbarrow 是对方上身压低靠手撑，双腿被举离地成水平","zh":["推车","推车式","wheelbarrow"]},"leg_wrap":{"tags":["leg_wrap"],"tier":"low","when":"腿缠式（低热度 2,576，仅点缀，不单独成镜）","zh":["缠腿","腿缠","腿盘","leg wrap"]},"amazon":{"tags":["amazon_position"],"tier":"low","when":"亚马逊式（低热度 1,582，仅点缀，不单独成镜）：女方上身伏低、双臂前撑，男方在其身后抬起双腿；与 wheelbarrow 的区别是双腿被夹在腋下而非平举","zh":["亚马逊","亚马逊式","amazon"]}}}],"views":[{"group":"水平","tags":["pov","from_side","from_behind","profile"]},{"group":"垂直","tags":["from_above","from_below","looking_up","looking_down"]},{"group":"景别","tags":["close-up","cowboy_shot","full_body","upper_body"]},{"group":"视线","tags":["looking_at_viewer","looking_back"]}],"postures":["standing","sitting","kneeling","lying","straddling","on_back","on_stomach","all_fours","spread_legs","bent_over","arched_back","on_side","arm_support"],"outfits":[{"key":"serafuku","cn":"水手服","category":"制服","base":["serafuku","sailor_collar"],"comp":["pleated_skirt","ribbon"],"tags":["serafuku","sailor_collar","pleated_skirt","ribbon"]},{"key":"school","cn":"校园制服","category":"制服","base":["school_uniform","blazer"],"comp":["necktie","pleated_skirt"],"tags":["school_uniform","blazer","necktie","pleated_skirt"]},{"key":"maid","cn":"女仆装","category":"职业装","base":["maid"],"comp":["maid_headdress","apron"],"tags":["maid","maid_headdress","apron"]},{"key":"nurse","cn":"护士服","category":"职业装","base":["nurse"],"comp":["nurse_cap","blouse"],"tags":["nurse","nurse_cap","blouse"]},{"key":"office","cn":"职场西装","category":"职业装","base":["blazer","dress_shirt"],"comp":["necktie","miniskirt"],"tags":["blazer","dress_shirt","necktie","miniskirt"]},{"key":"qipao","cn":"旗袍","category":"传统","base":["qipao"],"comp":["side_slit","obi"],"tags":["qipao","side_slit","obi"]},{"key":"kimono","cn":"和服浴衣","category":"传统","base":["kimono"],"comp":["obi","hakama"],"tags":["kimono","obi","hakama"]},{"key":"gym","cn":"体操服","category":"运动","base":["gym_uniform","bloomers"],"comp":["track_suit","socks"],"tags":["gym_uniform","bloomers","track_suit","socks"]},{"key":"schoolswim","cn":"学校泳装","category":"泳装","base":["school_swimsuit"],"comp":["competition_swimsuit"],"tags":["school_swimsuit","competition_swimsuit"]},{"key":"swimsuit","cn":"连体泳衣","category":"泳装","base":["swimsuit"],"comp":["one-piece_swimsuit","competition_swimsuit"],"tags":["swimsuit","one-piece_swimsuit","competition_swimsuit"]},{"key":"bikini","cn":"比基尼","category":"泳装","base":["bikini"],"comp":["string_bikini","midriff"],"tags":["bikini","string_bikini","midriff"]},{"key":"bunny","cn":"兔女郎","category":"特殊","base":["playboy_bunny"],"comp":["leotard","pantyhose"],"tags":["playboy_bunny","leotard","pantyhose"]},{"key":"bodysuit","cn":"紧身胶衣","category":"特殊","base":["bodysuit","latex"],"comp":["zipper","leotard"],"tags":["bodysuit","latex","zipper","leotard"]},{"key":"leotard","cn":"连体体操衣","category":"特殊","base":["leotard"],"comp":["midriff","turtleneck"],"tags":["leotard","midriff","turtleneck"]},{"key":"pajama","cn":"睡衣","category":"居家","base":["camisole","shorts"],"comp":["sweater"],"tags":["camisole","shorts","sweater"]},{"key":"sweater","cn":"毛线衫","category":"日常","base":["sweater"],"comp":["cardigan","turtleneck"],"tags":["sweater","cardigan","turtleneck"]},{"key":"hoodie","cn":"连帽衫","category":"日常","base":["hoodie"],"comp":["jacket","shorts"],"tags":["hoodie","jacket","shorts"]},{"key":"trench","cn":"长风衣","category":"日常","base":["trench_coat","coat"],"comp":["zipper","buttons"],"tags":["trench_coat","coat","zipper","buttons"]},{"key":"apron","cn":"围裙","category":"居家","base":["apron","bare_shoulders"],"comp":["thighhighs"],"tags":["apron","bare_shoulders","thighhighs"]},{"key":"lingerie","cn":"内衣吊带","category":"内衣","base":["lingerie","bra"],"comp":["panties","garter_straps"],"tags":["lingerie","bra","panties","garter_straps"]}],"outfitStates":{"D0":{"cn":"全着 · 衣不卸","add":["clothed_sex"],"ucAdd":["nude","completely_nude"]},"D1":{"cn":"半脱","add":["partially_undressed"],"ucAdd":["nude","completely_nude"]},"D2":{"cn":"拨开让位","add":["clothing_aside"],"ucAdd":["nude","completely_nude"]},"D3":{"cn":"正在脱","add":["undressing"],"ucAdd":["nude","completely_nude","jacket","coat","trench_coat","blazer"]},"D4":{"cn":"全裸","add":["completely_nude"],"ucAdd":["clothes","shirt","bra","panties"]}},"outfitForms":{"skirt_lift":"skirt_lift","shirt_lift":"shirt_lift","open_shirt":"open_shirt","panty_pull":"panty_pull","panties_aside":"panties_aside","panties_around_one_leg":"panties_around_one_leg","bra_lift":"bra_lift","off_shoulder":"off_shoulder","bottomless":"bottomless"},"outfitMaterials":{"wet":"wet_clothes","torn":"torn_clothes","sheer":"see-through_clothes","cumStained":"cum_on_clothes","stained":"stained_clothes","latex":"latex","fishnet":"fishnets","knit":"sweater"},"outfitHoisery":{"thighhighs":"thighhighs","pantyhose":"pantyhose","kneehighs":"kneehighs","socks":"socks","garter":"garter_straps","barefoot":"barefoot"},"accessories":[{"tag":"choker","cn":"颈环/贴颈链"},{"tag":"collar","cn":"项圈"},{"tag":"thigh_strap","cn":"腿环"},{"tag":"garter_straps","cn":"吊袜带"},{"tag":"armband","cn":"臂环"},{"tag":"leash","cn":"牵引绳"}],"outfitResidue":["choker","thigh_strap"],"outfitConflicts":[{"name":"nude_kills_all","trig":["nude","completely_nude"],"mode":"uc","kill":["serafuku","school_uniform","blazer","sailor_collar","maid","qipao","kimono","dress","skirt","pleated_skirt","shirt","bra","panties","apron","trench_coat","bodysuit","leotard","camisole"]},{"name":"bottomless_no_lower","trig":["bottomless"],"mode":"drop","kill":["skirt","shorts","pantyhose","pleated_skirt","miniskirt"]},{"name":"barefoot_no_socks","trig":["barefoot"],"mode":"drop","kill":["socks","thighhighs","kneehighs","pantyhose","high_heels"]},{"name":"leg_wrap_invisible","trig":["panties_around_one_leg"],"mode":"dropTrig","kill":["sex_from_behind","from_behind"]},{"name":"open_shirt_blocked","trig":["open_shirt"],"mode":"dropTrig","kill":["sex_from_behind","from_behind"]},{"name":"pantyhose_one_piece","trig":["pantyhose"],"mode":"drop","kill":["panties_aside","panty_pull"]},{"name":"latex_no_wet","trig":["latex"],"mode":"drop","kill":["wet_clothes"]},{"name":"skirt_lift_no_hands","trig":["skirt_lift"],"mode":"dropTrig","kill":["girl_on_top","cowgirl_position"]},{"name":"heels_no_kneel","trig":["high_heels"],"mode":"dropTrig","kill":["all_fours","bent_over","prone_bone"]},{"name":"wet_no_sheer","trig":["wet_clothes"],"mode":"drop","kill":["see-through_clothes"]}],"viewRules":{"oneOf":[["pov","from_side","from_behind","profile"],["from_above","from_below"],["close-up","cowboy_shot","upper_body","full_body"]],"forbid":[["pov","profile"],["pov","from_side"]]},"postureRules":{"requires":{"arm_support":["all_fours","prone_bone","bent_over"],"spread_legs":["lying","sitting","on_back"]},"forbid":[["standing","lying"],["standing","sitting"],["on_back","on_stomach"],["kneeling","standing"]]},"nonTag":["clothes"]};
+    const SDT_POSE_MATRIX = {"version":"1.0.0","generatedAt":"2026-10-31T19:56:22.074Z","generator":"tools/build-matrix.js","thresholds":{"heatOk":3000,"heatLow":1},"stats":{"referencedTags":172,"emittedTags":172,"ok":167,"low":5,"dead":0,"deprecated":0,"unknown":0,"aliases":121,"implications":19,"deadFixes":0,"outfits":20,"outfitStates":5,"outfitForms":9,"outfitMaterials":8,"outfitHoisery":6,"accessories":6,"outfitResidue":2,"outfitConflicts":10,"viewRuleGroups":3,"postureRuleGroups":4,"nonTag":1},"tags":{"69":{"post_count":3778,"tier":"ok"},"against_wall":{"post_count":20311,"tier":"ok"},"all_fours":{"post_count":82713,"tier":"ok"},"amazon_position":{"post_count":1582,"tier":"low"},"anal":{"post_count":76858,"tier":"ok"},"anus":{"post_count":173206,"tier":"ok"},"apron":{"post_count":316519,"tier":"ok"},"arched_back":{"post_count":25321,"tier":"ok"},"arm_support":{"post_count":121254,"tier":"ok"},"armband":{"post_count":85687,"tier":"ok"},"bare_shoulders":{"post_count":1430829,"tier":"ok"},"barefoot":{"post_count":513229,"tier":"ok"},"bent_over":{"post_count":86272,"tier":"ok"},"bikini":{"post_count":716537,"tier":"ok"},"blazer":{"post_count":100573,"tier":"ok"},"blindfold":{"post_count":31057,"tier":"ok"},"bloomers":{"post_count":28814,"tier":"ok"},"blouse":{"post_count":50434,"tier":"ok"},"bodysuit":{"post_count":188215,"tier":"ok"},"bondage":{"post_count":76266,"tier":"ok"},"bottomless":{"post_count":125113,"tier":"ok"},"bound_wrists":{"post_count":30919,"tier":"ok"},"bra":{"post_count":283309,"tier":"ok"},"bra_lift":{"post_count":13216,"tier":"ok"},"buttons":{"post_count":223182,"tier":"ok"},"camisole":{"post_count":69853,"tier":"ok"},"cardigan":{"post_count":133079,"tier":"ok"},"carrying":{"post_count":67097,"tier":"ok"},"choker":{"post_count":636866,"tier":"ok"},"close-up":{"post_count":65061,"tier":"ok"},"clothed_sex":{"post_count":55256,"tier":"ok"},"clothing_aside":{"post_count":67613,"tier":"ok"},"coat":{"post_count":392415,"tier":"ok"},"collar":{"post_count":286025,"tier":"ok"},"competition_swimsuit":{"post_count":39186,"tier":"ok"},"completely_nude":{"post_count":302697,"tier":"ok"},"cowboy_shot":{"post_count":875909,"tier":"ok"},"cowgirl_position":{"post_count":57402,"tier":"ok"},"crossed_legs":{"post_count":109216,"tier":"ok"},"cum_on_clothes":{"post_count":17025,"tier":"ok"},"deepthroat":{"post_count":8316,"tier":"ok"},"doggystyle":{"post_count":43115,"tier":"ok"},"double_penetration":{"post_count":14822,"tier":"ok"},"dress":{"post_count":2006407,"tier":"ok"},"dress_shirt":{"post_count":169492,"tier":"ok"},"fellatio":{"post_count":101277,"tier":"ok"},"ffm_threesome":{"post_count":19429,"tier":"ok"},"fishnets":{"post_count":96011,"tier":"ok"},"folded":{"post_count":18564,"tier":"ok"},"footjob":{"post_count":11857,"tier":"ok"},"from_above":{"post_count":149977,"tier":"ok"},"from_behind":{"post_count":337644,"tier":"ok"},"from_below":{"post_count":122852,"tier":"ok"},"from_side":{"post_count":349270,"tier":"ok"},"full_body":{"post_count":1321547,"tier":"ok"},"garter_straps":{"post_count":115359,"tier":"ok"},"girl_on_top":{"post_count":94461,"tier":"ok"},"group_sex":{"post_count":85167,"tier":"ok"},"gym_uniform":{"post_count":43005,"tier":"ok"},"hakama":{"post_count":69095,"tier":"ok"},"handjob":{"post_count":53998,"tier":"ok"},"high_heels":{"post_count":303013,"tier":"ok"},"hoodie":{"post_count":203947,"tier":"ok"},"hugging_own_legs":{"post_count":20038,"tier":"ok"},"indian_style":{"post_count":21628,"tier":"ok"},"irrumatio":{"post_count":8354,"tier":"ok"},"jacket":{"post_count":1536085,"tier":"ok"},"kimono":{"post_count":350341,"tier":"ok"},"kneehighs":{"post_count":171045,"tier":"ok"},"kneeling":{"post_count":160355,"tier":"ok"},"knees_to_chest":{"post_count":7576,"tier":"ok"},"knees_up":{"post_count":84237,"tier":"ok"},"latex":{"post_count":20062,"tier":"ok"},"leaning_forward":{"post_count":167067,"tier":"ok"},"leash":{"post_count":39967,"tier":"ok"},"leg_lift":{"post_count":21767,"tier":"ok"},"leg_up":{"post_count":114657,"tier":"ok"},"leg_wrap":{"post_count":2575,"tier":"low"},"legs_apart":{"post_count":47773,"tier":"ok"},"legs_together":{"post_count":38108,"tier":"ok"},"legs_up":{"post_count":48603,"tier":"ok"},"leotard":{"post_count":325269,"tier":"ok"},"lingerie":{"post_count":68406,"tier":"ok"},"looking_at_viewer":{"post_count":5046690,"tier":"ok"},"looking_back":{"post_count":371737,"tier":"ok"},"looking_down":{"post_count":142876,"tier":"ok"},"looking_up":{"post_count":102851,"tier":"ok"},"lying":{"post_count":638370,"tier":"ok"},"maid":{"post_count":216630,"tier":"ok"},"maid_headdress":{"post_count":213891,"tier":"ok"},"masturbation":{"post_count":52284,"tier":"ok"},"mating_press":{"post_count":6554,"tier":"ok"},"midriff":{"post_count":412617,"tier":"ok"},"miniskirt":{"post_count":395809,"tier":"ok"},"missionary":{"post_count":51116,"tier":"ok"},"mmf_threesome":{"post_count":18892,"tier":"ok"},"mutual_masturbation":{"post_count":1177,"tier":"low"},"necktie":{"post_count":685170,"tier":"ok"},"nude":{"post_count":711298,"tier":"ok"},"nurse":{"post_count":23444,"tier":"ok"},"nurse_cap":{"post_count":35819,"tier":"ok"},"obi":{"post_count":109217,"tier":"ok"},"off_shoulder":{"post_count":353494,"tier":"ok"},"on_back":{"post_count":366844,"tier":"ok"},"on_side":{"post_count":127337,"tier":"ok"},"on_stomach":{"post_count":94562,"tier":"ok"},"one-piece_swimsuit":{"post_count":192276,"tier":"ok"},"open_shirt":{"post_count":153300,"tier":"ok"},"oral":{"post_count":123687,"tier":"ok"},"orgy":{"post_count":9097,"tier":"ok"},"paizuri":{"post_count":61039,"tier":"ok"},"panties":{"post_count":834362,"tier":"ok"},"panties_around_one_leg":{"post_count":27790,"tier":"ok"},"panties_aside":{"post_count":34056,"tier":"ok"},"panty_pull":{"post_count":60156,"tier":"ok"},"pantyhose":{"post_count":753448,"tier":"ok"},"partially_undressed":{"post_count":9891,"tier":"ok"},"playboy_bunny":{"post_count":152138,"tier":"ok"},"pleated_skirt":{"post_count":727641,"tier":"ok"},"pov":{"post_count":207478,"tier":"ok"},"profile":{"post_count":186555,"tier":"ok"},"prone_bone":{"post_count":6839,"tier":"ok"},"qipao":{"post_count":79494,"tier":"ok"},"restrained":{"post_count":72764,"tier":"ok"},"reverse_cowgirl_position":{"post_count":12555,"tier":"ok"},"reverse_upright_straddle":{"post_count":6611,"tier":"ok"},"ribbon":{"post_count":1488901,"tier":"ok"},"rope":{"post_count":73025,"tier":"ok"},"sailor_collar":{"post_count":424696,"tier":"ok"},"school_swimsuit":{"post_count":76887,"tier":"ok"},"school_uniform":{"post_count":1082440,"tier":"ok"},"see-through_clothes":{"post_count":224952,"tier":"ok"},"serafuku":{"post_count":399815,"tier":"ok"},"sex_from_behind":{"post_count":110061,"tier":"ok"},"shibari":{"post_count":25373,"tier":"ok"},"shirt":{"post_count":3034081,"tier":"ok"},"shirt_lift":{"post_count":111710,"tier":"ok"},"shorts":{"post_count":678156,"tier":"ok"},"side_slit":{"post_count":61253,"tier":"ok"},"sitting":{"post_count":1343206,"tier":"ok"},"sitting_on_face":{"post_count":5435,"tier":"ok"},"sitting_on_lap":{"post_count":18908,"tier":"ok"},"skirt":{"post_count":2230728,"tier":"ok"},"skirt_lift":{"post_count":96651,"tier":"ok"},"socks":{"post_count":593850,"tier":"ok"},"solo":{"post_count":7216037,"tier":"ok"},"spooning":{"post_count":3800,"tier":"ok"},"spread_legs":{"post_count":358967,"tier":"ok"},"squatting_cowgirl_position":{"post_count":11663,"tier":"ok"},"stained_clothes":{"post_count":1415,"tier":"low"},"standing":{"post_count":1363886,"tier":"ok"},"standing_sex":{"post_count":24238,"tier":"ok"},"straddling":{"post_count":99758,"tier":"ok"},"string_bikini":{"post_count":69966,"tier":"ok"},"suspension":{"post_count":6123,"tier":"ok"},"sweater":{"post_count":314875,"tier":"ok"},"swimsuit":{"post_count":940727,"tier":"ok"},"thigh_sex":{"post_count":5394,"tier":"ok"},"thigh_strap":{"post_count":258789,"tier":"ok"},"thighhighs":{"post_count":1563204,"tier":"ok"},"threesome":{"post_count":45579,"tier":"ok"},"top-down_bottom-up":{"post_count":29442,"tier":"ok"},"torn_clothes":{"post_count":217598,"tier":"ok"},"track_suit":{"post_count":14944,"tier":"ok"},"trench_coat":{"post_count":8535,"tier":"ok"},"turtleneck":{"post_count":185492,"tier":"ok"},"undressing":{"post_count":69844,"tier":"ok"},"upper_body":{"post_count":1229761,"tier":"ok"},"upright_straddle":{"post_count":8112,"tier":"ok"},"wet_clothes":{"post_count":62772,"tier":"ok"},"wheelbarrow":{"post_count":1195,"tier":"low"},"zipper":{"post_count":58468,"tier":"ok"}},"aliases":{"aerial_view":"from_above","all-fours":"all_fours","anal_penetration":"anal","anal_sex":"anal","ashikoki":"footjob","ass-up_head-down":"top-down_bottom-up","ass_hole":"anus","asshole":"anus","back_turned":"from_behind","back_view":"from_behind","bathing_suit":"swimsuit","bending_over":"bent_over","blindfolded":"blindfold","blow_job":"fellatio","blowjob":"fellatio","bound_hands":"bound_wrists","bunny_suit":"playboy_bunny","bunnysuit":"playboy_bunny","bust":"upper_body","butt_hole":"anus","butthole":"anus","carry":"carrying","cheongsam":"qipao","china_dress":"qipao","chinese_dress":"qipao","closeup":"close-up","completely_naked":"completely_nude","doggy_style":"doggystyle","face_down_ass_up":"top-down_bottom-up","face_fucking":"irrumatio","facefuck":"irrumatio","female_on_top":"girl_on_top","fmm_threesome":"mmf_threesome","forced_blowjob":"irrumatio","forced_fellatio":"irrumatio","from_back":"from_behind","from_behind_position":"sex_from_behind","garter_strap":"garter_straps","groupsex":"group_sex","gym_clothes":"gym_uniform","hand_job":"handjob","hands_and_knees":"all_fours","hands_bound":"bound_wrists","hands_tied":"bound_wrists","in_profile":"profile","intercrural":"thigh_sex","intercrural_sex":"thigh_sex","kosode":"kimono","laying":"lying","laying_down":"lying","looking_over_shoulder":"looking_back","low_angle":"from_below","lying_down":"lying","lying_on_back":"on_back","lying_on_side":"on_side","lying_on_stomach":"on_stomach","male_pov":"pov","masturbate":"masturbation","masturbating":"masturbation","masturbating_each_other":"mutual_masturbation","mff_threesome":"ffm_threesome","missionary_position":"missionary","mizugi":"swimsuit","naked":"nude","naked_socks":"socks","nurse_hat":"nurse_cap","nurse_outfit":"nurse","nurse_uniform":"nurse","on_all_fours":"all_fours","on_belly":"on_stomach","on_front":"on_stomach","on_knees":"kneeling","open_legs":"spread_legs","pantsu":"panties","penetration_from_behind":"sex_from_behind","playboy_bunny_leotard":"playboy_bunny","prone":"on_stomach","reverse_cowgirl":"reverse_cowgirl_position","rope_bondage":"shibari","ropes":"rope","school_girl":"school_uniform","school_uniforms":"school_uniform","schoolgirl":"school_uniform","seifuku":"school_uniform","side":"from_side","side_view":"from_side","sit":"sitting","sitting_down":"sitting","sitting_in_lap":"sitting_on_lap","sock":"socks","spread_leg":"spread_legs","stocking":"thighhighs","stockings":"thighhighs","straddle":"straddling","straddle_penis":"thigh_sex","sucking_cock":"fellatio","sucking_dick":"fellatio","sucking_penis":"fellatio","sumata":"thigh_sex","supine":"on_back","sweatshirt":"sweater","swim_suit":"swimsuit","swimsuits":"swimsuit","taken_from_behind":"sex_from_behind","tekoki":"handjob","thigh_job":"thigh_sex","thighjob":"thigh_sex","tied_hands":"bound_wrists","tied_up_(sexual)":"bondage","tied_wrists":"bound_wrists","tights":"pantyhose","tit_fuck":"paizuri","titfuck":"paizuri","titjob":"paizuri","turning":"looking_back","view_from_above":"from_above","view_from_below":"from_below","viewed_from_above":"from_above","viewed_from_behind":"from_behind","viewed_from_below":"from_below","viewed_from_side":"from_side"},"implies":{"bikini":["swimsuit"],"completely_nude":["nude"],"cowgirl_position":["straddling"],"deepthroat":["fellatio"],"doggystyle":["sex_from_behind"],"fellatio":["oral"],"ffm_threesome":["threesome"],"irrumatio":["fellatio"],"mmf_threesome":["threesome"],"on_back":["lying"],"on_side":["lying"],"on_stomach":["lying"],"orgy":["group_sex"],"pleated_skirt":["skirt"],"qipao":["dress"],"reverse_cowgirl_position":["straddling"],"standing_sex":["standing"],"threesome":["group_sex"],"upright_straddle":["straddling"]},"deadFixes":{},"proseOnly":[],"poses":[{"code":"C01","key":"missionary","label":"正常位","main":["missionary","on_back"],"variants":{"standard":{"tags":["missionary","on_back"],"when":"男上女下，面对面"},"legs_up":{"tags":["legs_up","missionary"],"when":"女方腿被抬起压向胸口"},"spread":{"tags":["spread_legs","missionary"],"when":"双腿大张，几何最清晰"}},"negative":["sex_from_behind","doggystyle","cowgirl_position","girl_on_top"]},{"code":"C02","key":"doggy","label":"后入跪撑","main":["sex_from_behind","doggystyle","all_fours"],"variants":{"standard":{"tags":["all_fours"],"when":"床面或地面四足支撑"},"standing":{"tags":["standing_sex","bent_over"],"when":"女方站立前倾被后入"},"prone":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧被压住下半身"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"男方全身压覆，女方完全在下"},"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立后入"},"carrying":{"tags":["carrying","standing_sex"],"when":"抱起悬空后入"}},"negative":["missionary","cowgirl_position","girl_on_top"]},{"code":"C03","key":"prone","label":"趴位压身","main":["prone_bone","on_stomach"],"variants":{"standard":{"tags":["prone_bone","on_stomach"],"when":"女方俯卧，男方覆压"},"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆，仅手肘支撑"},"legs_together":{"tags":["prone_bone","legs_together"],"when":"俯卧并腿，双膝与脚踝并拢，几何最稳，优先上"},"legs_apart":{"tags":["prone_bone","legs_apart"],"when":"俯卧双腿张开到最大张角，脊椎下凹、臀线最低"},"knees_up":{"tags":["prone_bone","knees_up"],"when":"俯卧屈膝抬臀，腰臀抬高、胸口贴床"},"folded":{"tags":["prone_bone","folded"],"when":"小腿后折贴向背侧，身体折成两截（folded 是体位词，不是叠衣服）"},"leg_lift":{"tags":["prone_bone","leg_lift"],"when":"俯卧单腿抬起，左右不对称，最不稳，排最后用"}},"negative":["missionary","on_back","cowgirl_position"]},{"code":"C04","key":"cowgirl","label":"骑乘正面","main":["cowgirl_position","girl_on_top","straddling"],"variants":{"standard":{"tags":["cowgirl_position"],"when":"面对面骑乘"},"squatting":{"tags":["squatting_cowgirl_position"],"when":"蹲踞式，手撑膝盖"},"upright":{"tags":["upright_straddle"],"when":"直立相拥，女在上"}},"negative":["sex_from_behind","doggystyle","all_fours","prone_bone"]},{"code":"C05","key":"reverse_cowgirl","label":"骑乘背面","main":["reverse_cowgirl_position","girl_on_top"],"variants":{"standard":{"tags":["reverse_cowgirl_position"],"when":"背对骑乘，反向"},"leaning":{"tags":["reverse_cowgirl_position","leaning_forward"],"when":"背对前倾，手撑床面"}},"negative":["missionary","sex_from_behind","doggystyle"]},{"code":"C06","key":"side","label":"侧入","main":["on_side","lying"],"variants":{"standard":{"tags":["on_side","sex_from_behind"],"when":"两人侧躺，男在后"},"spooning":{"tags":["spooning"],"when":"汤匙式贴身侧卧（低热 tag，仅点睛）"}},"negative":["missionary","cowgirl_position","standing_sex"]},{"code":"C07","key":"sitting","label":"坐姿","main":["sitting","straddling"],"variants":{"standard":{"tags":["sitting","straddling"],"when":"女方跨坐于男方腿上"},"lap":{"tags":["sitting_on_lap"],"when":"正坐怀中"},"crossed_legs":{"tags":["sitting","crossed_legs"],"when":"翘腿交叠坐，膝向一侧，最稳的新增项"},"hugging_legs":{"tags":["sitting","hugging_own_legs"],"when":"抱腿坐，身体前团贴膝（正名 hugging_own_legs，不写 alias 形式）"},"indian_style":{"tags":["sitting","indian_style"],"when":"盘腿正坐，双膝外展、脚掌相对贴于身前"},"legs_apart":{"tags":["sitting","legs_apart"],"when":"开腿坐，膝向两侧（与 C03 同名 tag，组装时按 Set 去重）"},"amazon_position":{"tags":["amazon_position"],"tier":"low","when":"反骑坐（低热度 1,582，仅点缀，不单独成镜）"}},"negative":["standing_sex","prone_bone"]},{"code":"C08","key":"standing","label":"站立","main":["standing_sex","standing"],"variants":{"against_wall":{"tags":["against_wall","standing_sex"],"when":"靠墙站立"},"bent_over":{"tags":["bent_over","standing_sex"],"when":"站立前倾"},"in_arms":{"tags":["carrying","standing_sex"],"when":"抱起悬空（lifted 为死词，改用 carrying）"}},"negative":["lying","on_back","on_stomach"]},{"code":"C09","key":"carrying","label":"抱持挂身","main":["carrying"],"variants":{"standard":{"tags":["carrying","standing_sex"],"when":"抱起，女方挂身"},"suspended":{"tags":["suspension"],"when":"完全悬空（suspension 6,123）"}},"negative":["lying","on_back"]},{"code":"C10","key":"sitting_on_face","label":"颜面骑乘","main":["sitting_on_face","girl_on_top"],"variants":{"standard":{"tags":["sitting_on_face"],"when":"女方跨坐面部"}},"negative":["missionary","sex_from_behind"]},{"code":"C11","key":"oral","label":"口交","main":["fellatio","oral"],"variants":{"standard":{"tags":["fellatio","kneeling"],"when":"跪姿口交"},"looking_up":{"tags":["fellatio","looking_up"],"when":"抬眼看向对方"},"deepthroat":{"tags":["deepthroat"],"when":"深喉"},"irrumatio":{"tags":["irrumatio"],"when":"男方主动"},"sixty_nine":{"tags":["69","fellatio"],"when":"六九式：双方同时口交，上下叠位（体位名出现六九/69 时启用）","zh":["六九","69式","69","互相口交"]}},"negative":["sex_from_behind","cowgirl_position","paizuri"]},{"code":"C12","key":"paizuri","label":"乳交","main":["paizuri"],"variants":{"standard":{"tags":["paizuri"],"when":"乳沟夹持"}},"negative":["fellatio","footjob"]},{"code":"C13","key":"leg","label":"足交腿交","main":["footjob","thigh_sex"],"variants":{"footjob":{"tags":["footjob"],"when":"足部夹持"},"thigh_grip":{"tags":["thigh_sex"],"when":"腿间夹持（键名原 intercrural 为死词，已改名）"}},"negative":["paizuri","fellatio"]},{"code":"C14","key":"handjob","label":"手交","main":["handjob","masturbation"],"variants":{"standard":{"tags":["handjob"],"when":"手部刺激"},"mutual":{"tags":["masturbation","mutual_masturbation"],"tier":"low","when":"互相抚慰"}},"negative":["paizuri","footjob"]},{"code":"C15","key":"anal","label":"肛交","main":["anal","anus"],"variants":{"standard":{"tags":["anal","sex_from_behind"],"when":"后入肛交"},"cowgirl":{"tags":["anal","reverse_cowgirl_position"],"when":"骑乘肛交"}},"negative":["missionary"]},{"code":"C16","key":"group","label":"多人","main":["group_sex","threesome"],"variants":{"mmf":{"tags":["mmf_threesome","group_sex"],"when":"两男一女"},"ffm":{"tags":["ffm_threesome","group_sex"],"when":"两女一男"},"orgy":{"tags":["orgy","group_sex"],"when":"群交"},"dp":{"tags":["double_penetration"],"when":"双插"}},"negative":["solo"]},{"code":"C17","key":"bondage","label":"束缚","main":["bondage","restrained"],"variants":{"standard":{"tags":["bondage","bound_wrists"],"when":"腕部束缚"},"shibari":{"tags":["shibari","rope"],"when":"绳缚"},"blindfold":{"tags":["blindfold"],"when":"蒙眼"}},"negative":["solo"]},{"code":"C18","key":"high_leverage","label":"特殊高杠杆","main":["mating_press","top-down_bottom-up"],"variants":{"mating_press":{"tags":["mating_press","top-down_bottom-up"],"when":"全身压覆"},"upright_straddle":{"tags":["upright_straddle"],"when":"直立相拥"},"reverse_upright_straddle":{"tags":["reverse_upright_straddle"],"when":"背向直立相拥，与 upright_straddle 同族，方向相反"},"folded":{"tags":["folded","mating_press"],"when":"压覆 + 大腿后折折身，折角最大"},"knees_to_chest":{"tags":["knees_to_chest"],"when":"团身抱膝，身体缩成一团，正面朝向相机"},"leg_lift":{"tags":["mating_press","leg_lift"],"when":"压覆 + 单腿抬起，比 prone 单腿更成立"},"wheelbarrow":{"tags":["wheelbarrow","leg_up"],"tier":"low","when":"推车式（低热度 1,195，仅点缀，不单独成镜）。与 carrying 的区别：carrying 是抱起悬空、上身贴人；wheelbarrow 是对方上身压低靠手撑，双腿被举离地成水平","zh":["推车","推车式","wheelbarrow"]},"leg_wrap":{"tags":["leg_wrap"],"tier":"low","when":"腿缠式（低热度 2,576，仅点缀，不单独成镜）","zh":["缠腿","腿缠","腿盘","leg wrap"]},"amazon":{"tags":["amazon_position"],"tier":"low","when":"亚马逊式（低热度 1,582，仅点缀，不单独成镜）：女方上身伏低、双臂前撑，男方在其身后抬起双腿；与 wheelbarrow 的区别是双腿被夹在腋下而非平举","zh":["亚马逊","亚马逊式","amazon"]}},"regular":false,"ambiguousMain":["mating_press","top-down_bottom-up"]}],"views":[{"group":"水平","tags":["pov","from_side","from_behind","profile"]},{"group":"垂直","tags":["from_above","from_below","looking_up","looking_down"]},{"group":"景别","tags":["close-up","cowboy_shot","full_body","upper_body"]},{"group":"视线","tags":["looking_at_viewer","looking_back"]}],"postures":["standing","sitting","kneeling","lying","straddling","on_back","on_stomach","all_fours","spread_legs","bent_over","arched_back","on_side","arm_support"],"outfits":[{"key":"serafuku","cn":"水手服","category":"制服","base":["serafuku","sailor_collar"],"comp":["pleated_skirt","ribbon"],"tags":["serafuku","sailor_collar","pleated_skirt","ribbon"]},{"key":"school","cn":"校园制服","category":"制服","base":["school_uniform","blazer"],"comp":["necktie","pleated_skirt"],"tags":["school_uniform","blazer","necktie","pleated_skirt"]},{"key":"maid","cn":"女仆装","category":"职业装","base":["maid"],"comp":["maid_headdress","apron"],"tags":["maid","maid_headdress","apron"]},{"key":"nurse","cn":"护士服","category":"职业装","base":["nurse"],"comp":["nurse_cap","blouse"],"tags":["nurse","nurse_cap","blouse"]},{"key":"office","cn":"职场西装","category":"职业装","base":["blazer","dress_shirt"],"comp":["necktie","miniskirt"],"tags":["blazer","dress_shirt","necktie","miniskirt"]},{"key":"qipao","cn":"旗袍","category":"传统","base":["qipao"],"comp":["side_slit","obi"],"tags":["qipao","side_slit","obi"]},{"key":"kimono","cn":"和服浴衣","category":"传统","base":["kimono"],"comp":["obi","hakama"],"tags":["kimono","obi","hakama"]},{"key":"gym","cn":"体操服","category":"运动","base":["gym_uniform","bloomers"],"comp":["track_suit","socks"],"tags":["gym_uniform","bloomers","track_suit","socks"]},{"key":"schoolswim","cn":"学校泳装","category":"泳装","base":["school_swimsuit"],"comp":["competition_swimsuit"],"tags":["school_swimsuit","competition_swimsuit"]},{"key":"swimsuit","cn":"连体泳衣","category":"泳装","base":["swimsuit"],"comp":["one-piece_swimsuit","competition_swimsuit"],"tags":["swimsuit","one-piece_swimsuit","competition_swimsuit"]},{"key":"bikini","cn":"比基尼","category":"泳装","base":["bikini"],"comp":["string_bikini","midriff"],"tags":["bikini","string_bikini","midriff"]},{"key":"bunny","cn":"兔女郎","category":"特殊","base":["playboy_bunny"],"comp":["leotard","pantyhose"],"tags":["playboy_bunny","leotard","pantyhose"]},{"key":"bodysuit","cn":"紧身胶衣","category":"特殊","base":["bodysuit","latex"],"comp":["zipper","leotard"],"tags":["bodysuit","latex","zipper","leotard"]},{"key":"leotard","cn":"连体体操衣","category":"特殊","base":["leotard"],"comp":["midriff","turtleneck"],"tags":["leotard","midriff","turtleneck"]},{"key":"pajama","cn":"睡衣","category":"居家","base":["camisole","shorts"],"comp":["sweater"],"tags":["camisole","shorts","sweater"]},{"key":"sweater","cn":"毛线衫","category":"日常","base":["sweater"],"comp":["cardigan","turtleneck"],"tags":["sweater","cardigan","turtleneck"]},{"key":"hoodie","cn":"连帽衫","category":"日常","base":["hoodie"],"comp":["jacket","shorts"],"tags":["hoodie","jacket","shorts"]},{"key":"trench","cn":"长风衣","category":"日常","base":["trench_coat","coat"],"comp":["zipper","buttons"],"tags":["trench_coat","coat","zipper","buttons"]},{"key":"apron","cn":"围裙","category":"居家","base":["apron","bare_shoulders"],"comp":["thighhighs"],"tags":["apron","bare_shoulders","thighhighs"]},{"key":"lingerie","cn":"内衣吊带","category":"内衣","base":["lingerie","bra"],"comp":["panties","garter_straps"],"tags":["lingerie","bra","panties","garter_straps"]}],"outfitStates":{"D0":{"cn":"全着 · 衣不卸","add":["clothed_sex"],"ucAdd":["nude","completely_nude"]},"D1":{"cn":"半脱","add":["partially_undressed"],"ucAdd":["nude","completely_nude"]},"D2":{"cn":"拨开让位","add":["clothing_aside"],"ucAdd":["nude","completely_nude"]},"D3":{"cn":"正在脱","add":["undressing"],"ucAdd":["nude","completely_nude","jacket","coat","trench_coat","blazer"]},"D4":{"cn":"全裸","add":["completely_nude"],"ucAdd":["clothes","shirt","bra","panties"]}},"outfitForms":{"skirt_lift":"skirt_lift","shirt_lift":"shirt_lift","open_shirt":"open_shirt","panty_pull":"panty_pull","panties_aside":"panties_aside","panties_around_one_leg":"panties_around_one_leg","bra_lift":"bra_lift","off_shoulder":"off_shoulder","bottomless":"bottomless"},"outfitMaterials":{"wet":"wet_clothes","torn":"torn_clothes","sheer":"see-through_clothes","cumStained":"cum_on_clothes","stained":"stained_clothes","latex":"latex","fishnet":"fishnets","knit":"sweater"},"outfitHoisery":{"thighhighs":"thighhighs","pantyhose":"pantyhose","kneehighs":"kneehighs","socks":"socks","garter":"garter_straps","barefoot":"barefoot"},"accessories":[{"tag":"choker","cn":"颈环/贴颈链"},{"tag":"collar","cn":"项圈"},{"tag":"thigh_strap","cn":"腿环"},{"tag":"garter_straps","cn":"吊袜带"},{"tag":"armband","cn":"臂环"},{"tag":"leash","cn":"牵引绳"}],"outfitResidue":["choker","thigh_strap"],"outfitConflicts":[{"name":"nude_kills_all","trig":["nude","completely_nude"],"mode":"uc","kill":["serafuku","school_uniform","blazer","sailor_collar","maid","qipao","kimono","dress","skirt","pleated_skirt","shirt","bra","panties","apron","trench_coat","bodysuit","leotard","camisole"]},{"name":"bottomless_no_lower","trig":["bottomless"],"mode":"drop","kill":["skirt","shorts","pantyhose","pleated_skirt","miniskirt"]},{"name":"barefoot_no_socks","trig":["barefoot"],"mode":"drop","kill":["socks","thighhighs","kneehighs","pantyhose","high_heels"]},{"name":"leg_wrap_invisible","trig":["panties_around_one_leg"],"mode":"dropTrig","kill":[],"whenPose":["sex_from_behind","from_behind"],"dropOutfit":["panties_around_one_leg"]},{"name":"open_shirt_blocked","trig":["open_shirt"],"mode":"dropTrig","kill":[],"whenPose":["sex_from_behind","from_behind"],"dropOutfit":["open_shirt"]},{"name":"pantyhose_one_piece","trig":["pantyhose"],"mode":"drop","kill":["panties_aside","panty_pull"]},{"name":"latex_no_wet","trig":["latex"],"mode":"drop","kill":["wet_clothes"]},{"name":"skirt_lift_no_hands","trig":["skirt_lift"],"mode":"dropTrig","kill":[],"whenPose":["girl_on_top","cowgirl_position"],"dropOutfit":["skirt_lift"]},{"name":"heels_no_kneel","trig":["high_heels"],"mode":"dropTrig","kill":[],"whenPose":[],"requireText":["跪","跪姿","跪撑","膝着地","kneel","kneeling"],"exemptText":["踮脚","踮起","脚尖","脚背","脚趾","脚踝","tip_toe","tiptoe","on_tiptoe"],"dropOutfit":["high_heels"],"dropNamed":true},{"name":"wet_no_sheer","trig":["wet_clothes"],"mode":"drop","kill":["see-through_clothes"]}],"viewRules":{"oneOf":[["pov","from_side","from_behind","profile"],["from_above","from_below"],["close-up","cowboy_shot","upper_body","full_body"]],"forbid":[["pov","profile"],["pov","from_side"]]},"postureRules":{"requires":{"arm_support":["all_fours","prone_bone","bent_over"],"spread_legs":["lying","sitting","on_back"]},"forbid":[["standing","lying"],["standing","sitting"],["on_back","on_stomach"],["kneeling","standing"]]},"nonTag":["clothes"]};
 
     // === [阶段1·桥接] 姿势引擎（local 变量）→ storyFacts 事实卡片 ===
     // 变量真身：chat_metadata.variables['姿势引擎']['状态']。ST-Prompt-Template 用 lodash _.set 写点号路径，
@@ -13350,12 +13360,24 @@ SCHEMA:
                     sock: container['袜履'] !== undefined ? container['袜履'] : pickVar(vars, '姿势引擎.袜履'),
                     arousal: container['兴奋度'] !== undefined ? container['兴奋度'] : pickVar(vars, '姿势引擎.兴奋度'),
                     session: container['场次'] !== undefined ? container['场次'] : pickVar(vars, '姿势引擎.场次'),
+                    mode: container['模式'] !== undefined ? container['模式'] : pickVar(vars, '姿势引擎.模式'),
+                    script: container['剧本'] !== undefined ? container['剧本'] : pickVar(vars, '姿势引擎.剧本'),
+                    advice: container['建议'] !== undefined ? container['建议'] : pickVar(vars, '姿势引擎.建议'),
+                    seg: container['段'] !== undefined ? container['段'] : pickVar(vars, '姿势引擎.段'),
+                    segShots: container['段.镜'] !== undefined ? container['段.镜'] : (container['段'] && container['段']['镜'] !== undefined ? container['段']['镜'] : pickVar(vars, '姿势引擎.段.镜')),
+                    gateMode: container['闸门模式'] !== undefined ? container['闸门模式'] : pickVar(vars, '姿势引擎.闸门模式'),
+                    removed: container['已除去'] !== undefined ? container['已除去'] : pickVar(vars, '姿势引擎.已除去'),
+                    trace: container['痕迹'] !== undefined ? container['痕迹'] : pickVar(vars, '姿势引擎.痕迹'),
                 };
             }
             return {
                 state: pickVar(vars, '姿势引擎.状态'), scene: pickVar(vars, '姿势引擎.场景'),
                 dress: pickVar(vars, '姿势引擎.着装'), sock: pickVar(vars, '姿势引擎.袜履'),
                 arousal: pickVar(vars, '姿势引擎.兴奋度'), session: pickVar(vars, '姿势引擎.场次'),
+                mode: pickVar(vars, '姿势引擎.模式'), script: pickVar(vars, '姿势引擎.剧本'),
+                advice: pickVar(vars, '姿势引擎.建议'), seg: pickVar(vars, '姿势引擎.段'), segShots: pickVar(vars, '姿势引擎.段.镜'),
+                gateMode: pickVar(vars, '姿势引擎.闸门模式'),
+                removed: pickVar(vars, '姿势引擎.已除去'), trace: pickVar(vars, '姿势引擎.痕迹'),
             };
         } catch (e) {
             return null;
@@ -13455,6 +13477,37 @@ SCHEMA:
             };
             // 阶段2：服装事实只在命中时追加到末尾——既有 7 键前缀与键序一字不动（harness A6 逐字断言依赖）
             if (outfit) facts.outfit = outfit;
+            // 6.5.72：正文主导模式才追加分镜骨架——引擎主导 / 无剧本 → 一个键都不加（payload 逐字节不变）
+            const factsMode = sdtPoseMode(store, engine);
+            const factsSegs = (factsMode === 'body') ? sdtNormalizeSegments(engine) : [];
+            if (factsMode === 'body' && factsSegs.length && !(store && store.poseBodyFirst === false)) {
+                facts.poseMode = 'body';
+                facts.segments = sdtSegmentsForFacts(factsSegs);
+                facts.poseSegmentHint = !(store && store.poseSegmentHint === false);
+                const advText = sdtAdviceText(engine ? engine.advice : null);
+                if (advText) { facts.advice = advText; facts.poseHint = advText; }   // F12：建议池另起一列，不与 pose 混用
+                // F01：payload 通道——调用方把当前 payload 放进 deps 时，归属按 payload.meta.segIndex 判
+                const pickF = sdtPickSegmentForPayload((deps && deps.payload) || null, factsSegs, engine);
+                facts.segIndex = pickF.index;
+                // F12（6.5.72）：正文主导模式下 pose 必须为 null——下游不许再把世界书锁定类当渲染指令源，
+                // 主类只能来自该分镜正文（resolveSegmentPose）或该分镜自己的声明。
+                // 原始掷骰元数据（场次/剩余/越界/换牌三态）另存 poseRaw，供体检行与三态断言使用。
+                if (facts.pose && facts.pose.raw) facts.poseRaw = facts.pose.raw;
+                facts.pose = null;
+                // F11（6.5.72）：正文里说「换一个 / 不要这个 / 换个姿势」→ 触发换牌（旧码只认世界书变量）
+                try {
+                    const hintF = sdtOutfitNameHints(engine, deps);
+                    const rerollWord = sdtRerollWord(hintF && hintF.text);
+                    if (rerollWord) {
+                        const applied = sdtApplyReroll();
+                        facts.poseReroll = {
+                            hit: true, word: rerollWord, applied: applied,
+                            target: applied ? SDT_REROLL_LAST.target : '',
+                            value: applied ? SDT_REROLL_LAST.value : null,
+                        };
+                    }
+                } catch (eRr) { /* 换牌通道失败不影响主链 */ }
+            }
             return facts;
         } catch (e) {
             return null;                                    // 任何异常静默降级，绝不打断请求构造
@@ -13487,9 +13540,748 @@ SCHEMA:
         } catch (e) { return null; }
     }
 
-    /** 词面块：主类必含 + 变体组 + 禁止换类。矩阵缺失 → 空数组（老档/无变量零影响）。 */
-    function sdtPoseVocabLines(className) {
+    /* ── 6.5.72 分镜级姿势判定：正文优先（Pose(seg_i) 三级） ───────────────────
+     * 数据契约见 docs/22：世界书只出「素材建议」，正文/该分镜的 anchor.text 是唯一权威，
+     * 插件只做翻译（补该分镜缺的词、剪同镜混类、保护正文已写明的体位词）。
+     * 模式缺失 / 模式=引擎主导 / 无剧本 → 所有新分支短路，输出与 6.5.71 逐字节一致。
+     */
+    let SDT_POSE_STORE_OVERRIDE = null;
+
+    /** store 读取：harness 可注入覆写；生产走 getStore()（VM 里没有 getStore → null） */
+    function sdtPoseStore() {
         try {
+            if (SDT_POSE_STORE_OVERRIDE && typeof SDT_POSE_STORE_OVERRIDE === 'object') return SDT_POSE_STORE_OVERRIDE;
+            if (typeof getStore === 'function') {
+                const live = getStore();
+                if (live && typeof live === 'object') return live;
+            }
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    /** 判定权模式：'body' 分镜级正文优先 | 'engine' 引擎主导（= 6.5.71 原路径）
+     *  优先级：世界书 姿势引擎.模式 > store.poseAuthority > 无 store 时回落 engine */
+    function sdtPoseMode(store, engine) {
+        try {
+            const raw = (engine && engine.mode !== undefined && engine.mode !== null) ? String(engine.mode).trim() : '';
+            const key = raw.toLowerCase();
+            if (key) {
+                if (/引擎|engine|global/.test(key)) return 'engine';
+                if (/正文|body|segment|分镜|随机|指定|random|specified/.test(key)) return 'body';
+            }
+            const auth = (store && store.poseAuthority !== undefined && store.poseAuthority !== null) ? String(store.poseAuthority) : '';
+            if (auth === 'global') return 'engine';
+            if (auth === 'segment') return 'body';
+            return 'engine';
+        } catch (e) { return 'engine'; }
+    }
+
+    /** 中文体位实词 → 主类。数组顺序即仲裁优先级：专属先于泛用（颜面骑乘 > 骑乘，推车 > 趴位） */
+    // 6.5.72（F02）：本表只是「中文体位实词候选池」，不再靠表序决定胜负——
+    // 判类按 docs/22:194「取最早出现的体位词」：命中位置最靠前的胜出，同位置取更长词。
+    // 补齐 docs/22:184 的 L0 词：从后面 / 后方进入 / 坐上来 / 自己动 / 观音坐莲 / 趴着 / 趴平 / 靠墙 / 火车便当 / 舔 / 肛
+    const SDT_POSE_ZH_CLASS = [
+        ['C10', ['颜面骑乘', '坐在脸上', '骑脸', '坐在他脸']],
+        ['C05', ['背骑', '反向骑乘', '背对骑乘', '背对着骑']],
+        ['C18', ['推车', '高杠杆', '对折', '腿缠', '亚马逊']],
+        ['C02', ['后入', '背后位', '背入', '从后面进', '从后面', '后方进入', '跪撑']],
+        ['C03', ['趴位', '俯卧', '趴在', '压在身下', '压着趴', '趴趴', '压覆', '压住他', '趴着', '趴平',
+            // t24 R7：压在身上的自然语言（弱词，走 weakWords 通道；「压身式后入」仍由「后入」实词判 C02）
+            '压在身上', '压在她身上', '压在他身上', '压着她', '贴在她身上']],
+        ['C04', ['女上', '骑乘', '跨坐', '跨骑', '骑坐', '沉腰', '跨在', '骑在他', '坐上来', '自己动', '观音坐莲']],
+        ['C11', ['口交', '口活', '含住', '含着', '吞下', '舔弄', '舔']],
+        ['C12', ['乳交']],
+        ['C13', ['足交', '腿交']],
+        ['C14', ['手交', '手活', '撸动']],
+        ['C15', ['肛交', '后庭', '肛']],
+        ['C16', ['多人', '群交', '双插', '3p']],
+        ['C17', ['束缚', '捆绑', '绳缚']],
+        // F08：侧卧位的中文实词是「侧卧 / 侧身 / 汤匙」——只收 侧入/侧躺 会让「两人侧卧着」判不出主类（word 空 → 无从举证）
+        ['C06', ['侧入', '侧躺', '侧卧', '侧身', '汤匙']],
+        ['C07', ['坐姿', '坐怀', '坐在他腿']],
+        ['C08', ['站立', '站姿', '站着做', '靠墙']],
+        ['C09', ['抱持', '挂身', '抱起', '火车便当']],
+        ['C01', ['正常位', '传教士', '面对面']],
+    ];
+
+    /** F18（6.5.72）：正文里点名的「细节行为」主类（手/口/胸/道具等）—— 换类清洗不得把它们当矛盾锚词剪掉。
+     *  只认正文（anchor/texts），不含 caption(input)；返回主类代码数组，命中顺序按 SDT_POSE_ZH_CLASS。 */
+    function sdtClassesNamedInText(text) {
+        try {
+            const s = String(text || '');
+            if (!s) return [];
+            const out = [];
+            for (let i = 0; i < SDT_POSE_ZH_CLASS.length; i++) {
+                const code = String(SDT_POSE_ZH_CLASS[i][0] || '');
+                const words = SDT_POSE_ZH_CLASS[i][1] || [];
+                for (let k = 0; k < words.length; k++) {
+                    const w = String(words[k] || '');
+                    if (w && s.indexOf(w) >= 0) { if (out.indexOf(code) < 0) out.push(code); break; }
+                }
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+
+    /** 变体名整串匹配表：完整变体名优先于单字实词命中（「压身式后入」先记成 C03/mating_press 变体）。
+     *  t24 R2：但歧义变体（mating_press 挂 C02/C03 两侧）遇别类实词要让位——「压身式后入」最终判 C02（后入实词），
+     *  单写「压身式」仍判 C03+mating_press。判据见 sdtVariantAmbiguous / sdtResolveSegmentPose 的 useVariant。
+     *  与矩阵 variants[].zh 合并使用，取「命中最长」的那一个。 */
+    const SDT_POSE_VARIANT_ZH = [
+        ['C03', 'mating_press', ['压身式后入', '压身式', '压身', '压覆式']],
+        ['C18', 'wheelbarrow', ['推车式', '推车']],
+        ['C18', 'leg_wrap', ['缠腿式', '缠腿', '腿盘式', '腿盘']],
+        ['C18', 'amazon', ['亚马逊式', '亚马逊']],
+        ['C11', 'sixty_nine', ['69式', '六九式', '六九', '互相口交']],
+        ['C04', 'squatting', ['蹲骑', '蹲坐骑乘', '蹲姿骑乘']],
+        ['C02', 'prone', ['趴伏后入', '趴跪后入']],
+        ['C07', 'lap', ['坐怀式', '坐怀']],
+        ['C05', 'leaning', ['背骑前倾']],
+    ];
+
+    /** 变体名整串匹配：返回命中最长的 {class, variant, word}；无命中返回 null */
+    function sdtVariantHitInText(text) {
+        try {
+            const probe = String(text || '');
+            if (!probe) return null;
+            const lower = probe.toLowerCase();
+            let best = null;
+            const take = function (cls, variant, word) {
+                const w = String(word || '');
+                if (!w) return;
+                if (lower.indexOf(w.toLowerCase()) < 0) return;
+                if (!best || w.length > best.word.length) best = { class: cls, variant: variant, word: w };
+            };
+            for (let i = 0; i < SDT_POSE_VARIANT_ZH.length; i++) {
+                const row = SDT_POSE_VARIANT_ZH[i];
+                const words = row[2] || [];
+                for (let k = 0; k < words.length; k++) take(row[0], row[1], words[k]);
+            }
+            const list = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX.poses : [];
+            for (let i = 0; i < list.length; i++) {
+                const pe = list[i] || {};
+                const vmap = (pe.variants && typeof pe.variants === 'object') ? pe.variants : {};
+                const keys = Object.keys(vmap);
+                for (let k = 0; k < keys.length; k++) {
+                    const zh = (vmap[keys[k]] && Array.isArray(vmap[keys[k]].zh)) ? vmap[keys[k]].zh : [];
+                    for (let j = 0; j < zh.length; j++) take(pe.code, keys[k], zh[j]);
+                }
+            }
+            return best;
+        } catch (e) { return null; }
+    }
+
+    /** 6.5.72（F03）：变体名是否跨类共享（mating_press 同时挂在 C02/C03）——共享时改由正文主类实词定类 */
+    function sdtVariantAmbiguous(variantName) {
+        try {
+            const v = String(variantName || '');
+            if (!v) return false;
+            const list = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX.poses : [];
+            let n = 0;
+            for (let i = 0; i < list.length; i++) {
+                const pe = list[i] || {};
+                if (pe.variants && pe.variants[v]) n++;
+                if (n > 1) return true;
+            }
+            return false;
+        } catch (e) { return false; }
+    }
+
+    /** 6.5.72（F03）：矩阵 ambiguousMain（mating_press / top-down-bottom-up）= 几何描述词，永远不参与主类判别 */
+    function sdtAmbiguousMainSet() {
+        try {
+            const M = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX : null;
+            if (!M) return {};
+            const set = {};
+            for (let i = 0; i < M.poses.length; i++) {
+                const amb = (M.poses[i] && Array.isArray(M.poses[i].ambiguousMain)) ? M.poses[i].ambiguousMain : [];
+                for (let k = 0; k < amb.length; k++) {
+                    // 口径：ambiguousMain 与 main 同形（下划线），比较时 `_` 与 `-` 视作等价
+                    const t = String(amb[k] || '').toLowerCase();
+                    if (!t) continue;
+                    set[t] = 1;
+                    set[t.replace(/_/g, '-')] = 1;
+                    set[t.replace(/-/g, '_')] = 1;
+                }
+            }
+            return set;
+        } catch (e) { return {}; }
+    }
+
+    /** 6.5.72（F03）：判不出主类时沿用同段前镜主类（变体连续）。剧本 = 一场戏，向前找最近一个声明了主类的镜。 */
+    function sdtCarryClass(segs, seg) {
+        try {
+            const list = Array.isArray(segs) ? segs : [];
+            if (!list.length || !seg) return '';
+            const idx = (typeof seg.index === 'number') ? seg.index : list.indexOf(seg);
+            if (!(idx > 0)) return '';
+            for (let i = idx - 1; i >= 0; i--) {
+                const s = list[i];
+                const cls = (s && s.pose && s.pose.class) ? String(s.pose.class).toUpperCase() : '';
+                if (cls && sdtPoseMatrixEntry(cls)) return cls;
+            }
+            return '';
+        } catch (e) { return ''; }
+    }
+
+    /** 正文/分镜文本里的主类实词（中文实词 → 矩阵 main tag → 矩阵 aliases） */
+    /** F02（6.5.72）：主类判据 = 「取最早出现的体位词」（docs/22:194）。
+     *  旧码按 SDT_POSE_ZH_CLASS 表序先命中即 return（「抱持站立位（火车便当）」因表里 C08 在 C09 前面被判成站立）——
+     *  现在三路候选（中文实词 / 矩阵 main tag / aliases）全部带命中位置，按 [位置升序, 词长降序, 中文优先] 取第一。
+     *  矩阵 regular:false（C18）与 ambiguousMain（mating_press / top-down_bottom_up）仍一律跳过，不参与判类。 */
+    function sdtClassHitInText(text) {
+        try {
+            const probe = String(text || '');
+            if (!probe) return null;
+            const lower = probe.toLowerCase();
+            const cand = [];
+            // F02 补丁（6.5.72）：位置/支撑类弱词只当补充证据，不能压过同句里真正的交合实词。
+            // 否则「她趴在扶手上，后入继续」会先命中「趴在」判成 C03，「顶到墙边靠墙站立着继续后入」判成 C08。
+            // t24 R7：压在身上 / 压着她 / 贴在她身上 一律走弱词层——「他压身式后入，整个人贴下来」必须仍判 C02（后入实词压过弱词，K6 不破）
+            const weakWords = ['靠墙','趴在','趴着','趴平','趴着做','从后面','后方进入','站立','站姿','站着做','站着','坐姿','坐在','躺着','躺着做','all_fours','bent_over','standing','sitting','lying','on_back','on_stomach','against_wall','prone','kneeling','压在身上','压在她身上','压在他身上','压着她','贴在她身上'];
+            const pushCand = function (cls, word, via, pos) {
+                const c = String(cls || '');
+                const w = String(word || '');
+                if (!c || !w || typeof pos !== 'number' || pos < 0) return;
+                const weak = weakWords.indexOf(w) >= 0 || weakWords.indexOf(String(w).toLowerCase()) >= 0;
+                cand.push({ class: c, word: w, via: via, pos: pos, len: w.length, weak: weak });
+            };
+            // 候选池 ①：中文体位实词（表序不再决定胜负）
+            for (let i = 0; i < SDT_POSE_ZH_CLASS.length; i++) {
+                const code = SDT_POSE_ZH_CLASS[i][0];
+                const words = Array.isArray(SDT_POSE_ZH_CLASS[i][1]) ? SDT_POSE_ZH_CLASS[i][1] : [];
+                for (let k = 0; k < words.length; k++) {
+                    const w = String(words[k] || '');
+                    if (!w) continue;
+                    pushCand(code, w, 'zh', lower.indexOf(w.toLowerCase()));
+                }
+            }
+            const list = (SDT_POSE_MATRIX && Array.isArray(SDT_POSE_MATRIX.poses)) ? SDT_POSE_MATRIX.poses : [];
+            const amb = sdtAmbiguousMainSet();
+            const tagPos = function (t) {
+                let pos = lower.indexOf(String(t).toLowerCase());
+                if (pos < 0) pos = lower.indexOf(String(t).replace(/_/g, ' ').toLowerCase());
+                if (pos < 0) pos = lower.indexOf(String(t).replace(/_/g, '-').toLowerCase());
+                return pos;
+            };
+            // 候选池 ②：矩阵 main tag
+            for (let i = 0; i < list.length; i++) {
+                const pe = list[i] || {};
+                if (pe.regular === false) continue;                    // C18 需正文专属动作词，不靠共享几何词判定
+                const mains = Array.isArray(pe.main) ? pe.main : [];
+                for (let k = 0; k < mains.length; k++) {
+                    const t = String(mains[k] || '');
+                    if (!t || amb[t]) continue;                        // F03：歧义几何词（mating_press…）一律跳过、不判类
+                    const pos = tagPos(t);
+                    if (pos >= 0) pushCand(pe.code, t, 'tag', pos);
+                }
+            }
+            // 候选池 ③：aliases → 正名（正名必须落在某个主类的 main 里）
+            const alias = (SDT_POSE_MATRIX && SDT_POSE_MATRIX.aliases && typeof SDT_POSE_MATRIX.aliases === 'object') ? SDT_POSE_MATRIX.aliases : {};
+            const keys = Object.keys(alias);
+            for (let i = 0; i < keys.length; i++) {
+                const canon = String(alias[keys[i]] || '');
+                if (!canon || amb[canon]) continue;
+                const pos = tagPos(keys[i]);
+                if (pos < 0) continue;
+                for (let k = 0; k < list.length; k++) {
+                    const pe = list[k] || {};
+                    if (pe.regular === false) continue;
+                    const mains = Array.isArray(pe.main) ? pe.main.map(String) : [];
+                    if (mains.indexOf(canon) >= 0) { pushCand(pe.code, keys[i], 'alias', pos); break; }
+                }
+            }
+            if (!cand.length) return null;
+            const strongCand = cand.filter(function (c) { return !c.weak; });
+            const pool = strongCand.length ? strongCand : cand;
+            pool.sort(function (a, b) {
+                if (a.pos !== b.pos) return a.pos - b.pos;             // ① 最早出现
+                if (b.len !== a.len) return b.len - a.len;             // ② 同位置取更长（「压身式后入」不拆成「后入」+「后」）
+                return (a.via === 'zh' ? 0 : 1) - (b.via === 'zh' ? 0 : 1);   // ③ 同长同位置中文优先
+            });
+            return { class: pool[0].class, word: pool[0].word, via: pool[0].via, weak: !!pool[0].weak };
+        } catch (e) { return null; }
+    }
+
+    /** 剧本 → 分镜数组（容忍 JSON 字符串 / 多种键名；每项归一成 {index,pose,place,tier,anchorText,texts}） */
+    function sdtNormalizeSegments(engine) {
+        try {
+            if (!engine) return [];
+            let raw = engine.script;
+            if ((raw === undefined || raw === null || raw === '') && engine.segShots !== undefined) raw = engine.segShots;
+            if (typeof raw === 'string' && raw.trim()) {
+                try { raw = JSON.parse(raw); } catch (e) { raw = null; }
+            }
+            // 段.镜 可能是数组，也可能是「镜号 → 声明」的对象
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                const inner = (raw['镜'] !== undefined) ? raw['镜'] : ((raw.shots !== undefined) ? raw.shots : raw);
+                if (Array.isArray(inner)) raw = inner;
+                else if (inner && typeof inner === 'object') {
+                    const keys = Object.keys(inner);
+                    const arr = [];
+                    for (let i = 0; i < keys.length; i++) {
+                        const v = inner[keys[i]];
+                        if (!v || typeof v !== 'object') continue;
+                        if (v.index === undefined && v.segIndex === undefined) v.index = (isFinite(parseInt(keys[i], 10)) ? parseInt(keys[i], 10) : keys[i]);
+                        arr.push(v);
+                    }
+                    raw = arr;
+                }
+            }
+            if (!Array.isArray(raw)) return [];
+            const out = [];
+            const head = function (v, max) { return sdtFactText(v, max || 600); };
+            for (let i = 0; i < raw.length && i < 64; i++) {
+                const s = raw[i];
+                if (!s || typeof s !== 'object') continue;
+                const poseSrc = (s.pose && typeof s.pose === 'object') ? s.pose : {};
+                const clsRaw = (poseSrc.class !== undefined && poseSrc.class !== null) ? poseSrc.class
+                    : ((poseSrc.className !== undefined && poseSrc.className !== null) ? poseSrc.className
+                        : ((s.class !== undefined && s.class !== null) ? s.class : ''));
+                const ent = sdtPoseMatrixEntry(clsRaw);
+                const anchor = (s.anchor && typeof s.anchor === 'object') ? s.anchor : null;
+                const texts = [];
+                const push = function (v) { const t = head(v); if (t) texts.push(t); };
+                // F18：bodyTexts 只收「正文」类文本（text / action），不收 caption —— caption 是机位词堆，
+                // 拿它做「正文点名」判据会把不该保留的别类锚词整片豁免掉。
+                const bodyTexts = [];
+                const pushBody = function (v) { const t = head(v); if (t) bodyTexts.push(t); };
+                push(s.caption); push(s.text); push(s.action);
+                pushBody(s.text); pushBody(s.action);
+                if (Array.isArray(s.characters)) {
+                    for (let k = 0; k < s.characters.length && k < 4; k++) {
+                        const c = s.characters[k];
+                        if (!c || typeof c !== 'object') continue;
+                        push(c.caption); push(c.action); push(c.text);
+                        pushBody(c.action); pushBody(c.text);
+                    }
+                }
+                const outfit = (s.outfit && typeof s.outfit === 'object') ? s.outfit : null;
+                const place = (s.place && typeof s.place === 'object') ? s.place : null;
+                out.push({
+                    index: (s.index !== undefined && s.index !== null) ? s.index : ((s.segIndex !== undefined && s.segIndex !== null) ? s.segIndex : i),
+                    seq: i,
+                    pose: {
+                        class: ent ? ent.code : '',
+                        className: ent ? ent.code : '',
+                        label: ent ? sdtFactText(ent.label, 40) : '',
+                        variant: (poseSrc.variant !== undefined && poseSrc.variant !== null) ? String(poseSrc.variant) : '',
+                    },
+                    place: place ? { code: head(place.code, 16), spot: head(place.spot, 24) } : null,
+                    tier: (outfit && outfit.tier !== undefined) ? outfit.tier : (s.tier !== undefined ? s.tier : null),
+                    anchorText: anchor ? head(anchor.text !== undefined ? anchor.text : anchor.content, 1200) : '',
+                    texts: texts,
+                    bodyTexts: bodyTexts,
+                });
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+
+    /** 分镜骨架进 storyFacts 的紧凑视图（只留 prompt 需要的字段，避免把整段正文灌进 payload） */
+    function sdtSegmentsForFacts(segs) {
+        const list = Array.isArray(segs) ? segs : [];
+        const out = [];
+        for (let i = 0; i < list.length && i < 24; i++) {
+            const s = list[i] || {};
+            out.push({
+                index: s.index,
+                className: (s.pose && s.pose.class) ? s.pose.class : '',
+                variant: (s.pose && s.pose.variant) ? s.pose.variant : '',
+                place: (s.place && (s.place.code || s.place.spot)) ? ((s.place.code || '') + (s.place.spot ? '/' + s.place.spot : '')) : '',
+                tier: (s.tier !== null && s.tier !== undefined) ? String(s.tier) : '',
+            });
+        }
+        return out;
+    }
+
+    /** 归属：context 分镜元数据 → payload.segIndex → payload.storyFacts.segIndex → 第 0 镜 */
+    function sdtPickSegmentForPayload(payload, segs, engineArg) {
+        try {
+            const list = Array.isArray(segs) ? segs : [];
+            if (!list.length) return { seg: null, index: -1, why: 'no-script' };
+            const byIndex = function (v, why) {
+                if (v === undefined || v === null || v === '') return null;
+                const n = (typeof v === 'number') ? v : parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
+                if (!isFinite(n)) return null;
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i].index === n) return { seg: list[i], index: i, why: why };
+                }
+                if (n >= 0 && n < list.length) return { seg: list[n], index: n, why: why };
+                return null;
+            };
+            let hit = null;
+            // 世界书 姿势引擎.段（当前段序号）优先：t2 已落地的归属口径
+            const engSeg = (engineArg && engineArg.seg !== undefined && engineArg.seg !== null) ? engineArg.seg : null;
+            const engSegIdx = (engSeg && typeof engSeg === 'object')
+                ? (engSeg['序号'] !== undefined ? engSeg['序号'] : (engSeg.index !== undefined ? engSeg.index : (engSeg['当前'] !== undefined ? engSeg['当前'] : null)))
+                : engSeg;
+            hit = byIndex(engSegIdx, 'engine.seg');
+            if (hit) return hit;
+            try {
+                const vars = readPoseEngineVars();
+                const meta = vars ? (pickVar(vars, '分镜.元') || pickVar(vars, 'meta')) : null;
+                hit = byIndex(meta ? meta.segIndex : null, 'ctx.meta');
+            } catch (e) { /* ignore */ }
+            if (hit) return hit;
+            const p = (payload && typeof payload === 'object') ? payload : {};
+            hit = byIndex((p.segIndex !== undefined) ? p.segIndex : (p.meta ? p.meta.segIndex : null), 'payload');
+            if (hit) return hit;
+            const sf = (p.storyFacts && typeof p.storyFacts === 'object') ? p.storyFacts : null;
+            hit = byIndex(sf ? sf.segIndex : null, 'storyFacts');
+            if (hit) return hit;
+            return { seg: list[0], index: 0, why: 'default' };
+        } catch (e) { return { seg: null, index: -1, why: 'error' }; }
+    }
+
+    /** L0 分镜级裁决：正文实词 > 分镜声明（segment.pose.class）> null（交给引擎兜底）
+     *  返回 {className,label,variant,tags,protected,source,segIndex,word} */
+    function sdtResolveSegmentPose(input, seg, segs) {
+        try {
+            // F18（6.5.72）：bodyText 只含「正文」（分镜 anchor + texts），不含 caption(input)。
+            // 换类清洗据此豁免正文点名的性行为细节词（手/口/胸/道具），避免「一镜一姿势」把正文写明的细节一并剪掉。
+            const bodyText = seg ? String((seg.anchorText || '') + ' ' + (seg.bodyTexts || []).join(' ')).trim() : '';
+            // F02（6.5.72）：正文在前、caption 在后——主类判据「取最早出现的体位词」必须在正文里取，
+            // 否则 caption 里现成的英文 tag（handjob / fellatio…）位置更靠前，永远压过正文中文（正文写了女上却判成 C14）。
+            const probe = bodyText + ' ' + String(input || '');
+            const segPose = (seg && seg.pose) ? seg.pose : null;
+            const hitVariant = sdtVariantHitInText(probe);                 // a) 变体名整串命中优先
+            const hitText = sdtClassHitInText(probe);                      // b) 正文主类实词
+            const declared = (segPose && segPose.class) ? sdtPoseMatrixEntry(segPose.class) : null;  // c) 段声明，仅当正文无实词
+            // F03：「压身式后入」里的 压身 是跨类变体名（mating_press 挂在 C02/C03），
+            // 一旦正文另有主类实词（后入/side 等）→ 以主类实词定类，变体名只作几何描述
+            const variantAmb = !!(hitVariant && sdtVariantAmbiguous(hitVariant.variant));
+            const useVariant = !!(hitVariant && !(variantAmb && hitText && hitText.class !== hitVariant.class));
+            let ent = null;
+            let source = '';
+            // 分支链顺序即裁决优先级（静态断言 segment.resolveOrder 依赖这三行的先后）：
+            //   a) if (hitVariant …  变体名整串命中
+            //   b) else if (hitText   正文主类实词
+            //   c) else if (declared) 段声明
+            // F03 只加「跨类变体名但正文另有主类实词」的降级条件（useVariant），顺序不变。
+            if (hitVariant && useVariant) { ent = sdtPoseMatrixEntry(hitVariant.class); source = 'body'; }
+            else if (hitText) { ent = sdtPoseMatrixEntry(hitText.class); source = 'body'; }
+            else if (declared) { ent = declared; source = 'director'; }
+            else {
+                // F03：正文没写主类、剧本也没声明 → 沿用同段前镜（变体连续）；实在没有前镜才算兜底
+                const carryCls = sdtCarryClass(segs, seg);
+                if (carryCls) { const ce = sdtPoseMatrixEntry(carryCls); if (ce) { ent = ce; source = 'carry'; } }
+            }
+            const declaredCls = (segPose && segPose.class) ? String(segPose.class).toUpperCase() : '';
+            const variant = useVariant ? String(hitVariant.variant)
+                : ((declaredCls && ent && declaredCls === ent.code && segPose.variant) ? String(segPose.variant) : '');
+            const tags = [];
+            if (ent) {
+                const mains = Array.isArray(ent.main) ? ent.main.map(String) : [];
+                for (let i = 0; i < mains.length; i++) if (mains[i] && tags.indexOf(mains[i]) < 0) tags.push(mains[i]);
+                const vtags = (variant && ent.variants && ent.variants[variant] && Array.isArray(ent.variants[variant].tags)) ? ent.variants[variant].tags : [];
+                for (let i = 0; i < vtags.length; i++) if (vtags[i] && tags.indexOf(String(vtags[i])) < 0) tags.push(String(vtags[i]));
+            }
+            // F06：来源要分得清「正文」与「caption」——两者都算 body（判类优先级不变，source 不动），
+            // 但面板/体检行必须说清命中词到底写在哪里，否则「正文优先」无法举证（正文只写「她翻身上来」而 caption 有 girl_on_top 时不能标成正文）。
+            let hitSrc = source;
+            if (source === 'body') {
+                const wSrc = useVariant ? hitVariant.word : (hitText ? hitText.word : '');
+                const inBody = !!(wSrc && (bodyText.indexOf(wSrc) >= 0 || sdtTagHasLoose(bodyText, wSrc)));
+                hitSrc = inBody ? 'body' : 'caption';
+            }
+            return {
+                className: ent ? ent.code : '',
+                code: ent ? ent.code : '',
+                label: ent ? sdtFactText(ent.label, 40) : '',
+                variant: variant,
+                tags: tags,
+                protected: tags.slice(0, 8),
+                source: source,
+                hitSrc: hitSrc,
+                segIndex: seg ? seg.index : null,
+                word: useVariant ? hitVariant.word : (hitText ? hitText.word : ''),
+                hitWord: useVariant ? hitVariant.word : (hitText ? hitText.word : ''),
+                declared: (segPose && segPose.class) ? String(segPose.class).toUpperCase() : '',
+                carry: source === 'carry',
+                fallback: !ent,
+                l1Overridden: !!(segPose && segPose.class && ent && String(segPose.class).toUpperCase() !== ent.code),
+                bodyText: bodyText,
+            };
+        } catch (e) { return null; }
+    }
+
+    /** 6.5.72 删词守卫：正文已写明的体位词不删，只记 rec.protectedKept（prot 为空 → 与 sdtTagDropAll 完全一致） */
+    function sdtDropAllGuarded(input, drop, rec, protectedTags) {
+        try {
+            const prot = Array.isArray(protectedTags) ? protectedTags.map(String) : [];
+            if (!prot.length) return sdtTagDropAll(input, drop, rec);
+            const list = Array.isArray(drop) ? drop.map(String) : [];
+            const keep = [];
+            const rest = [];
+            for (let i = 0; i < list.length; i++) {
+                const t = list[i];
+                if (!t) continue;
+                if (prot.indexOf(t) >= 0) { if (keep.indexOf(t) < 0) keep.push(t); }
+                else if (rest.indexOf(t) < 0) rest.push(t);
+            }
+            if (keep.length) {
+                if (!Array.isArray(rec.protectedKept)) rec.protectedKept = [];
+                for (let i = 0; i < keep.length; i++) if (rec.protectedKept.indexOf(keep[i]) < 0) rec.protectedKept.push(keep[i]);
+            }
+            return rest.length ? sdtTagDropAll(input, rest, rec) : input;
+        } catch (e) { return input; }
+    }
+
+    /** 同镜混类的可删锚词：只删「专属主类锚词」，共享几何词与机位/肢势词一律不动 */
+    function sdtCrossClassTags(keepClass, variantName) {
+        try {
+            const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : null;
+            if (!M || !Array.isArray(M.poses)) return [];
+            const keep = String(keepClass || '').toUpperCase();
+            const amb = sdtAmbiguousMainSet();
+            // F01（6.5.72）：不再用「共享词白名单」——凡不在本镜主类 main/variants 里的别类 main 一律可删（一镜一姿势优先）
+            const keepSet = {};
+            const keepEntry = sdtPoseMatrixEntry(keep) || null;
+            if (keepEntry) {
+                const km = Array.isArray(keepEntry.main) ? keepEntry.main : [];
+                for (let i = 0; i < km.length; i++) { const t = String(km[i] || ''); if (t) keepSet[t] = 1; }
+                // t24 R1：本类全部变体的几何词照旧豁免（收窄到「只认当前变体」会把 prone_bone 从后入镜里删掉，
+                // 与 L1/L2「体位词一个不少」冲突），但下面要把 5 个跨类肢势词从 keepSet 里剔掉——
+                // 它们既是 C01/C03/C06/C07/C08 的 main，又被每个 class 的变体表反复引用；
+                // 不剔就会出现「后入标准式」镜里 on_stomach 与 C03 主类并列（X3 实测）。
+                const kv = (keepEntry.variants && typeof keepEntry.variants === 'object') ? keepEntry.variants : {};
+                const kk = Object.keys(kv);
+                for (let i = 0; i < kk.length; i++) {
+                    const vt = (kv[kk[i]] && Array.isArray(kv[kk[i]].tags)) ? kv[kk[i]].tags : [];
+                    for (let k = 0; k < vt.length; k++) { const t = String(vt[k] || ''); if (t) keepSet[t] = 1; }
+                }
+                // 跨类肢势词：只有本镜主类自己的 main 才留（C08 standing / C06 lying / C07 sitting / C01 on_back / C03 on_stomach）
+                const CROSS_POSTURE = ['standing', 'lying', 'sitting', 'on_back', 'on_stomach'];
+                for (let i = 0; i < CROSS_POSTURE.length; i++) {
+                    const t = CROSS_POSTURE[i];
+                    if (!keepSet[t]) continue;
+                    const own = Array.isArray(keepEntry.main) && keepEntry.main.indexOf(t) >= 0;
+                    if (!own) delete keepSet[t];
+                }
+                // 形参 variantName 保留给调用侧传「当前变体」，判定口径见上（全变体豁免 + 5 个跨类肢势词剔除）
+                if (variantName === '__never__') { /* no-op */ }
+            }
+            // F01（6.5.72）：旧码把 views / viewRules / postureRules 的词也当白名单，顺带豁免了共享主类词
+            // （girl_on_top 被 C04/C05/C10 共用 → 出现次数 2 → 永远不清洗）。机位/肢势词本就不在 poses.main 里，无需保护池。
+            // F02（F21）：豁免集只留 forbid 对两侧——肢势词（standing / lying / sitting / kneeling / on_back / on_stomach）
+            // 是跨类几何词，交给 postureRules.forbid 逐对处理，不参与「换类清洗」整片删除。
+            // requires 的 key 与取值（arm_support / spread_legs / legs_apart…）不再当白名单：它们不是任何主类的 main，
+            // 本来就不会出现在下面的遍历里；把它们塞进来只会顺带豁免同名主类锚词（F02 finding 根因）。
+            // t24 R1 洞A（6.5.72）：forbid 对不许再给「别类主类锚词」发免死牌。
+            // 归属实测：standing→C08.main / lying→C06.main / sitting→C07.main / on_back→C01.main / on_stomach→C03.main。
+            // 旧码把 forbid 两侧整包塞进 forbidSet → 这 5 词永久免清洗，一镜能并列 6 套主类锚词（X1 实测）。
+            // 新口径：一个词进 forbidSet 当且仅当它不属于任何主类的 main（如 kneeling：只是 C11 的变体几何词）；
+            // 属于别类 main 的交回 keepSet 判——本类才豁免，别类照删。
+            // postureRules.forbid 的「同一类内部互斥」语义由闸门 ③ 单独负责，不靠这张豁免表（别把提级做成让 forbid 失效）。
+            const allMain = {};
+            const poses0 = Array.isArray(M.poses) ? M.poses : [];
+            for (let i = 0; i < poses0.length; i++) {
+                const pm0 = (poses0[i] && Array.isArray(poses0[i].main)) ? poses0[i].main : [];
+                for (let k = 0; k < pm0.length; k++) { const t = String(pm0[k] || ''); if (t) allMain[t] = 1; }
+            }
+            const forbidSet = {};
+            const pr = (M.postureRules && typeof M.postureRules === 'object') ? M.postureRules : null;
+            if (pr) {
+                const fb = Array.isArray(pr.forbid) ? pr.forbid : [];
+                for (let i = 0; i < fb.length; i++) {
+                    const pair = Array.isArray(fb[i]) ? fb[i] : [];
+                    for (let k = 0; k < pair.length; k++) {
+                        const t = String(pair[k] || '');
+                        if (t && !allMain[t]) forbidSet[t] = 1;        // 别类 main → 不豁免，交给 keepSet
+                    }
+                }
+            }
+            const out = [];
+            for (let i = 0; i < M.poses.length; i++) {
+                const pe = M.poses[i] || {};
+                if (String(pe.code || '').toUpperCase() === keep) continue;
+                if (pe.regular === false) continue;                    // C18 main 是几何词（ambiguousMain），不算别类锚词
+                const mains = Array.isArray(pe.main) ? pe.main : [];
+                for (let k = 0; k < mains.length; k++) {
+                    const t = String(mains[k] || '');
+                    if (!t || keepSet[t] || amb[t] || forbidSet[t] || out.indexOf(t) >= 0) continue;
+                    out.push(t);
+                }
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+
+    /** 世界书 建议（advisory）→ 一行提示文字（≤180），读不到返回 '' */
+    function sdtAdviceText(adv) {
+        try {
+            if (!adv) return '';
+            if (typeof adv === 'string') return sdtFactText(adv, 180);
+            const cand = Array.isArray(adv['候选']) ? adv['候选'] : (Array.isArray(adv.candidates) ? adv.candidates : []);
+            const bits = [];
+            for (let i = 0; i < cand.length && i < 3; i++) {
+                const c = cand[i];
+                if (c === null || c === undefined) continue;
+                if (typeof c === 'string') { bits.push(c); continue; }
+                const cls = (c.class !== undefined && c.class !== null) ? String(c.class) : ((c.className !== undefined) ? String(c.className) : '');
+                const nm = (c.name !== undefined && c.name !== null) ? String(c.name) : ((c.label !== undefined) ? String(c.label) : '');
+                const vt = (c.variant !== undefined && c.variant !== null) ? String(c.variant) : '';
+                const one = sdtFactText((cls + (nm ? ' ' + nm : '') + (vt ? '·' + vt : '')).trim(), 40);
+                if (one) bits.push(one);
+            }
+            const main = (adv['主推'] !== undefined) ? String(adv['主推']) : '';
+            const text = (main ? '主推 ' + main + (bits.length ? '｜' : '') : '') + bits.join('、');
+            return text ? sdtFactText(text, 180) : '';
+        } catch (e) { return ''; }
+    }
+
+    /** F11（6.5.72）：正文换牌通道——用户在正文里说「换一个 / 不要这个 / 换个姿势」必须能触发换牌，
+     *  旧码只认世界书变量 姿势引擎.状态.换牌（uid62 正文里 0 命中），世界里写了也换不动。 */
+    function sdtRerollWord(text) {
+        try {
+            const s = String(text || '');
+            if (!s) return '';
+            const m = /(换个姿势|换一个姿势|换个体位|换个动作|换一个|换一张|换张牌|换个牌|换牌|不要这个|不喜欢这个)/.exec(s);
+            return m ? String(m[1]) : '';
+        } catch (e) { return ''; }
+    }
+
+    /** 换牌请求落进世界书变量：姿势引擎.状态.换牌 0→1（已在换牌态则最多推到 2），再触发一次存档 */
+    let SDT_REROLL_LAST = { target: '', value: null, wroteState: false, wroteTop: false };
+    function sdtApplyReroll() {
+        try {
+            let ctx = null;
+            if (typeof RBQ !== 'undefined' && RBQ && RBQ.api && typeof RBQ.api.getContext === 'function') ctx = RBQ.api.getContext();
+            if (!ctx && typeof globalThis !== 'undefined' && globalThis.SillyTavern && typeof globalThis.SillyTavern.getContext === 'function') ctx = globalThis.SillyTavern.getContext();
+            const vars = ctx && ctx.chatMetadata && ctx.chatMetadata.variables;
+            const eng = vars && vars['姿势引擎'];
+            if (!eng || typeof eng !== 'object') return false;              // 世界书还没跑过 → 插件不伪造姿势变量
+            const cur = Number(eng['换牌']);
+            const next = (!isFinite(cur) || cur <= 0) ? 1 : Math.min(2, cur + 1);
+            // F03：世界书真正消费的是 姿势引擎.状态.换牌（uid62 掷骰分支），顶层 换牌 只是旧插件自读的影子键。
+            // 旧码只写顶层 → 面板说「已推进」而世界书毫无反应（t19 F03 死键）。两处都写，另补 换姿势 布尔给旧世界书。
+            let st = eng['状态'];
+            if (!st || typeof st !== 'object' || Array.isArray(st)) { st = {}; eng['状态'] = st; }
+            st['换牌'] = next;
+            eng['换牌'] = next;
+            eng['换姿势'] = true;
+            SDT_REROLL_LAST = { target: '姿势引擎.状态.换牌', value: next, wroteState: true, wroteTop: true };
+            try { if (RBQ && RBQ.api && typeof RBQ.api.saveChatDebounced === 'function') RBQ.api.saveChatDebounced(); } catch (e2) { /* ignore */ }
+            return true;
+        } catch (e) { return false; }
+    }
+
+    /** 分镜骨架行（只作提示，不锁一组）：【分镜骨架】#0 C02 后入跪撑｜#1 未声明 */
+    function sdtSegmentSkeletonLine(segs) {
+        try {
+            const list = Array.isArray(segs) ? segs : [];
+            if (!list.length) return '';
+            const bits = [];
+            for (let i = 0; i < list.length && i < 8; i++) {
+                const s = list[i] || {};
+                const cls = s.className ? sdtFactText(s.className, 8) : '未声明';
+                const nm = s.className ? (' ' + (sdtPoseMatrixEntry(s.className) ? sdtFactText(sdtPoseMatrixEntry(s.className).label, 20) : '')) : '';
+                const pl = s.place ? ('@' + s.place) : '';
+                bits.push('#' + (s.index !== undefined ? s.index : i) + ' ' + cls + nm + pl);
+            }
+            return sdtFactText('【分镜骨架】' + bits.join('｜') + '（只作提示，不锁一组）', 400);
+        } catch (e) { return ''; }
+    }
+
+    /** 词面块：主类必含 + 变体组 + 禁止换类。矩阵缺失 → 空数组（老档/无变量零影响）。 */
+    // 6.5.72 rev3 附1c/附1d：足部细节 → 景别与 uc 约束；机位可达性（第三人称能返回 from_side，pov 独占）
+    const SDT_FOOT_ZH = ['高跟鞋', '高跟', '踮脚', '踮起', '脚尖', '脚背', '脚趾', '丝袜', '吊带袜', '长筒袜', '过膝袜'];
+    const SDT_FOOT_TAGS = ['high_heels', 'tip_toe', 'tiptoe', 'on_tiptoe', 'tiptoes', 'pantyhose', 'thighhighs', 'kneehighs', 'stockings', 'feet', 'foot', 'toes', 'foot_focus'];
+    // 6.5.72 rev5：矩阵 outfits/forms 只覆盖成套服装，high_heels / skirt 这类高频词只在 tags 表里 → 补静态词表
+    const SDT_NAMED_OUTFIT_TAGS = [
+        'skirt', 'miniskirt', 'pleated_skirt', 'dress', 'one_piece_dress', 'kimono', 'qipao', 'china_dress',
+        'high_heels', 'heels', 'boots', 'thighhighs', 'pantyhose', 'kneehighs', 'socks', 'stockings', 'garter_straps',
+        'barefoot', 'panties', 'bra', 'shirt', 'apron', 'blazer', 'serafuku', 'school_uniform', 'sailor_collar',
+        'maid', 'bodysuit', 'leotard', 'camisole', 'trench_coat', 'coat', 'jacket', 'ribbon', 'necktie',
+        'choker', 'collar', 'armband', 'leash', 'thigh_strap', 'lingerie',
+        'open_shirt', 'skirt_lift', 'shirt_lift', 'panty_pull', 'panties_aside', 'panties_around_one_leg',
+        'bra_lift', 'off_shoulder', 'bottomless', 'wet_clothes', 'see-through_clothes', 'latex', 'fishnet', 'knit',
+    ];
+    /** 6.5.72 rev5（问题②）：正文显式点名的服装/配件词（矩阵口径 ∪ 静态高频表）——用户写了的细节，冲突规则不许静默删掉 */
+    function sdtNamedOutfitTags(text) {
+        try {
+            const t = String(text || '');
+            if (!t) return [];
+            const MM = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : null;
+            if (!MM) return [];
+            const out = [];
+            const push = function (v) { const s = String(v || ''); if (s && out.indexOf(s) < 0 && sdtTagHas(t, s)) out.push(s); };
+            const arrs = [SDT_NAMED_OUTFIT_TAGS];
+            if (Array.isArray(MM.outfits)) for (let i = 0; i < MM.outfits.length; i++) { const e = MM.outfits[i] || {}; arrs.push(e.tags, e.base, e.comp); }
+            if (MM.outfitForms && typeof MM.outfitForms === 'object') arrs.push(Object.keys(MM.outfitForms));
+            if (MM.outfitHoisery && typeof MM.outfitHoisery === 'object') arrs.push(Object.keys(MM.outfitHoisery));
+            if (MM.outfitMaterials && typeof MM.outfitMaterials === 'object') arrs.push(Object.keys(MM.outfitMaterials));
+            if (Array.isArray(MM.accessories)) arrs.push(MM.accessories.map(function (a) { return a && a.tag; }));
+            if (Array.isArray(MM.outfitResidue)) arrs.push(MM.outfitResidue);
+            for (let i = 0; i < arrs.length; i++) {
+                const list = arrs[i];
+                if (!Array.isArray(list)) continue;
+                for (let k = 0; k < list.length; k++) push(list[k]);
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+    /** 词面命中：ASCII 走宽松 tag 命中，中文走子串 */
+    function sdtZhProbeHit(text, w) {
+        try {
+            const t = String(text || ''), x = String(w || '');
+            if (!t || !x) return false;
+            if (/^[a-z0-9_-]+$/i.test(x)) return sdtTagHasLoose(t, x);
+            return t.indexOf(x) >= 0;
+        } catch (e) { return false; }
+    }
+    /** 足部细节命中：高跟鞋/踮脚/脚尖/脚背/丝袜 → 该镜必须看得到脚 */
+    function sdtFootDetailHit(text) {
+        try {
+            const t = String(text || '');
+            if (!t) return false;
+            for (let i = 0; i < SDT_FOOT_ZH.length; i++) if (t.indexOf(SDT_FOOT_ZH[i]) >= 0) return true;
+            for (let i = 0; i < SDT_FOOT_TAGS.length; i++) if (sdtTagHasLoose(t, SDT_FOOT_TAGS[i])) return true;
+            return false;
+        } catch (e) { return false; }
+    }
+    /** 景别守卫（附1c）：足部是主体时只能全身/远景，uc 不得屏蔽 feet/shoes */
+    function sdtShotGuard(input) {
+        try {
+            const foot = sdtFootDetailHit(input);
+            if (!foot) return { footDetail: false, allowShot: [], forbidShot: [], ucForbid: [] };
+            return { footDetail: true, allowShot: ['full_body', 'wide_shot'], forbidShot: ['cowboy_shot', 'mid_shot', 'upper_body', 'close-up'], ucForbid: ['feet', 'shoes'] };
+        } catch (e) { return { footDetail: false, allowShot: [], forbidShot: [], ucForbid: [] }; }
+    }
+    /** 机位互斥校验（附1d）：pov 与 from_side/from_behind/profile 并列 → 违规对 */
+    function sdtViewConflicts(tags) {
+        try {
+            const list = Array.isArray(tags) ? tags.map(function (x) { return String(x).toLowerCase(); }) : [];
+            const has = function (t) { return list.indexOf(t) >= 0; };
+            const out = [];
+            if (has('pov')) {
+                const others = ['from_side', 'from_behind', 'profile'];
+                for (let i = 0; i < others.length; i++) if (has(others[i])) out.push(['pov', others[i]]);
+            }
+            return out;
+        } catch (e) { return []; }
+    }
+    /** 机位选择（附1d）：第三人称后入/趴姿 → from_side；第一人称 → 只 pov */
+    function sdtPickView(input, opts) {
+        try {
+            const o = (opts && typeof opts === 'object') ? opts : {};
+            const t = String(input || '');
+            const cls = String(o.cls || o.className || '').toUpperCase();
+            const firstPerson = (o.mode === 'first') || (o.mode !== 'third' && /(^|[^a-z0-9_])(pov|first_person)([^a-z0-9_]|$)/i.test(t));
+            const behind = cls === 'C02' || /(^|[^a-z0-9_])(sex_from_behind|from_behind|doggystyle|all_fours|bent_over|prone_bone)([^a-z0-9_]|$)/i.test(t) || /后入|背后位|背入/.test(t);
+            const guard = sdtShotGuard(t);
+            const shot = guard.footDetail ? 'full_body' : '';
+            if (firstPerson) {
+                return { view: 'pov', shot: shot, pov: true, forbid: ['from_side', 'from_behind', 'profile'], allow: ['pov'], footDetail: guard.footDetail, forbidShot: guard.forbidShot, ucForbid: guard.ucForbid, why: 'first-person' };
+            }
+            return { view: 'from_side', shot: shot, pov: false, forbid: ['pov'], allow: ['from_side', 'profile', 'from_behind', 'three-quarter_view'], footDetail: guard.footDetail, forbidShot: guard.forbidShot, ucForbid: guard.ucForbid, why: behind ? 'third-person+behind' : 'third-person' };
+        } catch (e) { return { view: '', shot: '', pov: false, forbid: [], allow: [], footDetail: false, forbidShot: [], ucForbid: [], why: 'error' }; }
+    }
+
+    function sdtPoseVocabLines(className, opts) {
+        try {
+            const advisory = !!(opts && opts.advisory);
             const entry = sdtPoseMatrixEntry(className);
             if (!entry) return [];
             const main = Array.isArray(entry.main) ? entry.main.filter(Boolean) : [];
@@ -13502,6 +14294,15 @@ SCHEMA:
                 if (tags.length) variants.push(k + '=' + tags.join(','));
             });
             const lines = [];
+            // 6.5.72：正文主导模式只给建议清单——不再写「换类即判错」，改判错口径为「同镜混类」
+            if (advisory) {
+                const irregular = (entry.regular === false) ? '（非常规主类，需正文明确专属动作）' : '';
+                lines.push('【体位词面 · 建议】' + irregular + entry.code + ' ' + sdtFactText(entry.label, 40) + ' → 主类几何参考 ' + main.join(','));
+                if (variants.length) lines.push('  可用变体：' + variants.slice(0, 5).join('｜'));
+                if (neg.length) lines.push('  本镜不建议出现的主类词（仅提示，不删词）：' + neg.join(','));
+                lines.push('【分镜级词面约束】每个分镜自己声明主类（segment.pose.class）；同一镜内不得并列两个主类的 main tag（同镜混类即判错）；不同分镜可以换主类、可以沿用同一主类的不同变体；一段（同主类连续镜）至少 1 张含该主类全 main tag，单镜几何 tag ≤ 3。');
+                return lines;
+            }
             lines.push('【体位词面】锁定 ' + entry.code + ' ' + sdtFactText(entry.label, 40) + ' → 必含 ' + main.join(','));
             if (variants.length) lines.push('  可用变体：' + variants.slice(0, 5).join('｜'));
             if (neg.length) lines.push('  禁止换类：' + neg.join(','));
@@ -13629,14 +14430,17 @@ SCHEMA:
             const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : null;
             if (!M) return null;
             const engine = readPoseEngine();
-            const outfit = engine ? buildOutfitFacts(engine, {}) : null;      // 台账开关在 buildOutfitFacts 内部
+            // F01：把当前 payload 交给衣着事实链 —— 分镜档位/D1 判定要走 payload.meta.segIndex（payload 通道），
+            // 旧码这里传 {} → pickQ 恒为 default → 档位永远只能来自 dress.tier。
+            const outfit = engine ? buildOutfitFacts(engine, { payload: payload }) : null;   // 台账开关在 buildOutfitFacts 内部
+            SDT_LAST_PAYLOAD = payload;                                     // F01：供体检行读同一条 payload 通道
             if (!engine && !outfit) return null;                             // 无变量聊天：零改动（V8 契约）
             const triple = engine ? parsePoseTriple(coercePoseState(engine.state)) : null;
             const entry = (triple && triple.className) ? sdtPoseMatrixEntry(triple.className) : null;
             const main = (entry && Array.isArray(entry.main)) ? entry.main.filter(Boolean) : [];
-            const asm = outfit ? assembleOutfitTags(outfit) : { tags: [], uc: [] };
-            const outfitTags = Array.isArray(asm.tags) ? asm.tags : [];
-            const hasOutfit = !!(outfit && (outfitTags.length || (Array.isArray(asm.uc) && asm.uc.length)));
+            let asm = outfit ? assembleOutfitTags(outfit) : { tags: [], uc: [], ruleNotes: [] };
+            let outfitTags = Array.isArray(asm.tags) ? asm.tags : [];
+            let hasOutfit = !!(outfit && (outfitTags.length || (Array.isArray(asm.uc) && asm.uc.length)));
             const conflicts = Array.isArray(M.outfitConflicts) ? M.outfitConflicts : [];
             const rec = {
                 locked: triple ? triple.id : null,
@@ -13647,6 +14451,77 @@ SCHEMA:
             };
             let input = payload.input;
             let changed = false;
+
+            // ── 6.5.72 分镜级判定（正文优先）：模式缺失 / 模式=引擎主导 / 无剧本 → 以下全部短路，
+            //    走 6.5.71 原路径，payload.input 逐字节一致（engine-dominant 快照比对）。
+            const poseStore = sdtPoseStore();
+            // 6.5.72（F07/F08）：闸门只有两态——'off' 整段不生效 / 'fill-gap' 只补该分镜缺的词。
+            // 旧世界书/老 store 可能存着已废的 'enforce'：一律回退 fill-gap，不允许「存了旧值就静默不生效」。
+            const gateRaw = (poseStore && poseStore.poseGateMode !== undefined && poseStore.poseGateMode !== null)
+                ? String(poseStore.poseGateMode)
+                : ((engine && engine.gateMode !== undefined && engine.gateMode !== null) ? String(engine.gateMode) : '');
+            const gateMode = (gateRaw === 'off') ? 'off' : 'fill-gap';
+            const gateMigrated = !!(gateRaw && gateRaw !== 'off' && gateRaw !== 'fill-gap');
+            if (gateMode === 'off') { SDT_GATE_LAST = { phase: negOnly ? 'neg' : 'input', gateMode: 'off', why: 'gate-off' }; return null; }   // 闸门总开关
+            const poseMode = sdtPoseMode(poseStore, engine);
+            const bodyFirstOn = !(poseStore && poseStore.poseBodyFirst === false);
+            const segs = (poseMode === 'body') ? sdtNormalizeSegments(engine) : [];
+            const segPick = segs.length ? sdtPickSegmentForPayload(payload, segs, engine) : { seg: null, index: -1, why: 'legacy' };
+            const seg = segPick.seg;
+            // 无剧本（剧本变量缺失）→ 不做正文判定，整段与 6.5.71 一致
+            const bodyPose = (poseMode === 'body' && bodyFirstOn && seg) ? sdtResolveSegmentPose(input, seg, segs) : null;
+            // F03：判不出主类时的两条退路都要在面板上说得清——沿用同段前镜（变体连续）/ 实在没有才是兜底
+            if (bodyPose && bodyPose.source === 'carry') rec.gateWhy = 'segCarry';
+            else if (poseMode === 'body' && seg && !(bodyPose && bodyPose.className)) rec.gateWhy = 'fallback';
+            // 该分镜正文/剧本已声明主类 → 不补、不改写、不跨类补（引擎类不再当渲染指令源）
+            // 6.5.72 rev3：只有「正文显式给出主类」才锁；仅段声明（正文无线索）时走引擎兜底补词一次
+            const bodyLock = !!(bodyPose && bodyPose.source === 'body');
+            // F08（6.5.72）：补词条件看「本镜是否已有可判定的正文主类」——段声明（director）或判不出主类都算没有，
+            // 仍然要兜底补一次引擎主类；只有正文真的定了一个主类时才禁止补词（旧码用 !classMismatch 代替，与规格冲突3 不符）。
+            // F08：只有「正文真写了主类」（source body / carry）才锁死补词；分镜声明类不算正文证据，
+            // 否则声明 C11 而 input 缺 fellatio 时该镜的词面永远补不上（K9）。
+            const bodyPoseLive = (bodyPose && bodyPose.className && (bodyPose.source === 'body' || bodyPose.source === 'carry')) ? bodyPose : null;
+            // 6.5.72 rev5（问题②）：保护集合 = 体位锚词（正文显式定类时） ∪ 正文点名的服装/配件词（任何模式都算）
+            // 口径：让细节让位前，先看它是不是用户点名的；宁可不删，不许静默删。
+            const poseProt = bodyLock ? bodyPose.protected.slice() : [];
+            const origInput = String(input);
+            const namedOutfit = sdtNamedOutfitTags(origInput);
+            const protTags = poseProt.slice();
+            for (let pi = 0; pi < namedOutfit.length; pi++) if (protTags.indexOf(namedOutfit[pi]) < 0) protTags.push(namedOutfit[pi]);
+            if (poseMode === 'body' && namedOutfit.length) rec.namedOutfit = namedOutfit.slice(0, 12);
+            // 分镜主类与引擎主类不同 → 变体触发也不许跨类补（同镜混类即判错）
+            const classMismatch = !!(bodyPose && bodyPose.className && entry && bodyPose.className !== entry.code);
+            if (poseMode === 'body') { rec.authority = 'body'; rec.segIndex = segPick.index; rec.segWhy = segPick.why; rec.gateMode = gateMode; }
+            if (gateMigrated) rec.gateModeMigrated = gateRaw;
+            // 6.5.72（F04）：正文证据 = 中文正文 ∪ caption —— gate ④ / assembleOutfitTags / 体检行共用同一条 text。
+            // 旧口径只读 payload.input（英文 caption），中文正文里写的「裙摆被撩起」根本不触发 whenPose（假优先）。
+            let probeText = String(input);
+            if (poseMode === 'body' && seg) {
+                probeText = sdtBodyProbe(input, seg, engine);
+                const asmB = outfit ? assembleOutfitTags(outfit, { text: probeText }) : { tags: [], uc: [], ruleNotes: [] };
+                asm = asmB;
+                outfitTags = Array.isArray(asmB.tags) ? asmB.tags : [];
+                hasOutfit = !!(outfit && (outfitTags.length || (Array.isArray(asmB.uc) && asmB.uc.length)));
+                rec.bodyProbe = sdtFactText(String(probeText).replace(/\s+/g, ' '), 60);
+            }
+            // F11（6.5.72）：正文换牌请求。写入口只有 buildStoryFacts 一处（gate 会被同一条消息多次调用，
+            // 若在这里也写变量，换牌会从 0 被推到 2），此处只记账，供体检行显示。
+            const rerollWordG = sdtRerollWord(probeText);
+            if (rerollWordG) rec.reroll = { hit: true, word: rerollWordG };
+            // F06：正文/caption 分开举证 —— 正文只写「她翻身上来」而 caption 有 girl_on_top 时，面板不许说「正文命中」
+            if (bodyPose) { rec.bodyHitSrc = bodyPose.hitSrc || bodyPose.source; rec.bodyHitWord = bodyPose.hitWord || bodyPose.word || ''; }
+            // F07：换套正向载体（行内 `套=` 给本镜 / 变量 `套签名` 给当前）；均缺失 → 空串，零影响
+            if (outfit && SDT_OUTFIT_DIAG) {
+                const setRow = SDT_OUTFIT_DIAG.outfitSet || '';
+                const setVar = SDT_OUTFIT_DIAG.outfitSetVar || '';
+                if (setRow) rec.outfitSet = setRow;
+                if (setVar) rec.outfitSetVar = setVar;
+            }
+            // F03：换牌真正落地的目标键（世界书读 姿势引擎.状态.换牌），只在 buildStoryFacts 里写过才有值
+            if (rerollWordG && SDT_REROLL_LAST && SDT_REROLL_LAST.target) {
+                rec.reroll.target = SDT_REROLL_LAST.target;
+                rec.reroll.value = SDT_REROLL_LAST.value;
+            }
 
             // uc 类清单（幂等重算）：trig 命中正向或服装事实 → kill 全部进负向，正向先剔干净
             const ucList = [];
@@ -13659,19 +14534,114 @@ SCHEMA:
                     if (!trig.length) continue;
                     const hit = trig.some(function (t) { return sdtTagHas(input, t) || outfitTags.indexOf(t) >= 0; });
                     if (!hit) continue;
-                    for (let k = 0; k < kill.length; k++) if (ucList.indexOf(kill[k]) < 0) ucList.push(kill[k]);
+                    for (let k = 0; k < kill.length; k++) {
+                        const w = String(kill[k] || '');
+                        if (!w || ucList.indexOf(w) >= 0) continue;
+                        // 6.5.72 rev5（问题③）：正文点名了这件衣服 → 不进负向（否则「裙子褪到腰」被判 nude 后，下一轮整套衣服被反向禁止）
+                        if (namedOutfit.indexOf(w) >= 0) {
+                            if (!Array.isArray(rec.ucNamed)) rec.ucNamed = [];
+                            if (rec.ucNamed.indexOf(w) < 0) rec.ucNamed.push(w);
+                            continue;
+                        }
+                        ucList.push(w);
+                    }
                 }
             }
             if (ucList.length) rec.uc = ucList.slice(0, 24);   // 正/负相都记：诊断能看出本次排除了哪些词（幂等重算、无副作用）
 
             if (!negOnly) {
+                // 6.5.72 rev5（问题③续）：正文点名了具体衣服、而 uc 触发词（nude / completely_nude）还在正向 → 让触发词让位，服装留着
+                // 依据：半脱戏里 nude 往往是引擎按档位写的，用户写的是「裙子褪到腰」；删服装 = 怎么脱都脱不下来
+                const ucTrigHit = [];
+                if (hasOutfit && namedOutfit.length) {
+                    for (let i = 0; i < conflicts.length; i++) {
+                        const crule = conflicts[i] || {};
+                        if (String(crule.mode || '') !== 'uc') continue;
+                        const ctrig = Array.isArray(crule.trig) ? crule.trig.map(String) : [];
+                        for (let k = 0; k < ctrig.length; k++) {
+                            if (ucTrigHit.indexOf(ctrig[k]) < 0 && sdtTagHas(input, ctrig[k])) ucTrigHit.push(ctrig[k]);
+                        }
+                    }
+                }
+                if (ucTrigHit.length) {
+                    input = sdtDropAllGuarded(input, ucTrigHit, rec, poseProt);
+                    rec.ucTriggerDropped = ucTrigHit.slice(0, 6);
+                }
                 // ① 主类补词（6.5.61 起；6.5.65 放宽触发条件）
                 // 6.5.65 修两个真 bug：
                 //   a) 旧判定只认下划线 tag 形态，模型写的却是自然语言（"sex from behind"）→「已出现别的主类」永不命中，补词形同虚设；
                 //   b) 旧判定要求先出现别的主类词才补，本镜一个体位词都没有（只写了景别/视线）时也补不上。
                 // 新口径：锁定主类一字未落 且（出现别的主类 main 或 本镜属性场景）→ 补 main.slice(0,2)，带 1.3 权重以免被长句稀释。
                 let hasOwn = main.some(function (t) { return sdtTagHasLoose(input, t); });
-                if (main.length && !hasOwn && entry && input.length <= 1800) {
+                if (bodyLock) {
+                    rec.overridden = {
+                        from: entry ? entry.code : '',
+                        l1: bodyPose.declared || ((seg && seg.pose) ? String(seg.pose.class || '') : ''),
+                        to: bodyPose.className || '',
+                        why: bodyPose.l1Overridden ? 'body-over-l1' : 'body-first',
+                        word: bodyPose.word || '',
+                    };
+                    rec.protected = protTags;
+                    rec.anchor = bodyPose.tags.slice(0, 8);
+                }
+                // t24 R1 洞B（6.5.72）：换类清洗从「正文定类（bodyLock）」提级到「本镜有生效主类即清洗」。
+                // 生效主类 = 正文/分镜判定（bodyPose.className）优先；正文一个字都没写、类只由 caption/引擎给出时
+                // 退回引擎锁定类 entry.code 作 keepClass —— 旧码把整段关在 if (bodyLock) 里，这条路上完全不执行（X2「一字未删」）。
+                // 保护集跟着分账：只有正文定类时才有正文点名（protTags）；仅引擎定类时没有正文证据 → 保护集空集，
+                // 不能把矩阵 main 当保护词，否则清洗又变空转。正文点名的别类词照旧走 rec.mixedKept（正文是唯一权威）。
+                // 只在 body 模式且定位到分镜时执行：引擎主导模式必须与 6.5.71 逐字节一致（无剧本 → 零改动）。
+                // t24 R1：清洗前的 input 快照——闸门 ③（postureRules.forbid）必须看得见「清洗前还并存」的肢势对，
+                // 否则 standing/lying 这类别类锚词先被换类清洗整片删掉，③ 永远空转（同类互斥语义丢失）。
+                const inputPreMixed = input;
+                const effKeepClass = (poseMode === 'body' && seg)
+                    ? ((bodyPose && bodyPose.className) ? String(bodyPose.className) : ((entry && entry.code) ? String(entry.code) : ''))
+                    : '';
+                if (effKeepClass) {
+                    const mixedProt = bodyLock ? protTags : [];
+                    // 一镜只能有一套主类锚词：生效主类之外、别类专属的 main 锚词一并剪掉（共享几何/机位/肢势词不在此表）
+                    const mixedCand = sdtCrossClassTags(effKeepClass, (bodyPose && bodyPose.variant) ? String(bodyPose.variant) : '');
+                    if (mixedCand.length) {
+                        const presentMixed = mixedCand.filter(function (t) { return sdtTagHasLoose(input, t); });
+                        // F18（6.5.72）：正文点名的性行为细节词（手/口/胸/道具）与肢势词属正文权威，不参与换类清洗；
+                        // 只在正文（anchor/texts，不含 caption）里点过名才豁免，避免把无关的别类锚词留在画面里。
+                        const bodyTxt = (bodyPose && bodyPose.bodyText) ? String(bodyPose.bodyText) : '';
+                        // 正文点名的别类（手/口/胸/道具）→ 其 main 词保留；也兼容正文直接写英文 tag 的场合
+                        const bodyClsNamed = sdtClassesNamedInText(bodyTxt);
+                        const namedSet = {};
+                        for (let ni = 0; ni < bodyClsNamed.length; ni++) {
+                            const ne = sdtPoseMatrixEntry(bodyClsNamed[ni]);
+                            const nm = (ne && Array.isArray(ne.main)) ? ne.main : [];
+                            for (let nk = 0; nk < nm.length; nk++) { const t = String(nm[nk] || ''); if (t) namedSet[t] = 1; }
+                        }
+                        const bodyNamed = presentMixed.filter(function (t) {
+                            if (namedSet[t]) return true;
+                            return bodyTxt ? sdtTagHasLoose(bodyTxt, t) : false;
+                        });
+                        const mixedDrop = presentMixed.filter(function (t) { return bodyNamed.indexOf(t) < 0; });
+                        if (bodyNamed.length) { rec.mixedKept = bodyNamed.slice(); rec.mixedKeptCount = bodyNamed.length; }
+                        // t24 R1：判定本身也要记账——哪怕本镜一个别类锚词都没有（只由分镜声明定类时就必然如此），
+                        // 「按哪个类清、依据是谁」也必须可观测，否则体检行看不出这条通道跑没跑（验收③）。
+                        rec.mixedRule = 'cross-class:' + effKeepClass;
+                        rec.mixedKeepClass = effKeepClass;
+                        // t25 N3（6.5.72）：mixedFrom 只保留 'body' | 'caption' 二态——只回答「本镜主类的文字证据是不是只在 caption 里」。
+                        // 旧码本行第二分支与 bodyLock 同源（bodyLock 已含 source==='body'），恒假 → caption-only 永远报 'body'，
+                        // 面板写「依据 正文」是假话（与 F06 hitSrc 同类问题）。通道细分（正文 / caption / 沿用前镜 / 分镜声明 / 引擎锁定）
+                        // 由 rec.bodyHitSrc 承担，并在体检行「换类清洗 … 依据 …」里上屏，所以这里不需要第三个值。
+                        rec.mixedFrom = (bodyPose && bodyPose.source === 'body' && bodyPose.hitSrc === 'caption') ? 'caption' : 'body';
+                        if (mixedDrop.length) {
+                            input = sdtDropAllGuarded(input, mixedDrop, rec, mixedProt);
+                            rec.mixedDropped = mixedDrop.slice();          // F02：列全，不再截 8 个
+                            rec.mixedDroppedCount = mixedDrop.length;
+                        }
+                    }
+                }
+                // F05：主类补词因 input 超长被拒也要记账——旧码靠条件里的 input.length <= 1800 静默跳过，
+                // 面板上只看到「没补词」却不知道为什么（体检行必须宁可刷屏也不许沉默）。
+                if (main.length && !hasOwn && entry && input.length > 1800 && !bodyPoseLive && !classMismatch) {
+                    if (!Array.isArray(rec.skippedLong)) rec.skippedLong = [];
+                    rec.skippedLong.push('main:' + (entry.code || '') + '@' + input.length);
+                }
+                if (main.length && !hasOwn && entry && input.length <= 1800 && !bodyPoseLive && !classMismatch) {
                     const all = Array.isArray(M.poses) ? M.poses : [];
                     const others = [];
                     for (let i = 0; i < all.length; i++) {
@@ -13694,28 +14664,41 @@ SCHEMA:
                         input = input + ', 1.3::' + add + '::';
                         rec.added = add;
                         rec.switched = hit.slice(0, 6);
-                        rec.gateWhy = hit.length ? 'switch' : 'sexish';
+                        // F03：正文主导模式下 gateWhy 专记「主类从哪来」（segCarry / fallback），补词原因另记 fillWhy
+                        if (poseMode === 'body') { if (!rec.gateWhy) rec.gateWhy = 'fallback'; rec.fillWhy = hit.length ? 'switch' : 'sexish'; }
+                        else rec.gateWhy = hit.length ? 'switch' : 'sexish';
                         hasOwn = true;
                     } else if (hit.length && sfwScene) {
                         rec.skippedSfw = hit.slice(0, 4);
+                    } else if (!hasOwn && !(bodyPose && bodyPose.className)) {
+                        rec.gateWhy = 'fallback';                            // F03：既没正文主类也没前镜可沿用 → 兜底
                     }
                 }
                 // ①b 变体触发（6.5.65）：体位名/正文命中变体 zh 关键词（如「六九」→ 69）→ 追加该变体 tags
-                if (hasOwn && entry) {
+                if (hasOwn && entry && !classMismatch) {
                     const vmap = (entry.variants && typeof entry.variants === 'object') ? entry.variants : {};
                     const vkeys = Object.keys(vmap);
-                    const zhProbe = String(input) + ' ' + (triple && triple.name ? triple.name : '');
+                    const zhProbe = String(input) + ' ' + (triple && triple.name ? triple.name : '') +
+                        (seg ? (' ' + (seg.anchorText || '') + ' ' + (bodyPose && bodyPose.variant ? bodyPose.variant : '')) : '');
                     for (let i = 0; i < vkeys.length; i++) {
                         const v = vmap[vkeys[i]] || {};
                         const zh = Array.isArray(v.zh) ? v.zh.map(String) : [];
                         const vtags = Array.isArray(v.tags) ? v.tags.map(String) : [];
                         if (!zh.length || !vtags.length) continue;
-                        if (!zh.some(function (w) { return sdtZhHit(zhProbe, w); })) continue;
+                        const hitWord = zh.filter(function (w) { return sdtZhHit(zhProbe, w); })[0];
+                        if (!hitWord) continue;
                         const miss = vtags.filter(function (t) { return !sdtTagHasLoose(input, t); });
                         if (!miss.length) continue;
-                        if (input.length > 1800) break;
+                        if (input.length > 1800) {
+                            // 6.5.72 rev5（问题④）：不再静默跳过——记进体检行
+                            if (!Array.isArray(rec.skippedLong)) rec.skippedLong = [];
+                            rec.skippedLong.push('variant:' + vkeys[i] + '@' + input.length);
+                            break;
+                        }
                         input = input + ', ' + miss.join(', ');
                         rec.variant = (rec.variant ? rec.variant + ';' : '') + vkeys[i] + '=' + miss.join(',');
+                        // F14：变体命中必须带正文原文中文词，面板上要看得见「命中哪个词」
+                        rec.variantHit = { variant: vkeys[i], word: String(hitWord), segIndex: seg ? seg.index : null };
                         hasOwn = true;
                     }
                 }
@@ -13723,16 +14706,57 @@ SCHEMA:
                 if (hasOwn) {
                     const vr = (M.viewRules && typeof M.viewRules === 'object') ? M.viewRules : {};
                     const oneOf = Array.isArray(vr.oneOf) ? vr.oneOf : [];
+                    // 6.5.72 rev5（问题①）：组内消解不能是数组下标——景别按「本镜需求」选，机位按「谁在说话」选
+                    const footShot = sdtFootDetailHit(input);
+                    // 6.5.72 rev5（问题①）：第一人称必须由「正文/分镜明说」决定——模板塞进来的 pov 标签本身不算第一人称
+                    const fpText = String(input);
+                    const fpMark = /第一人称|主观视角|(^|[^a-z0-9_])first[_-]?person([^a-z0-9_]|$)/i.test(fpText) || /(^|[^a-z0-9_])pov([^a-z0-9_]|$)/i.test(fpText);
+                    const tpMark = /第三人称|客观视角|旁观|侧拍|对镜|third[_-]?person/i.test(fpText);
+                    const firstPerson = !!(fpMark && !tpMark);
+                    if (footShot) {
+                        const sg = sdtShotGuard(input);
+                        rec.shotGuard = { footDetail: true, allowShot: sg.allowShot, forbidShot: sg.forbidShot, ucForbid: sg.ucForbid };
+                    }
+                    const SHOT_TAGS = ['close-up', 'cowboy_shot', 'upper_body', 'full_body', 'mid_shot', 'wide_shot'];
+                    const HORIZ_TAGS = ['pov', 'from_side', 'from_behind', 'profile', 'three-quarter_view'];
                     for (let i = 0; i < oneOf.length; i++) {
                         const group = Array.isArray(oneOf[i]) ? oneOf[i].map(String) : [];
                         const present = group.filter(function (t) { return sdtTagHas(input, t); });
-                        if (present.length > 1) input = sdtTagDropAll(input, present.slice(1), rec);   // 只留矩阵序第一个
+                        if (present.length <= 1) continue;
+                        let kept = present[0];                       // 缺省仍是矩阵序第一个（老口径）
+                        let why = 'matrix-order';
+                        const isShot = present.some(function (t) { return SHOT_TAGS.indexOf(t) >= 0; });
+                        const isHoriz = present.some(function (t) { return HORIZ_TAGS.indexOf(t) >= 0; });
+                        if (isShot) {
+                            // 足部/服饰细节可见（high_heels / tip_toe / 踮脚 / 丝袜 / 脚背）→ 必须全身，close-up 不许赢
+                            if (footShot && present.indexOf('full_body') >= 0) { kept = 'full_body'; why = 'foot-detail'; }
+                        } else if (isHoriz) {
+                            // 第三人称 → from_side/profile 优先；pov 只在正文明确第一人称时出现
+                            const pick = sdtPickView(input, { mode: firstPerson ? 'first' : 'third' });
+                            if (present.indexOf(pick.view) >= 0) { kept = pick.view; why = pick.why; }
+                            else if (present.indexOf('pov') >= 0 && !firstPerson) {
+                                kept = present.filter(function (t) { return t !== 'pov'; })[0];
+                                why = 'pov-not-first-person';
+                            }
+                        }
+                        const dropped = present.filter(function (t) { return t !== kept; });
+                        if (!dropped.length) continue;
+                        input = sdtDropAllGuarded(input, dropped, rec, protTags);
+                        if (!Array.isArray(rec.viewRule)) rec.viewRule = [];
+                        rec.viewRule.push({ group: i, kept: kept, dropped: dropped.slice(0, 6), why: why });
                     }
                     const vForbid = Array.isArray(vr.forbid) ? vr.forbid : [];
                     for (let i = 0; i < vForbid.length; i++) {
                         const pair = Array.isArray(vForbid[i]) ? vForbid[i].map(String) : [];
                         if (pair.length < 2) continue;
-                        if (sdtTagHas(input, pair[0]) && sdtTagHas(input, pair[1])) input = sdtTagDropAll(input, [pair[1]], rec);
+                        if (!sdtTagHas(input, pair[0]) || !sdtTagHas(input, pair[1])) continue;
+                        // 6.5.72 rev5（问题①）：旧码无条件删 pair[1] → 侧面/背面视角永远被 pov 吞掉
+                        let vDrop = pair[1];
+                        if (pair[0] === 'pov' && !firstPerson) vDrop = pair[0];
+                        else if (pair[1] === 'pov' && firstPerson) vDrop = pair[0];
+                        input = sdtDropAllGuarded(input, [vDrop], rec, protTags);
+                        if (!Array.isArray(rec.viewForbid)) rec.viewForbid = [];
+                        rec.viewForbid.push({ pair: pair.join('+'), dropped: vDrop });
                     }
                     const pr = (M.postureRules && typeof M.postureRules === 'object') ? M.postureRules : {};
                     const req = (pr.requires && typeof pr.requires === 'object') ? pr.requires : {};
@@ -13742,33 +14766,111 @@ SCHEMA:
                         const need = Array.isArray(req[key]) ? req[key].map(String) : [];
                         if (!sdtTagHas(input, key)) continue;
                         const ok = need.some(function (t) { return sdtTagHas(input, t); });
-                        if (!ok) input = sdtTagDropAll(input, [key], rec);            // requires 前提不成立 → 剔除肢势词
+                        if (!ok) {
+                            input = sdtDropAllGuarded(input, [key], rec, protTags);            // requires 前提不成立 → 剔除肢势词
+                            if (!Array.isArray(rec.posture)) rec.posture = [];
+                            rec.posture.push({ rule: 'requires', key: key, need: need.slice(0, 4), keptByProtect: protTags.indexOf(key) >= 0 });
+                        }
                     }
                     const pForbid = Array.isArray(pr.forbid) ? pr.forbid : [];
+                    // t24 R1：并存判据读「清洗前」快照（inputPreMixed），落刀仍作用于当前 input——
+                    // 这样「一镜一姿势」的清洗与「同类肢势互斥」的记账同时成立，③ 不再被 ① 的清洗架空。
+                    const rulesProbe = inputPreMixed || input;
                     for (let i = 0; i < pForbid.length; i++) {
                         const pair = Array.isArray(pForbid[i]) ? pForbid[i].map(String) : [];
                         if (pair.length < 2) continue;
-                        if (!sdtTagHas(input, pair[0]) || !sdtTagHas(input, pair[1])) continue;
+                        if (!sdtTagHas(rulesProbe, pair[0]) || !sdtTagHas(rulesProbe, pair[1])) continue;
                         // 更贴锁定体位的一侧留下：主类 main 里出现过的那侧优先，都没有 → 按矩阵序保留第一个
                         const dropIdx = (main.indexOf(pair[1]) >= 0 && main.indexOf(pair[0]) < 0) ? 0 : 1;
-                        input = sdtTagDropAll(input, [pair[dropIdx]], rec);
+                        // 6.5.72 rev5（问题④）：删了哪一侧必须看得见（旧码静默）
+                        // F10：两侧都在点名/体位保护集里时 sdtDropAllGuarded 一个都删不掉——面板必须说「两侧受保护」，
+                        // 而不是让用户以为「已删」而画面没变（旧码只记 dropped，看起来像删了）。
+                        const bothProt = !!(protTags.indexOf(pair[0]) >= 0 && protTags.indexOf(pair[1]) >= 0);
+                        input = sdtDropAllGuarded(input, [pair[dropIdx]], rec, protTags);
+                        const stillThere = sdtTagHas(input, pair[dropIdx]);
+                        if (!Array.isArray(rec.postureForbid)) rec.postureForbid = [];
+                        rec.postureForbid.push({ pair: pair.join('+'), dropped: pair[dropIdx], protected: bothProt, kept: stillThere && bothProt });
                     }
                 }
                 // ④ 服装冲突（仅当服装事实存在且有组装输出）：uc 已进上方清单，这里只做 drop / dropTrig
+                // 6.5.72 rev4：dropTrig 只丢触发它的服装细节；kill 恒为空 ⇒ 服装冲突永远不让用户写的体位让位
+                // 6.5.72（F1b）：三消费点统一求值（whenPose / requireText / exemptText 全读）——同一条 rule 同输入必须同结论
                 if (hasOutfit) {
                     for (let i = 0; i < conflicts.length; i++) {
                         const rule = conflicts[i] || {};
                         const mode = String(rule.mode || '');
-                        if (mode === 'uc') continue;
+                        if (mode === 'uc') continue;                                  // uc 已在上方清单里处理（幂等重算）
                         const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
                         const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
                         if (!trig.length) continue;
-                        const hit = trig.some(function (t) { return sdtTagHas(input, t) || outfitTags.indexOf(t) >= 0; });
-                        if (!hit) continue;
-                        input = sdtTagDropAll(input, mode === 'dropTrig' ? trig : kill, rec);
+                        const ruleName = String(rule.name || '');
+                        const rg = sdtOutfitRuleGate(rule, { text: probeText, tags: outfitTags });   // F04：中文正文 ∪ caption
+                        if (!rg.apply) {
+                            // 规则根本没成立（whenPose 不成立 / 跪姿证据缺失 / 踮脚豁免）→ 整条跳过，而且必须留痕
+                            if (rg.why === 'whenPose' || rg.why === 'requireText' || rg.why === 'exemptText') {
+                                if (!Array.isArray(rec.conflictSkipped)) rec.conflictSkipped = [];
+                                if (rec.conflictSkipped.length < 12) rec.conflictSkipped.push({ rule: ruleName, why: rg.why });
+                            }
+                            continue;
+                        }
+                        // 6.5.72 附1：要删的词命中正文已写明的体位词/服装词 → 改删服装（dropOutfit），点名项一个不动
+                        // dropTrig 的语义：只删触发它的服装细节（trig）；kill 恒为空，体位词一个不动，whenPose 仅作触发条件
+                        let dropList = (mode === 'dropTrig' ? trig.slice() : kill.slice());
+                        // 6.5.72（F1b）：dropTrig 不再把 trig 从保护集里剔出去（旧码剔完 → hitProt 恒 false → dropOutfit 通道永不生效）
+                        const protForRule = (rule.dropNamed === true) ? poseProt : protTags;
+                        if (mode === 'dropTrig') {
+                            rec.outfitRule = { rule: ruleName, mode: 'dropTrig', drop: trig.slice(0, 6), poseUntouched: true, dropNamed: rule.dropNamed === true };
+                            // 该删的时候必须真删：requireText 成立 ⇒ 删的正是正文点名的服装本身，为什么删要看得见（acceptance ⑦）
+                            rec.outfitDeleteWhy = (Array.isArray(rule.requireText) && rule.requireText.length) ? 'requireText' : 'trig';
+                        }
+                        let guard = protForRule;
+                        let pendingKept = null;                                     // F04：让位后要核对「点名的还活着吗」
+                        if (protForRule.length && dropList.length) {
+                            const keptProt = [];
+                            for (let q = 0; q < dropList.length; q++) { const dt = String(dropList[q]); if (protForRule.indexOf(dt) >= 0 && keptProt.indexOf(dt) < 0) keptProt.push(dt); }
+                            if (keptProt.length) {
+                                // 让位通道是矩阵显式声明的删除（dropOutfit）：这时只保护体位词，服装侧按矩阵让位并记账
+                                guard = poseProt;
+                                // F06（6.5.72）：outfitConflictGuard=false → 禁止 dropOutfit，只记账，绝不删点名项
+                                const guardOffQ = !!(sdtPoseStore() && sdtPoseStore().outfitConflictGuard === false);
+                                if (guardOffQ) {
+                                    rec.outfitGuardOff = { rule: ruleName, kept: keptProt.slice(0, 6), why: 'guard-off' };
+                                    dropList = [];
+                                } else if (Array.isArray(rule.dropOutfit) && rule.dropOutfit.length) {
+                                    const sub = rule.dropOutfit.map(String);
+                                    // F04：kept 先留空，删完再按 input 实际内容核对（dropOutfit 可能把同名服装自己删掉）
+                                    rec.outfitConflict = { rule: ruleName, keptPose: true, dropped: sub.slice(0, 6), dropOutfit: sub.slice(0, 6), kept: [], why: 'named-protected' };
+                                    pendingKept = keptProt.slice();
+                                    dropList = sub;
+                                } else {
+                                    // 没有可替代的服装词 → 点名项绝不静默删除，整条规则空转并留痕
+                                    rec.conflictUnresolved = { rule: ruleName, kept: keptProt.slice(0, 6), why: 'named-protected' };
+                                    dropList = [];
+                                }
+                            }
+                        }
+                        if (!dropList.length) continue;
+                        const beforeDrop = input;
+                        input = sdtDropAllGuarded(input, dropList, rec, guard);
+                        if (mode === 'dropTrig' && input !== beforeDrop) {
+                            if (!Array.isArray(rec.outfitDropped)) rec.outfitDropped = [];
+                            for (let q = 0; q < dropList.length && rec.outfitDropped.length < 8; q++) {
+                                const dt = String(dropList[q]);
+                                if (beforeDrop.indexOf(dt) >= 0 && input.indexOf(dt) < 0 && rec.outfitDropped.indexOf(dt) < 0) rec.outfitDropped.push(dt);
+                            }
+                        }
+                        // F04（F21）：kept 只列「真没被删的点名项」——按删完的 input 复核，别让面板说保留而 input 里已经没有
+                        if (pendingKept && pendingKept.length && rec.outfitConflict) {
+                            const alive = pendingKept.filter(function (t) { return sdtTagHasLoose(input, t) || input.indexOf(t) >= 0; });
+                            const gone = pendingKept.filter(function (t) { return alive.indexOf(t) < 0; });
+                            rec.outfitConflict.kept = alive.slice(0, 6);
+                            rec.outfitConflict.keptCount = alive.length;
+                            if (gone.length) rec.outfitConflict.removed = gone.slice(0, 6);
+                            if (!alive.length) rec.outfitConflict.why = 'named-dropped-by-matrix';
+                        }
                     }
                 }
-                if (ucList.length) input = sdtTagDropAll(input, ucList, rec);      // uc 词先剔正向（幂等）
+                if (ucList.length) input = sdtDropAllGuarded(input, ucList, rec, poseProt);      // uc 词先剔正向（幂等；点名保护只作用于负向清单）
                 if (input !== payload.input) { payload.input = input; changed = true; rec.inputLen = input.length; }
             }
 
@@ -13778,7 +14880,35 @@ SCHEMA:
                 if (added.length) { changed = true; rec.ucAdded = added.slice(0, 24); }
             }
 
-            if (!changed) return null;
+            // 6.5.72（F09）：正文改判了主类、却没有词需要改（payload 一字不动）也必须留 rec——否则「为什么画成这样」查不到。
+            // 只在「分镜判定 vs 引擎锁定」真的不一致时才走这条路（同类的幂等重跑仍然返回 null）。
+            const overrideOnly = !!(bodyPose && bodyPose.className && bodyPose.source !== 'director'
+                && (!entry || bodyPose.className !== entry.code));
+            const gateLast = {
+                // F15（t20）：先整体引用 rec —— 不再手写键名白名单（白名单正是这次漏键的根因）
+                ...rec,
+                phase: negOnly ? 'neg' : 'input', gateMode: gateMode, changed: changed,
+                authority: poseMode === 'body' ? 'body' : 'engine',
+                segIndex: segPick.index, segWhy: segPick.why,
+                bodyClass: bodyPose ? bodyPose.className : '', bodySource: bodyPose ? bodyPose.source : '',
+                bodyWord: bodyPose ? bodyPose.word : '', l1Class: entry ? entry.code : '',
+                added: rec.added, dropped: rec.dropped.slice(0, 16), uc: rec.uc.slice(0, 16),
+                mixedDropped: rec.mixedDropped || [], protectedKept: rec.protectedKept || [],
+                outfitConflict: rec.outfitConflict || null, conflictSkipped: rec.conflictSkipped || [],
+                viewRule: rec.viewRule || [], viewForbid: rec.viewForbid || [],
+                posture: rec.posture || [], postureForbid: rec.postureForbid || [],
+                skippedLong: rec.skippedLong || [], variantHit: rec.variantHit || null,
+                overrideOnly: overrideOnly && !changed, gateWhy: rec.gateWhy || '',
+                reroll: rec.reroll || null,
+            };
+            SDT_GATE_LAST = gateLast;
+            if (!changed) {
+                if (!overrideOnly) return null;
+                rec.overrideOnly = true;
+                rec.changed = false;
+                try { sdtDiag() && sdtDiag().add('pose-gate-only', rec); } catch (e) { /* ignore */ }
+                return rec;
+            }
             try { sdtDiag() && sdtDiag().add('pose-gate', rec); } catch (e) { /* ignore */ }
             return rec;
         } catch (e) { return null; }
@@ -13867,21 +14997,132 @@ SCHEMA:
         } catch (e) { return ''; }
     }
 
+    /* ── 6.5.72 服装冲突统一求值（三个消费点共用） ───────────────────────────────
+     * 消费点：sdtPoseGateApply ④ / sdtFormConflicts / assembleOutfitTags 规则段。
+     * 同一条 rule + 同一段正文 → 三处必须得出同一个 apply 结论，否则「修一处漏两处」会继续静默删词。
+     * 口径（顺序即优先级）：
+     *   1) trig 命中（formTag 精确 / tagList 含 / text 整词或中文子串）→ 否则 no-trig
+     *   2) whenPose：数组且非空 ⇒ 必须命中 text；空数组或缺失 ⇒ 恒成立（缺失时不再拿 kill 当条件）
+     *   3) requireText：非空 ⇒ 至少一条命中 text，否则 not-yet（跪姿证据缺失）
+     *   4) exemptText：非空 ⇒ 任一命中即豁免（踮脚/脚尖/脚背 这类足部细节）
+     * text 为空 = 没有正文证据：whenPose / requireText 一律判不成立（宁可不删，不许静默删）。
+     */
+    /** 6.5.72（F04）：中文 → 服装/体位 tag 的规则证据词表（只服务 outfitConflicts 的 trig / whenPose）
+     *  —— 世界书写的是中文正文，矩阵写的是英文 tag；没有这张表，中文「裙摆被撩起」在规则求值里等于没写。 */
+    const SDT_RULE_ZH_HINT = {
+        nude: ['全裸', '赤裸', '赤身', '一丝不挂', '裸着'],
+        completely_nude: ['一丝不挂', '全裸', '脱得精光'],
+        bottomless: ['下身全裸', '没穿内裤', '下身光着', '下半身赤裸'],
+        barefoot: ['光脚', '赤脚', '赤足', '没穿鞋'],
+        panties_around_one_leg: ['内裤挂在一条腿', '内裤褪到一条腿', '挂在脚踝', '内裤只挂'],
+        open_shirt: ['敞开衬衫', '衬衫敞开', '衣襟敞开', '敞着怀', '衣襟半开'],
+        panty_pull: ['拉下内裤', '褪下内裤', '扒下内裤'],
+        panties_aside: ['拨到一边', '拨开内裤', '内裤拨开', '把内裤拨'],
+        wet_clothes: ['衣服湿透', '湿衣', '衣服被水浸', '浑身湿透', '衣服湿了'],
+        latex: ['乳胶', '胶衣', '乳胶衣'],
+        skirt_lift: ['撩裙', '裙摆被撩', '掀起裙子', '撩起裙', '裙子被掀', '把裙子撩', '撩起', '撩开', '裙摆撩', '撩上来', '掀起来'],
+        high_heels: ['高跟鞋', '高跟'],
+        girl_on_top: ['女上', '骑在上面', '骑在他身上', '跨在他身上', '坐在他身上'],
+        cowgirl_position: ['女上位', '骑乘位', '跨坐', '骑乘'],
+        sex_from_behind: ['后入', '从背后', '背后位', '从后面进'],
+        from_behind: ['从背后', '背后视角', '背影机位'],
+        thighhighs: ['大腿袜', '过膝袜', '长筒袜'],
+        pantyhose: ['连裤袜', '丝袜裤'],
+        skirt: ['裙子', '短裙'],
+        miniskirt: ['迷你裙'],
+        pleated_skirt: ['百褶裙'],
+        shorts: ['短裤'],
+        socks: ['袜子'],
+        kneehighs: ['及膝袜'],
+        'see-through_clothes': ['透视装', '透明衣', '薄纱']
+    };
+    /** 规则证据命中：英文 tag 走宽松命中，中文走子串；英文 tag 还要过一遍中文同义词表（F04） */
+    function sdtRuleProbeHit(text, w) {
+        try {
+            const t = String(text || '');
+            const x = String(w || '');
+            if (!t || !x) return false;
+            if (sdtZhProbeHit(t, x)) return true;
+            const zh = SDT_RULE_ZH_HINT[x];
+            if (Array.isArray(zh)) {
+                for (let i = 0; i < zh.length; i++) { if (t.indexOf(zh[i]) >= 0) return true; }
+            }
+            return false;
+        } catch (e) { return false; }
+    }
+    /** 6.5.72（F04）：正文证据 = 中文正文 ∪ caption —— 四类求值器（gate ④ / assembleOutfitTags / 体检行）共用同一条 text。
+     *  旧口径只把 payload.input（英文 caption）喂给规则求值器，中文正文写的「裙摆被撩起」根本看不见（假优先）。 */
+    function sdtBodyProbe(input, seg, engine) {
+        try {
+            const parts = [String(input || '')];
+            if (seg) {
+                if (seg.anchorText) parts.push(String(seg.anchorText));
+                if (Array.isArray(seg.texts)) { for (let i = 0; i < seg.texts.length; i++) { const x = String(seg.texts[i] || ''); if (x) parts.push(x); } }
+            }
+            try {
+                const bag = engine ? sdtOutfitNameHints(engine, {}) : null;
+                if (bag && bag.text) parts.push(String(bag.text));
+            } catch (e2) { /* 没有 ctx 就只用 input + 分镜正文 */ }
+            return sdtFactText(parts.filter(function (x) { return x && String(x).trim(); }).join('\n'), 2600);
+        } catch (e) { return String(input || ''); }
+    }
+
+    function sdtOutfitRuleGate(rule, probes) {
+        try {
+            const r = (rule && typeof rule === 'object') ? rule : {};
+            const pb = (probes && typeof probes === 'object') ? probes : {};
+            const text = (typeof pb.text === 'string') ? pb.text : '';
+            const tagList = Array.isArray(pb.tags) ? pb.tags.map(String) : [];
+            const formTag = (typeof pb.formTag === 'string') ? pb.formTag : '';
+            const trig = Array.isArray(r.trig) ? r.trig.map(String) : [];
+            if (!trig.length) return { apply: false, why: 'no-trig' };
+            let hit = false;
+            if (formTag) {
+                hit = trig.indexOf(formTag) >= 0;
+            } else {
+                for (let i = 0; i < trig.length; i++) {
+                    const t = trig[i];
+                    if (tagList.indexOf(t) >= 0) { hit = true; break; }
+                    if (text && sdtRuleProbeHit(text, t)) { hit = true; break; }
+                }
+            }
+            if (!hit) return { apply: false, why: 'no-trig' };
+            const when = Array.isArray(r.whenPose) ? r.whenPose.map(String) : [];
+            if (when.length) {
+                let ok = false;
+                for (let i = 0; i < when.length; i++) {
+                    const w = when[i];
+                    if (sdtRuleProbeHit(text, w)) { ok = true; break; }
+                }
+                if (!ok) return { apply: false, why: 'whenPose', need: when.slice(0, 4) };
+            }
+            const req = Array.isArray(r.requireText) ? r.requireText.map(String) : [];
+            if (req.length) {
+                let rh = false;
+                for (let i = 0; i < req.length; i++) { if (sdtRuleProbeHit(text, req[i])) { rh = true; break; } }
+                if (!rh) return { apply: false, why: 'requireText', need: req.slice(0, 4) };
+            }
+            const ex = Array.isArray(r.exemptText) ? r.exemptText.map(String) : [];
+            if (ex.length) {
+                for (let i = 0; i < ex.length; i++) { if (sdtRuleProbeHit(text, ex[i])) return { apply: false, why: 'exemptText', exempt: ex[i] }; }
+            }
+            return { apply: true, why: 'ok', requireText: req.length > 0 };
+        } catch (e) { return { apply: false, why: 'error' }; }
+    }
+
     /** form 与体位互斥（矩阵 dropTrig）：撩裙 + 女上 会让底模多画一只手 → 让 form 让位 */
     function sdtFormConflicts(formTag, text) {
         try {
             if (!formTag) return false;
             const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : {};
             const rules = Array.isArray(M.outfitConflicts) ? M.outfitConflicts : [];
-            const hay = String(text || '').toLowerCase().replace(/[_\-]+/g, ' ');
+            const hay = String(text || '');
             if (!hay.trim()) return false;
             for (let i = 0; i < rules.length; i++) {
                 const rule = rules[i] || {};
                 if (String(rule.mode || '') !== 'dropTrig') continue;
-                const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
-                if (trig.indexOf(formTag) < 0) continue;
-                const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
-                for (let k = 0; k < kill.length; k++) if (sdtTagHasLoose(hay, kill[k])) return true;
+                // 6.5.72：与 gate ④ / assembleOutfitTags 同一求值器（whenPose 空数组=恒成立 / requireText / exemptText 全读）
+                if (sdtOutfitRuleGate(rule, { text: hay, formTag: String(formTag) }).apply) return true;
             }
             return false;
         } catch (e) { return false; }
@@ -13919,6 +15160,165 @@ SCHEMA:
             }
             return hit[idx] || null;
         } catch (e) { return null; }
+    }
+
+    /** 6.5.72 C2：台账行首段 → 人名（「1. 苏晚｜…」→ 苏晚；「1. 女｜…」→ 女；去掉序号前缀） */
+    function sdtOutfitRowHead(row) {
+        try {
+            if (typeof row !== 'string' || !row) return '';
+            const head = String(row.split(OUTFIT_SEP)[0] || '').replace(/^\s*\d+\s*[.、．]\s*/, '').trim();
+            return head;
+        } catch (e) { return ''; }
+    }
+
+    /** 行首段如果是「女/男」这类性别位就不是人名；长度 < 2 的单字也不算（避免「女」字误配） */
+    function sdtOutfitRowName(row) {
+        try {
+            const head = sdtOutfitRowHead(row);
+            if (!head || head.length < 2) return '';
+            if (head === '女' || head === '男') return '';
+            if (/^(female|male)$/i.test(head)) return '';
+            return head;
+        } catch (e) { return ''; }
+    }
+
+    function sdtOutfitIsMaleRow(row) {
+        try {
+            const head = sdtOutfitRowHead(row);
+            if (!head) return false;
+            return head === '男' || /^男/.test(head) || /^male$/i.test(head);
+        } catch (e) { return false; }
+    }
+
+    /**
+     * 6.5.72 C2：按当前分镜的角色名认领台账行（多女场景不再固定取第一个女性行）。
+     * 行首只有「序号. 女」，没有角色名 —— 名字在行内 角色= 字段（世界书 t9 写入），所以：
+     * 先按序取女行 → 读 parsed['角色'] → 与 hints.names 双向包含匹配 / 正文出现角色名 → 命中即用；
+     * 未命中退回第一个女行（name 写 '#'+行下标，供体检行看出「没认到人」）。
+     * 返回 { row, name, index, why:'name'|'first-female'|'no-rows'|'none'|'error' }。
+     */
+    function sdtPickOutfitRow(rows, hints) {
+        try {
+            if (!Array.isArray(rows) || !rows.length) return { row: null, name: '', index: -1, why: 'no-rows' };
+            const h = (hints && typeof hints === 'object') ? hints : {};
+            const names = Array.isArray(h.names) ? h.names.filter(function (x) { return typeof x === 'string' && x.trim(); }) : [];
+            const text = (typeof h.text === 'string') ? h.text : '';
+            const femaleIdx = [];
+            for (let i = 0; i < rows.length; i++) {
+                const head = sdtOutfitRowHead(rows[i]);
+                if (head === '女' || (!sdtOutfitIsMaleRow(rows[i]) && sdtOutfitRowName(rows[i]))) femaleIdx.push(i);
+            }
+            if (!femaleIdx.length) return { row: null, name: '', index: -1, why: 'none' };
+            for (let k = 0; k < femaleIdx.length; k++) {
+                const idx = femaleIdx[k];
+                const p = parseOutfitRow(rows[idx]) || {};
+                const who = (typeof p['角色'] === 'string') ? p['角色'].trim() : '';
+                if (!who) continue;
+                let hit = false;
+                for (let n = 0; n < names.length; n++) {
+                    const cand = names[n].trim();
+                    if (!cand) continue;
+                    if (who === cand || who.indexOf(cand) >= 0 || cand.indexOf(who) >= 0) { hit = true; break; }
+                }
+                if (!hit && text && text.indexOf(who) >= 0) hit = true;
+                if (hit) return { row: rows[idx], name: who, index: idx, why: 'name' };
+            }
+            const firstIdx = femaleIdx[0];
+            return { row: rows[firstIdx], name: '#' + firstIdx, index: firstIdx, why: 'first-female' };
+        } catch (e) { return { row: null, name: '', index: -1, why: 'error' }; }
+    }
+
+    /** 6.5.72：档位/着装行的实际读取结果（体检行显示用；buildOutfitFacts 每次调用刷新） */
+    let SDT_OUTFIT_DIAG = { tierRaw: null, tierSrc: 'none', rowName: '', rowIndex: -1, rowWhy: '', d: null, outfitSet: '', outfitSetVar: '' };
+    // F01：最近一次过闸的 payload —— 体检行（桥接块外）拿不到 gate 的局部变量，靠这条通道读 payload.meta.segIndex
+    let SDT_LAST_PAYLOAD = null;
+// 6.5.72（F09）：闸门最后一次结论——即使 payload 一字未改，面板也要能看见「为什么没改」
+let SDT_GATE_LAST = null;
+
+    /** 当前镜头的角色名与正文线索（角色卡名 / 当前分镜 anchor.text / 末条正文），给 sdtPickOutfitRow 认人 */
+    function sdtOutfitNameHints(engine, deps) {
+        const out = { names: [], text: '' };
+        // 6.5.72（F01/F11）：opts 必须提到函数作用域——旧码把 const opts 声明在上一个 try 块里，
+        // 下面第二个 try 引用它直接 ReferenceError，被 catch 静默吞掉 ⇒ 分镜 anchorText 与 payload
+        // 两条线索从未进入 hints（正文换牌词、角色名匹配双双失效）。
+        const opts = (deps && typeof deps === 'object') ? deps : {};
+        const push = function (v) {
+            const s = (typeof v === 'string') ? v.trim() : '';
+            if (s && s.length <= 40 && out.names.indexOf(s) < 0) out.names.push(s);
+        };
+        const texts = [];
+        try {
+            if (Array.isArray(opts.charNames)) for (let i = 0; i < opts.charNames.length; i++) push(opts.charNames[i]);
+            if (typeof opts.bodyText === 'string') texts.push(opts.bodyText);
+        } catch (e) { /* ignore */ }
+        try {
+            const segs = sdtNormalizeSegments(engine);
+            if (segs.length) {
+                const pick = sdtPickSegmentForPayload((opts && opts.payload) || null, segs, engine);
+                const seg = pick && pick.seg;
+                if (seg) {
+                    if (seg.anchorText) texts.push(seg.anchorText);
+                    if (Array.isArray(seg.texts)) texts.push(seg.texts.join(' '));
+                }
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            let ctx = null;
+            if (typeof RBQ !== 'undefined' && RBQ && RBQ.api && typeof RBQ.api.getContext === 'function') ctx = RBQ.api.getContext();
+            if (!ctx && typeof globalThis !== 'undefined' && globalThis.SillyTavern && typeof globalThis.SillyTavern.getContext === 'function') ctx = globalThis.SillyTavern.getContext();
+            if (ctx) {
+                push(ctx.name2);
+                push(ctx.name1);
+                const chat = Array.isArray(ctx.chat) ? ctx.chat : null;
+                if (chat && chat.length) {
+                    const last = chat[chat.length - 1];
+                    const mes = last ? ((typeof last.mes === 'string') ? last.mes : ((typeof last.content === 'string') ? last.content : '')) : '';
+                    if (mes) texts.push(mes);
+                }
+            }
+        } catch (e) { /* ignore */ }
+        out.text = sdtFactText(texts.filter(Boolean).join(' '), 2000);
+        return out;
+    }
+
+    /** 6.5.72：正文 D 档词表（D4→D0）。世界书两个写入方都与正文脱钩：服饰引擎每日掷骰、姿势引擎段动作「不动」时
+     *  变量仍 D0，正文却已经「掀到腰」→ 出图衣服完好。这里只做「正文怎么说」，不改五档语义。 */
+    const SDT_OUTFIT_TIER_WORDS = [
+        { d: 4, words: ['全脱', '脱光', '一丝不挂', '赤裸', '不着寸缕', '全身裸露', '已除去全部衣物'] },
+        { d: 3, words: ['只剩内衬', '只剩内衣', '只剩袜子', '外层离体', '堆在脚边', '搭在椅背', '仅剩'] },
+        { d: 2, words: ['掀到腰', '推到腰', '拨到一侧', '拨开', '敞到', '拉开拉链', '解开扣子', '敞怀', '裙摆掀起', '从领口敞'] },
+        { d: 1, words: ['褪到膝弯', '褪到膝', '褪到大腿', '褪到脚踝', '推到锁骨', '推到胸口', '挂在一侧', '半褪', '滑落一半', '吊在臂弯'] },
+        { d: 0, words: ['穿戴整齐', '衣物完好', '整理妥当', '提上', '拉正', '穿回', '复原'] },
+    ];
+
+    /** 正文 → { d: 0|1|2|3|4|null, hit: 最深档原词, src: 'text', d0Hit, d0Overridden }
+     *  多档命中取最深（D4 > D0）。6.5.72：D0 只是「无更深档证据」时的结论——推进式正文
+     *  「推到腰上…事毕整理妥当」同镜命中 D2 与 D0，取 D2（一镜一画面，不可能既半褪又整理妥当）。 */
+    function sdtInferOutfitTier(text) {
+        const probe = (typeof text === 'string') ? text : String(text == null ? '' : text);
+        let best = null;
+        let d0Hit = '';
+        if (probe) {
+            try {
+                for (let i = 0; i < SDT_OUTFIT_TIER_WORDS.length; i++) {
+                    const row = SDT_OUTFIT_TIER_WORDS[i];
+                    for (let k = 0; k < row.words.length; k++) {
+                        const w = row.words[k];
+                        if (!w || probe.indexOf(w) < 0) continue;
+                        if (row.d === 0 && w.length > d0Hit.length) d0Hit = w;
+                        if (!best || row.d > best.d || (row.d === best.d && w.length > best.hit.length)) {
+                            best = { d: row.d, hit: w, src: 'text' };
+                        }
+                    }
+                }
+            } catch (e) { best = null; }
+        }
+        if (!best && d0Hit) best = { d: 0, hit: d0Hit, src: 'text' };
+        if (best) {
+            best.d0Hit = d0Hit;
+            best.d0Overridden = !!(d0Hit && best.d > 0);
+        }
+        return best || { d: null, hit: '', src: 'text', d0Hit: '', d0Overridden: false };
     }
 
     /** 台账行 → { 特指, 气质, 档位, 内层, 外层, 内裤, 单位, 装饰, 底牌, 器具 }（首段「序号. 女」无等号，自然跳过） */
@@ -13960,16 +15360,120 @@ SCHEMA:
             const readOutfit = (typeof opts.readOutfitEngine === 'function') ? opts.readOutfitEngine : readOutfitEngine;
             let bag = null;
             try { bag = readOutfit(); } catch (e1) { bag = null; }
+            // F01：payload 通道——体检行 / 闸门 / buildStoryFacts 都必须把「当前 payload」传下来，
+            // 否则 payload.meta.segIndex 永远读不到，档位来源只能退成 dress.tier（旧期望就是这么错的）。
+            const payloadQ = (opts.payload && typeof opts.payload === 'object') ? opts.payload : null;
             const dress = (pose && pose.dress && typeof pose.dress === 'object') ? pose.dress : null;
-            let d = null;
-            if (dress && dress['档位'] !== undefined && dress['档位'] !== null && dress['档位'] !== '') {
-                const n = Number(dress['档位']);
-                if (isFinite(n) && n >= 0 && n <= 4) d = Math.floor(n);   // 非法档位一律当缺失，不猜
-            }
             const upgraded = !!(dress && dress['升级'] === true);
             const hoiseryOn = !!(pose && pose.sock === true);             // 严格 bool：getvar(...) === true 才为真
             const rows = (bag && Array.isArray(bag.rows)) ? bag.rows : [];
-            const parsed = parseOutfitRow(pickOutfitRow(rows, '女', 0));
+            // 6.5.72 C2：按当前分镜角色名认领台账行（配角先出场 / 多女场景不再固定取第一个女性行）
+            const hintBag = sdtOutfitNameHints(pose, opts);
+            const rowPick = sdtPickOutfitRow(rows, hintBag);
+            const parsed = parseOutfitRow(rowPick.row);
+            // F07：换套正向载体——行内 `套=` 给「本镜这一身」（worldbook uid35 每行行尾追加），
+            // 变量 `姿势引擎.着装.套签名` 给「当前这一身」（角色级 `.套签名.<角色名>` 优先，本函数只读当前）。
+            // 两者都缺（旧档）→ 空串，面板不追加任何字符，其它事实零影响。
+            // t24 R3：提前到档位链之前求值——套签名变了 = 这一身换了，档位才允许回落到该行 D 档（见 row.code 分支）。
+            const outfitSetRow = (parsed && parsed['套']) ? sdtFactText(parsed['套'], 32) : '';
+            let outfitSetVar = '';
+            if (dress) {
+                const nameNow = rowPick && rowPick.name && String(rowPick.name).charAt(0) !== '#' ? String(rowPick.name) : '';
+                const setMap = (dress['套签名'] && typeof dress['套签名'] === 'object') ? dress['套签名'] : null;
+                const vOne = (setMap && nameNow && setMap[nameNow] !== undefined && setMap[nameNow] !== null) ? setMap[nameNow]
+                    : ((dress['套签名'] !== undefined && dress['套签名'] !== null && typeof dress['套签名'] !== 'object') ? dress['套签名'] : '');
+                outfitSetVar = (vOne === undefined || vOne === null) ? '' : sdtFactText(vOne, 32);
+            }
+            // 任一侧缺失（旧档 / 世界书未写）→ 不算换套，保持 6.5.72 的原行为（零影响）
+            const setChanged = !!(outfitSetRow && outfitSetVar && outfitSetRow !== outfitSetVar);
+            // 6.5.72 C1：档位容错 + 三来源回退——世界书可能写 'D3'（字符串）也可能写 3（数字），
+            // Number('D3') 曾等于 NaN → state.d 永远缺失。顺序：① dress.档位 → ② dress.档位码 → ③ 服饰行 档位码。
+            let d = null;
+            let tierRaw = null;
+            let tierSrc = 'none';
+            const tierTry = function (raw, src) {
+                if (tierRaw !== null) return;
+                if (raw === undefined || raw === null || raw === '') return;
+                const n = Number(String(raw).replace(/^\s*[Dd]\s*/, '').trim());
+                if (!isFinite(n) || n < 0 || n > 4) return;               // 非法档位一律当缺失，不猜
+                tierRaw = String(raw);
+                d = Math.floor(n);
+                tierSrc = src;
+            };
+            if (dress) {
+                tierTry(dress['档位'], 'dress.tier');
+                tierTry(dress['档位码'], 'dress.code');
+            }
+            // 6.5.72（F17）：台账档位只能「追加不降低」——变量 D1 + 服饰行 D3（这一身实际写到 D3）→ 取 3
+            // t24 R3：唯一例外是「换套」——套签名变了（行内 套= 与变量 套签名 不等）说明这一身整换，
+            // 此时允许回落到该行 D 档（换了衣服还沿用上一身的 D3 会画出「脱到一半」的错画面）。
+            // 套未变 / 任一侧缺失 → 仍是只升不降。回落只在这一步记账，后面的正文档位（含 D0 条件化）
+            // 依然最后裁决：正文写 D3 会把 d 抬回 3（正文优先，两者不同时降）。
+            if (parsed) {
+                const rawRow = parsed['档位码'];
+                if (rawRow !== undefined && rawRow !== null && rawRow !== '') {
+                    const nRow = Number(String(rawRow).replace(/^\s*[Dd]\s*/, '').trim());
+                    if (isFinite(nRow) && nRow >= 0 && nRow <= 4) {
+                        const nRowI = Math.floor(nRow);
+                        if (d === null || nRowI > d || setChanged) {
+                            if (tierRaw === null) tierRaw = String(rawRow);
+                            d = nRowI;
+                            tierSrc = setChanged ? 'setReset' : 'row.code';
+                        }
+                    }
+                }
+            }
+            // F06（6.5.72）：outfitSequence —— 一场戏多套服装序列，档位可随分镜 tier 推进（只升不降）。
+            // 放在正文证据之前求值：正文的 D0 证据（「整理妥当 / 穿回」）永远是最后裁决，段推进不能把它抬回去。
+            const seqOn = !(sdtPoseStore() && sdtPoseStore().outfitSequence === false);
+            let segTierRaw = null;
+            if (seqOn) {
+                try {
+                    const segsQ = sdtNormalizeSegments(pose);
+                    if (segsQ.length) {
+                        const pickQ = sdtPickSegmentForPayload(payloadQ, segsQ, pose);
+                        // 只有真正定位到「当前是第几镜」时才按分镜推进档位：定位不到（why=default / no-script）时
+                        // 拿 list[0] 的 tier 去抬每一镜是错的（旧实现把镜头 2 的 D0 抬成了镜头 1 的 D1）。
+                        const realChannel = !!(pickQ && (pickQ.why === 'engine.seg' || pickQ.why === 'ctx.meta' || pickQ.why === 'payload' || pickQ.why === 'storyFacts'));
+                        const rawQ = (realChannel && pickQ.seg && pickQ.seg.tier !== null && pickQ.seg.tier !== undefined) ? String(pickQ.seg.tier) : '';
+                        const nQ = Number(rawQ.replace(/^\s*[Dd]\s*/, '').trim());
+                        if (rawQ && isFinite(nQ) && nQ >= 0 && nQ <= 4) {
+                            segTierRaw = rawQ;
+                            const nQI = Math.floor(nQ);
+                            // F01：同深度（变量 D1 + 分镜 D1）以分镜声明为准 —— 分镜级才是权威；只升不降（F17）不变
+                            if (d === null || nQI >= d) { d = nQI; tierSrc = 'seg'; if (tierRaw === null) tierRaw = rawQ; }
+                        }
+                    }
+                } catch (eSeq) { /* 分镜档位不可读 → 只用变量与正文 */ }
+            }
+            // 6.5.72：正文所述优先，D0 条件化——① 只有 D0 词、没有更深档证据 → 拉回 0（可压过变量 D3）；
+            // ② D0 词与 D1–D4 同时命中 → 取更深档（推进式正文的收尾「整理妥当」压不过同镜的「推到腰上」）；
+            // ③ 无 D0 词 → max(变量 d, 正文 d)；④ 一个词都没命中 → 完全保持上面三段回退（6.5.72 逐字节一致）。
+            const textTier = sdtInferOutfitTier(hintBag && hintBag.text);
+            const tierText = (textTier && typeof textTier.d === 'number') ? ('D' + textTier.d) : null;
+            let tierTextHit = (textTier && typeof textTier.d === 'number') ? String(textTier.hit || '') : '';
+            if (tierText !== null) {
+                const tierVar = (typeof d === 'number') ? d : -1;
+                if (textTier.d0Overridden) {
+                    d = Math.max(tierVar, textTier.d);
+                    tierTextHit = tierTextHit + '｜D' + textTier.d + '(max, D0词被更深档压过)｜被压 D0 词「'
+                        + String(textTier.d0Hit || '') + '」';
+                } else if (textTier.d === 0) {
+                    d = 0;                                                  // 只有「整理妥当 / 穿回 / 复原」这一层证据
+                } else {
+                    d = Math.max(tierVar, textTier.d);
+                }
+                tierSrc = 'text';
+                if (tierRaw === null) tierRaw = tierText;
+            }
+            // （套签名已在档位链之前求值 —— t24 R3）
+            SDT_OUTFIT_DIAG = {
+                tierRaw: tierRaw, tierSrc: tierSrc, segTier: segTierRaw, seqOn: seqOn, tierSetChanged: setChanged,
+                rowName: rowPick.name || '', rowIndex: (typeof rowPick.index === 'number' ? rowPick.index : -1),
+                rowWhy: rowPick.why || '', d: d,
+                tierText: tierText, tierTextHit: tierTextHit,
+                outfitSet: outfitSetRow, outfitSetVar: outfitSetVar,
+            };
             // 服饰台账（服饰引擎.今日）整键未落盘 → 整段不注入：无服装变量时 prompt 与 6.5.62 逐字节一致
             // （A9 恒等断言 / B8 无状态断言 / A6 七键序断言都锁这个口径，台账存在与否是唯一开关）
             if (!bag) return null;
@@ -14024,10 +15528,12 @@ SCHEMA:
      * 二次侧组装（doc 07 §3.4 六步）：base → comp → 档位状态词 → D4×L6 残留 → 饰品 → 突破补 undressing → 材质/袜履 → 冲突剔除
      * 返回 { tags, uc }；只读 SDT_POSE_MATRIX，不硬编码服装 tag 串（残留件与饰品全部走矩阵 outfitResidue / accessories）。
      */
-    function assembleOutfitTags(facts) {
+    function assembleOutfitTags(facts, opts) {
         try {
             const f = (facts && typeof facts === 'object') ? facts : null;
-            if (!f) return { tags: [], uc: [] };
+            if (!f) return { tags: [], uc: [], ruleNotes: [] };
+            const o = (opts && typeof opts === 'object') ? opts : {};
+            const ruleNotes = [];
             const M = (SDT_POSE_MATRIX && typeof SDT_POSE_MATRIX === 'object') ? SDT_POSE_MATRIX : {};
             const tags = [];
             let uc = [];
@@ -14079,22 +15585,91 @@ SCHEMA:
             if (f.wetness && f.wetness.stain && mats.stained) tags.push(String(mats.stained));
             const hois = (M.outfitHoisery && typeof M.outfitHoisery === 'object') ? M.outfitHoisery : {};
             if (f.hoisery && f.hoisery.on === true && hois.thighhighs) tags.push(String(hois.thighhighs));
-            // 6 冲突剔除（矩阵顺序即优先级：uc 无条件排除 / drop 只动正向 / dropTrig 丢触发项本身）
+            // 6 冲突剔除（矩阵顺序即优先级：uc 无条件排除 / drop 只动正向 / dropTrig 只丢触发项本身——kill 恒空）
+            // 6.5.72（F1c）：与 gate ④ / sdtFormConflicts 同口径——whenPose / requireText / exemptText / dropNamed 全读。
+            // 否则这一层会把 gate 刚保住的鞋再删一次（「穿高跟被静默删」的第 4 条通路）。
             const rules = Array.isArray(M.outfitConflicts) ? M.outfitConflicts : [];
+            const probeText = (typeof o.text === 'string') ? o.text : '';
+            const namedProbe = probeText ? sdtNamedOutfitTags(probeText) : [];
             for (let r = 0; r < rules.length; r++) {
                 const rule = rules[r] || {};
                 const trig = Array.isArray(rule.trig) ? rule.trig.map(String) : [];
                 const kill = Array.isArray(rule.kill) ? rule.kill.map(String) : [];
                 const mode = String(rule.mode || '');
-                const hit = trig.some(function (x) { return tags.indexOf(x) >= 0; });
+                if (!trig.length) continue;
+                const ruleName = String(rule.name || '');
+                const hit = trig.some(function (x) { return tags.indexOf(x) >= 0; });   // 触发判定只看组装出的 tag，正文证据只进求值器
                 if (!hit) continue;
-                if (mode === 'uc') { uc = uc.concat(kill); dropAll(tags, kill); }
-                else if (mode === 'drop') { dropAll(tags, kill); }
-                else if (mode === 'dropTrig') { dropAll(tags, trig); }
+                if (mode === 'uc') { uc = uc.concat(kill); dropAll(tags, kill); continue; }
+                const rg = sdtOutfitRuleGate(rule, { text: probeText, tags: tags });
+                if (!rg.apply) {
+                    if (rg.why === 'whenPose' || rg.why === 'requireText' || rg.why === 'exemptText') {
+                        if (ruleNotes.length < 12) ruleNotes.push({ rule: ruleName, why: rg.why, kept: true, need: Array.isArray(rg.need) ? rg.need.slice(0, 4) : [], exempt: rg.exempt || '' });
+                    }
+                    continue;
+                }
+                let dropList = (mode === 'dropTrig') ? trig.slice() : kill.slice();
+                if (mode === 'dropTrig' && rule.dropNamed !== true && dropList.length) {
+                    const keptNamed = [];
+                    for (let q = 0; q < dropList.length; q++) { const dt = String(dropList[q]); if (namedProbe.indexOf(dt) >= 0) keptNamed.push(dt); }
+                    if (keptNamed.length) {
+                        if (Array.isArray(rule.dropOutfit) && rule.dropOutfit.length) {
+                            const sub = rule.dropOutfit.map(String);
+                            if (ruleNotes.length < 12) ruleNotes.push({ rule: ruleName, kept: keptNamed.slice(0, 4), dropped: sub.slice(0, 4), why: 'named-protected' });
+                            dropList = sub;
+                        } else {
+                            if (ruleNotes.length < 12) ruleNotes.push({ rule: ruleName, kept: keptNamed.slice(0, 4), why: 'unresolved' });
+                            dropList = [];
+                        }
+                    }
+                }
+                if (dropList.length) dropAll(tags, dropList);
             }
             const tagOut = uniq(tags);
-            return { tags: tagOut, uc: uniq(uc).filter(function (x) { return tagOut.indexOf(x) < 0; }) };
-        } catch (e) { return { tags: [], uc: [] }; }
+            return { tags: tagOut, uc: uniq(uc).filter(function (x) { return tagOut.indexOf(x) < 0; }), ruleNotes: ruleNotes.slice(0, 12) };
+        } catch (e) { return { tags: [], uc: [], ruleNotes: [] }; }
+
+/** 6.5.72 体检行取用：把服装冲突规则的「跳过 / 让位」压成一行短文本。
+ *  内部仍走 assembleOutfitTags（与 ④ 段 / sdtFormConflicts 同一求值器），桥接块外只调这个入口。 */
+function sdtOutfitRuleNoteLines(probeText) {
+    const out = [];
+    try {
+        // F01：体检行也必须读 payload 通道里的当前镜（SDT_LAST_PAYLOAD 由 gate 每次写入）
+        const factsN = buildOutfitFacts(readPoseEngine(), { payload: SDT_LAST_PAYLOAD });
+        if (!factsN) return out;
+        let probeN = (typeof probeText === 'string') ? sdtFactText(probeText, 2000) : '';
+        // 6.5.72（F04）：体检行与 gate ④ 用同一条「中文正文 ∪ caption」证据；有剧本就并进该镜正文
+        try {
+            const engN = readPoseEngine();
+            const segsN = sdtNormalizeSegments(engN);
+            if (segsN.length) {
+                const pickN = sdtPickSegmentForPayload(SDT_LAST_PAYLOAD, segsN, engN);
+                if (pickN && pickN.seg) probeN = sdtBodyProbe(probeN, pickN.seg, engN);
+            }
+        } catch (eN) { /* 无剧本就只用传入的正文 */ }
+        const asmN = assembleOutfitTags(factsN, probeN ? { text: probeN } : null);
+        const notesN = (asmN && Array.isArray(asmN.ruleNotes)) ? asmN.ruleNotes : [];
+        if (!notesN.length) return out;
+        // F11：不能只给规则英文名——哪条规则、条件是什么、为什么跳过/让位，全部翻成中文
+        const shownN = notesN.slice(0, 5).map(function (n) {
+            const ruleN = String((n && n.rule) || '?');
+            const needN = (n && Array.isArray(n.need) && n.need.length) ? ('「' + n.need.join('/') + '」') : '';
+            const exN = (n && n.exempt) ? ('「' + String(n.exempt) + '」') : '';
+            let whyN = String((n && n.why) || '跳过');
+            if (!probeN) whyN = '无正文证据';
+            else if (whyN === 'whenPose') whyN = 'whenPose 不成立' + needN + '（正文里没有该姿势 → 规则不触发，一个词都没删）';
+            else if (whyN === 'requireText') whyN = 'requireText 未命中' + needN + '（正文没写这个前置 → 规则不触发）';
+            else if (whyN === 'exemptText') whyN = 'exemptText 豁免' + exN + '（正文写了豁免词 → 规则不触发）';
+            else if (whyN === 'unresolved') whyN = '没有可替代的服装词 → 点名项不删';
+            else if (whyN === 'named-protected') whyN = '点名保护：删服装不删点名项';
+            if (n && Array.isArray(n.dropped) && n.dropped.length) return ruleN + ' 让位删 ' + n.dropped.join('/') + '（' + whyN + '）';
+            const keptN = (n && Array.isArray(n.kept) && n.kept.length) ? n.kept.join('/') : '点名项';
+            return ruleN + ' ' + whyN + '（保留 ' + keptN + '）';
+        });
+        out.push('  服装规则：' + shownN.join('｜') + (notesN.length > shownN.length ? (' …共 ' + notesN.length + ' 条') : ''));
+    } catch (e) { }
+    return out;
+}
     }
 
     /** 数字千分位：79494 → '79,494'（与 doc 07 §3.5 样例同形） */
@@ -14160,10 +15735,21 @@ SCHEMA:
         try {
             if (!storyFacts) return base;                    // 无事实卡片 → 逐字节恒等（S3 契约）
             const parts = [];
+            // 6.5.72：正文主导模式（世界书 姿势引擎.模式 / store.poseAuthority）→ 词面只给建议，判定交给正文
+            const bodyMode = (storyFacts.poseMode === 'body');
             const pose = (storyFacts.pose && storyFacts.pose.id) ? storyFacts.pose : null;
-            if (pose) {
-                const poseClass = pose.className ? sdtFactText(pose.className, 16) : '未标注';
-                const poseName = pose.name ? sdtFactText(pose.name, 120) : '未标注';
+            // F12（6.5.72）：正文主导模式 facts.pose 恒为 null（不许当渲染指令源），本块仍要出词面与骨架
+            if (pose || bodyMode) {
+                // 当前镜：优先 storyFacts.segIndex，越界/缺失取首镜
+                const segList = (bodyMode && Array.isArray(storyFacts.segments)) ? storyFacts.segments : [];
+                const segIdxNow = (typeof storyFacts.segIndex === 'number' && storyFacts.segIndex >= 0 && storyFacts.segIndex < segList.length) ? storyFacts.segIndex : 0;
+                const segNow = segList.length ? segList[segIdxNow] : null;
+                const poseClass = pose
+                    ? (pose.className ? sdtFactText(pose.className, 16) : '未标注')
+                    : (segNow && segNow.className ? sdtFactText(segNow.className, 16) : '未声明');
+                const poseName = pose
+                    ? (pose.name ? sdtFactText(pose.name, 120) : '未标注')
+                    : (segNow ? (sdtFactText('分镜#' + String(segNow.index !== undefined ? segNow.index : segIdxNow), 120) || '未声明') : '未声明');
                 const scene = (storyFacts.scene !== null && storyFacts.scene !== undefined) ? (sdtFactText(storyFacts.scene, 200) || '未标注') : '未标注';
                 const session = (storyFacts.session !== null && storyFacts.session !== undefined) ? (sdtFactText(storyFacts.session, 40) || '未标注') : '未标注';
                 let dress = '未标注';
@@ -14172,16 +15758,33 @@ SCHEMA:
                 } else if (typeof storyFacts.dress === 'string' && storyFacts.dress) {
                     dress = sdtFactText(storyFacts.dress, 24) || '未标注';
                 }
-                const lines = [
-                    '【体位锁定】本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
+                const lines = bodyMode ? [
+                    '【体位来源优先级 · 先于体位词典执行】',
+                    '① 正文（currentMessage / 本镜 anchor.text）写明姿势 → 以正文为唯一权威：写了什么主类就画什么，允许本组不同分镜用不同主类；',
+                    '② 正文没有姿势线索 → 采用世界书掷骰建议（下方「素材建议」），它只是候选，不是定稿；',
+                    '③ 正文与建议都没有 → 才允许按剧情推测（兜底）。',
+                    '【只锁一镜，不锁一组】同一镜内不得并列两个主类的 main tag（同镜混类即判错）；不同分镜换主类是合法的。',
+                    '【机位与景别 · 需求驱动】后入/趴姿的第三人称镜 → 选 from_side（侧面客观机位）；pov 只在正文明确第一人称时出现，不与 from_side / from_behind / profile 并用（正文没写第一人称就删 pov，别删侧面）。景别按本镜需求选：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 → 必须 full_body（禁 close-up / cowboy_shot / upper_body），Char uc 不得写 feet, shoes；没有足部需求时才允许 close-up / cowboy_shot 优先。【点名保护】正文点名写下的服装/配件词不被任何冲突规则删除，冲突时删的是没点名的细节。',
+                ] : [
+                    // F09：引擎模式是「世界书还没有剧本时的回滚态」——措辞必须限定，别让用户以为这是推荐工作模式
+                    '【体位锁定】（回滚态）本组锁定：本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
                     '① storyFacts.pose 存在 → 主类定稿，不得换类，不得改写成近邻体位（骑乘≠背入，后入≠正常位）；',
                     '② 缺失但正文有明确动作描写 → 按正文提取主类，禁止「美化」成更好画/更常见的体位；',
                     '③ 两者皆无 → 才允许按剧情推测。',
                     '【两条禁止】禁止因某条 tag 模板更长、更显眼、更热就照抄（模板是可选清单，不是定稿）；禁止把已指定体位改写成同场景惯用体位（标记与正文冲突时以标记为准）。',
-                    // 6.5.64 F1/F4：id 与整行都过清洗 —— id 带换行会把这一行拆成多行（注入面缺口）
-                    sdtFactText('本轮：' + sdtFactText(pose.id, 24) + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress, 320)
                 ];
-                const vocab = sdtPoseVocabLines(pose.className);
+                // 6.5.64 F1/F4：id 与整行都过清洗 —— id 带换行会把这一行拆成多行（注入面缺口）
+                // 6.5.72：正文主导时同一行降级为「建议」，措辞不再声称优先级高于正文
+                const headLine = bodyMode ? '【素材建议（可被正文推翻）】本轮建议：' : '本轮：';
+                const headId = pose ? sdtFactText(pose.id, 24) : ('#' + String(segIdxNow) + (segNow && segNow.variant ? '·' + String(segNow.variant) : ''));
+                lines.push(sdtFactText(headLine + headId + ' · 主类 ' + poseClass + ' ' + poseName + '｜场景 ' + scene + '｜场次 ' + session + '｜着装 ' + dress, 320));
+                if (bodyMode) {
+                    if (storyFacts.advice) lines.push('【世界书建议 · 候选（可被正文推翻）】' + storyFacts.advice);
+                    const skel = (storyFacts.poseSegmentHint === false) ? '' : sdtSegmentSkeletonLine(storyFacts.segments);
+                    if (skel) lines.push(skel);
+                }
+                const vocabClass = pose ? pose.className : (segNow ? segNow.className : '');
+                const vocab = sdtPoseVocabLines(vocabClass, bodyMode ? { advisory: true } : null);
                 if (vocab.length) lines.push.apply(lines, vocab);
                 parts.push(lines.join('\n'));
             }
@@ -14201,7 +15804,17 @@ SCHEMA:
         if (typeof window !== 'undefined' && window.__RBQ_SDT_TEST__ === true && RBQ && RBQ.api) {
             RBQ.api.__sdtTest = { readPoseEngine: readPoseEngine, buildStoryFacts: buildStoryFacts, applyPoseDirective: applyPoseDirective, poseVocabLines: sdtPoseVocabLines, poseGateApply: sdtPoseGateApply, outfitFacts: buildOutfitFacts, assembleOutfitTags: assembleOutfitTags, readOutfitEngine: readOutfitEngine, outfitLine: sdtOutfitLine,
                 accentResidue: outfitResidueList, accessoryTags: sdtAccessoryTags, wetnessFromText: sdtWetnessFromText,
-                formTag: sdtFormTag, formConflicts: sdtFormConflicts };
+                formTag: sdtFormTag, formConflicts: sdtFormConflicts, ruleGate: sdtOutfitRuleGate,
+                poseMode: sdtPoseMode, poseSegments: sdtNormalizeSegments, segmentsForFacts: sdtSegmentsForFacts,
+                pickSegment: sdtPickSegmentForPayload, resolveSegmentPose: sdtResolveSegmentPose,
+                dropAllGuarded: sdtDropAllGuarded, skeletonLine: sdtSegmentSkeletonLine, variantHit: sdtVariantHitInText,
+                crossClassTags: sdtCrossClassTags, adviceText: sdtAdviceText,
+                viewPick: sdtPickView, viewConflicts: sdtViewConflicts, shotGuard: sdtShotGuard, footDetailHit: sdtFootDetailHit, zhHit: sdtZhProbeHit,
+                poseStoreSet: function (s) { SDT_POSE_STORE_OVERRIDE = (s && typeof s === 'object') ? s : null; return SDT_POSE_STORE_OVERRIDE ? 'set' : 'cleared'; },
+                outfitDiag: function () { return SDT_OUTFIT_DIAG; }, outfitTier: sdtInferOutfitTier,
+                outfitHints: sdtOutfitNameHints,
+                gateLast: function () { return SDT_GATE_LAST; }, gateLastSet: function (rec) { SDT_GATE_LAST = (rec && typeof rec === 'object') ? rec : null; return SDT_GATE_LAST ? 'set' : 'cleared'; }, bodyProbe: sdtBodyProbe, ruleProbeHit: sdtRuleProbeHit,
+                classHit: sdtClassHitInText, carryClass: sdtCarryClass, ambiguousMain: function () { return Object.keys(sdtAmbiguousMainSet()); }, variantAmbiguous: sdtVariantAmbiguous };
         }
     } catch (e) {
         // 测试挂载失败不影响插件主体
@@ -15338,8 +16951,10 @@ const SDT_RETRY_BUDGET_MS = 300000;
 
 /* ===== [LOCAL PATCH] 诊断日志（本地采集，手机端可一键导出） ===== */
 const SDT_DIAG_KEY = 'rbq_sdt_diag_v1';
-const SDT_DIAG_MAX_RECORDS = 30;
+// 6.5.72（F09/F16）：闸门记录不许被 tagger 噪音挤掉——容量 30 → 200，并单独记「已挤掉多少条」
+const SDT_DIAG_MAX_RECORDS = 200;
 const SDT_DIAG_MAX_CHARS = 1600000;
+let SDT_DIAG_DROPPED = 0;
 
 function sdtDiag() {
     if (typeof window === 'undefined') return null;
@@ -15361,11 +16976,17 @@ function sdtDiag() {
     };
     const api = {
         records,
+        maxRecords() { return SDT_DIAG_MAX_RECORDS; },
+        dropped() { return SDT_DIAG_DROPPED; },
         add(type, data) {
             try {
                 const rec = Object.assign({ t: new Date().toISOString(), type }, data || {});
                 records.push(rec);
-                if (records.length > SDT_DIAG_MAX_RECORDS) records.splice(0, records.length - SDT_DIAG_MAX_RECORDS);
+                if (records.length > SDT_DIAG_MAX_RECORDS) {
+                    const over = records.length - SDT_DIAG_MAX_RECORDS;
+                    SDT_DIAG_DROPPED += over;                   // F16：挤掉多少条必须可观测，不能悄悄丢
+                    records.splice(0, over);
+                }
                 persist();
                 try { if (typeof window.__SDT_ROUND_REFRESH === 'function') window.__SDT_ROUND_REFRESH(); } catch (e) { /* ignore */ }
                 return rec;
@@ -15488,12 +17109,58 @@ function sdtRoundInspectLines() {
         const cross = st['越界'];
         lines.push(`  场次 ${st['场次'] ?? '-'}｜剩余 ${st['剩余'] ?? '-'}｜越界 ${cross === true ? 'true（无视场景抽中）' : (cross ?? '-')}`);
     }
+    // 6.5.72：档位原值 / 着装行两列——'D3' 这种字符串档位与多女场景取错人，都在这两列一眼可见
+    try {
+        let liveFacts = null;
+        try { liveFacts = buildOutfitFacts(readPoseEngine(), {}); } catch (eF) { liveFacts = null; }
+        const diag = (SDT_OUTFIT_DIAG && typeof SDT_OUTFIT_DIAG === 'object') ? SDT_OUTFIT_DIAG : {};
+        const tierRawShown = (diag.tierRaw === null || diag.tierRaw === undefined || diag.tierRaw === '') ? '无' : String(diag.tierRaw);
+        const tierParsed = (liveFacts && liveFacts.state && liveFacts.state.d !== null) ? String(liveFacts.state.d) : '缺';
+        let tierSrcShown = '';
+        if (diag.tierSrc === 'text') tierSrcShown = `正文 ${diag.tierText || '?'}「${diag.tierTextHit || '?'}」（→ d=${tierParsed}）`;
+        else if (diag.tierSrc === 'setReset') tierSrcShown = `套已换（→ d=${tierParsed}，回落到该行 D 档）`;
+        else if (diag.tierSrc === 'dress.tier') tierSrcShown = `姿势变量.档位（→ d=${tierParsed}）`;
+        else if (diag.tierSrc === 'dress.code') tierSrcShown = `姿势变量.档位码（→ d=${tierParsed}）`;
+        else if (diag.tierSrc === 'row.code') tierSrcShown = `服饰行 档位码（→ d=${tierParsed}）`;
+        else tierSrcShown = '无来源（state.d 缺失）';
+        const rowNameShown = diag.rowName ? String(diag.rowName) : (diag.rowWhy === 'no-rows' ? '台账无行' : '未取到');
+        const rowWhy = (diag.rowWhy === 'first-female') ? '（无角色名命中，退回首个女行）'
+            : ((diag.rowWhy === 'name') ? '（按分镜角色名命中）' : ((diag.rowWhy === 'none' || diag.rowWhy === 'no-rows') ? '（退回失败）' : ''));
+        // F07：世界书 t23 起的 套= 字段——缺失时 tierSetShown 为空串，整行与旧版逐字一致（零影响）
+        const tierSetShown = (diag && diag.outfitSet) ? String(diag.outfitSet) : '';
+        lines.push(`  档位原值 ${tierRawShown}｜档位来源 ${tierSrcShown}｜着装行 ${rowNameShown}${rowWhy}${tierSetShown ? ('｜套 ' + tierSetShown) : ''}`);
+    } catch (e) { /* ignore */ }
+    // 6.5.72：服装冲突三消费点的跳过 / 让位留痕——「静默删衣服」是本轮修的病根，改完必须在面板上看得见
+    try {
+        let probeC = '';
+        try {
+            const ctxC = (typeof window !== 'undefined' && window.SillyTavern && typeof window.SillyTavern.getContext === 'function')
+                ? window.SillyTavern.getContext() : null;
+            const chatC = (ctxC && Array.isArray(ctxC.chat)) ? ctxC.chat : [];
+            const lastC = chatC.length ? chatC[chatC.length - 1] : null;
+            probeC = (lastC && (lastC.mes || lastC.content)) || '';
+        } catch (eC) { probeC = ''; }
+        const noteLines = sdtOutfitRuleNoteLines(String(probeC || ''));
+        for (let iN = 0; iN < noteLines.length; iN++) lines.push(noteLines[iN]);
+    } catch (e) { /* ignore */ }
     let dc = null;
     try { dc = (typeof window !== 'undefined' && window.__SDT_DIAG_CTX) || null; } catch (e) { dc = null; }
     if (dc) {
-        lines.push(`【体位锁定】${dc.poseLockInPrompt ? '✅ 已进 system prompt' : '❌ 没进 prompt'}（prompt ${dc.systemPromptLen || 0} 字符）`);
-        const vocab = sdtPoseVocabLines((dc.storyFacts && dc.storyFacts.pose && dc.storyFacts.pose.className) || '');
-        if (vocab.length) lines.push('  词面：' + vocab[0].replace('【体位词面】', ''));
+        // F14（6.5.72）：正文主导模式不许出现「锁定」——世界书只出建议，判定看正文
+        const dcMode = (dc.storyFacts && dc.storyFacts.poseMode === 'body') ? 'body' : 'engine';
+        const dcHead = (dcMode === 'body') ? '【体位来源】' : '【体位锁定】';
+        lines.push(`${dcHead}${dc.poseLockInPrompt ? '✅ 已进 system prompt' : '❌ 没进 prompt'}（prompt ${dc.systemPromptLen || 0} 字符）`);
+        const dcSegs = (dcMode === 'body' && dc.storyFacts && Array.isArray(dc.storyFacts.segments)) ? dc.storyFacts.segments : [];
+        const dcSegIdx = (dcMode === 'body' && dc.storyFacts && typeof dc.storyFacts.segIndex === 'number' && dc.storyFacts.segIndex >= 0) ? dc.storyFacts.segIndex : 0;
+        const dcSeg = dcSegs.length ? dcSegs[(dcSegIdx < dcSegs.length) ? dcSegIdx : 0] : null;
+        const vocabCls = (dc.storyFacts && dc.storyFacts.pose && dc.storyFacts.pose.className) || (dcSeg && dcSeg.className) || '';
+        const vocab = sdtPoseVocabLines(vocabCls, (dcMode === 'body') ? { advisory: true } : null);
+        if (vocab.length) lines.push('  词面：' + vocab[0].replace('【体位词面】', '').replace('【体位词面 · 建议】', ''));
+        if (dcMode === 'body') {
+            const advTxt = (dc.storyFacts && (dc.storyFacts.poseHint || dc.storyFacts.advice)) || '无（世界书没掷骰）';
+            lines.push('  本镜 #' + dcSegIdx + ' 声明 ' + (dcSeg ? (dcSeg.className || '未声明') : '未声明') + (dcSeg && dcSeg.variant ? ('·' + dcSeg.variant) : '') + '｜引擎建议 ' + sdtFactText(advTxt, 120));
+            if (dc.storyFacts && dc.storyFacts.poseReroll) lines.push('  换牌 ' + (dc.storyFacts.poseReroll.applied ? '已请求（姿势引擎.换牌 已推进）' : '请求未落地（世界书没跑过）') + '：正文「' + String(dc.storyFacts.poseReroll.word) + '」');
+        }
         const lb = dc.lorebook || {};
         const budget = Number(lb.budget) || 0;
         const chars = Number(lb.chars) || 0;
@@ -15509,7 +17176,7 @@ function sdtRoundInspectLines() {
             lines.push(`  ⚠️ ${lb.ejsEntries.length} 条含 EJS 源码被塞进 prompt（本该排除）`);
         }
     } else {
-        lines.push('【体位锁定】本次会话还没有生成记录');
+        lines.push('【体位来源】本次会话还没有生成记录');
     }
     try {
         const recs = sdtDiag().records || [];
@@ -15552,6 +17219,101 @@ function sdtRoundInspectLines() {
         }
         const gates = recs.slice(lastIdx + 1).filter(r => r.type === 'pose-gate');
         if (gates.length) lines.push(`【词法闸门】补回体位词 ${gates.length} 张（${gates.map(g => g.className + ' ' + g.added).join(' / ')}）`);
+    // 6.5.72（F05/F11/F13/F14）：闸门结论文本化——凡发生删/改/跳过/让位，面板上必须有一行看得懂的中文（宁可刷屏）
+    try {
+        const gl = (SDT_GATE_LAST && typeof SDT_GATE_LAST === 'object') ? SDT_GATE_LAST : null;
+        if (gl) {
+            const modeTxt = (gl.gateMode === 'off') ? 'off（整段不生效）' : 'fill-gap（只补该分镜缺的词）';
+            const authTxt = (gl.authority === 'body') ? '正文（分镜优先）' : '引擎（世界书）';
+            const segTxt = (typeof gl.segIndex === 'number' && gl.segIndex >= 0) ? String(gl.segIndex) : '-';
+            lines.push('【闸门】' + modeTxt + '｜权威 ' + authTxt + '｜镜 #' + segTxt + '（' + (gl.segWhy || '-') + '）｜' + (gl.changed ? '本轮有改动' : '本轮未改 input'));
+            // 6.5.72（F05/F07）：闸门模式是从旧档迁移来的、以及补词判据，都要留痕（不许静默改语义）
+            if (gl.gateModeMigrated) lines.push('  闸门模式迁移 ' + String(gl.gateModeMigrated) + ' → fill-gap（旧档 enforce 等失效值已回落，语义等同只补缺词）');
+            if (gl.fillWhy) lines.push('  补词判据 ' + String(gl.fillWhy));
+            // F06：来源分「正文 / caption」——正文里没写、只在 caption 里出现的英文 tag 不许标成正文（举证要诚实）
+            const srcKey = gl.bodyHitSrc || gl.bodySource;
+            const srcTxt = (srcKey === 'body') ? '正文' : ((srcKey === 'caption') ? 'caption（正文没写，只在 caption 里）' : ((srcKey === 'carry') ? '沿用同段前镜' : ((srcKey === 'director') ? '分镜声明' : String(srcKey || '-'))));
+            const bodyWordTxt = (gl.bodyHitWord || gl.bodyWord) ? ('「' + String(gl.bodyHitWord || gl.bodyWord) + '」') : '';
+            const bodyTxt = gl.bodyClass ? ('分镜判定 ' + gl.bodyClass + bodyWordTxt + '（来源 ' + srcTxt + '）') : '分镜判定 判不出主类';
+            lines.push('  ' + bodyTxt + '｜' + ((gl.authority === 'body') ? '引擎参考 ' : '引擎锁定 ') + (gl.l1Class || '无') + '（世界书只出建议，不判该镜）');
+            // F05：改判要看得见——引擎类 → 正文类、为什么让位、正文命中的原词
+            if (gl.overridden) {
+                const ovWhy = (gl.overridden.why === 'body-over-l1') ? '正文覆盖世界书锁定' : '正文优先';
+                lines.push('  改判 ' + String(gl.overridden.from || '-') + ' → ' + String(gl.overridden.to || '-') + '（' + ovWhy + '，正文命中「' + String(gl.overridden.word || '') + '」）');
+            }
+            // F05：足部细节 → 景别/uc 守卫必须上屏（旧码只在 rec 里躺着）
+            if (gl.shotGuard && gl.shotGuard.footDetail) {
+                lines.push('  足部守卫 景别限 ' + ((gl.shotGuard.allowShot || []).join('/') || '-') + '｜禁 ' + ((gl.shotGuard.forbidShot || []).join('/') || '-') + '｜uc 禁 ' + ((gl.shotGuard.ucForbid || []).join('/') || '-'));
+            }
+            if (gl.gateWhy) {
+                const whyMap = { segCarry: '正文没写主类 → 沿用同段前镜（变体连续）', fallback: '正文与前镜都没有主类 → 兜底', 'switch': '正文主类与引擎不同 → 以正文为准', sexish: '正文与引擎都缺 → 补一次引擎主类' };
+                lines.push('  判定说明 ' + (whyMap[gl.gateWhy] || gl.gateWhy));
+            }
+            if (gl.added) lines.push('  补词 +' + gl.added + '（只补一次）');
+            if (gl.switched) lines.push('  跨类改判 ' + String(gl.switched) + '（正文主类覆盖旧锁定类，旧类锚词一并换掉）');
+            if (gl.skippedSfw) lines.push('  补词跳过（SFW 场景：宁可不补，也不给日常镜头硬塞体位词）');
+            if (Array.isArray(gl.dropped) && gl.dropped.length) lines.push('  删词 ' + gl.dropped.join(' / ') + '（机位/肢势/规则互斥）');
+            // t31 F06：依据文案只认 bodyHitSrc 的五个取值（caption / body / carry / director / engine）。
+            // 旧码拿 mixedFrom 当抽奖箱：它只有 body|caption 二态，所以末位 else 的「引擎锁定类」从 mixedFrom 永远进不去（判据错位）。
+            // 现在五个通道一律先看 bodyHitSrc；mixedFrom 只做「文字证据」的最后兜底（bodyHitSrc 缺省时才算），不再是主判据。
+            const mixSrcKey = String(gl.bodyHitSrc || '');
+            const mixSrcTxt = (mixSrcKey === 'caption') ? 'caption（正文没写，只在 caption 里）'
+                : (mixSrcKey === 'body') ? '正文'
+                    : (mixSrcKey === 'carry') ? '沿用同段前镜'
+                        : (mixSrcKey === 'director') ? '分镜声明'
+                            : (mixSrcKey === 'engine') ? '引擎锁定类（正文没写主类）'
+                                : ((gl.mixedFrom === 'caption') ? 'caption（正文没写，只在 caption 里）' : '引擎锁定类（正文没写主类）');
+            if (Array.isArray(gl.mixedDropped) && gl.mixedDropped.length) lines.push('  换类清洗 ' + gl.mixedDropped.join(' / ') + '（本镜主类 ' + (gl.mixedKeepClass || gl.bodyClass || '-') + '，依据 ' + mixSrcTxt + '；别类锚词不许留）');
+            if (Array.isArray(gl.protectedKept) && gl.protectedKept.length) lines.push('  点名保护 ' + gl.protectedKept.join(' / '));
+            // F05：uc 通道三行——正向剔除过哪些词 / 负向加了哪些词 / 哪些点名衣服被豁免出负向清单（旧码全躺在 rec 里）
+            if (Array.isArray(gl.uc) && gl.uc.length) lines.push('  正向剔除 ' + gl.uc.slice(0, 8).join(' / ') + '（uc 规则判定的排除词，已从正向拿掉）');
+            if (Array.isArray(gl.ucAdded) && gl.ucAdded.length) lines.push('  负向加词 ' + gl.ucAdded.join(' / ') + '（写进 v4_negative_prompt）');
+            if (Array.isArray(gl.ucNamed) && gl.ucNamed.length) lines.push('  负向点名保护 ' + gl.ucNamed.join(' / ') + '（正文点名了这件衣服 → 不进负向清单）');
+            if (gl.variantHit || gl.variant) lines.push('  变体命中 ' + (gl.variantHit ? (String(gl.variantHit.variant) + '「' + String(gl.variantHit.word) + '」') : '') + (gl.variant ? ('  +' + String(gl.variant)) : ''));
+            // t24 R4：kept 为空时不许再写「— 保留」（假话）——直接说明点名项被矩阵让位删掉了
+            if (gl.outfitConflict) {
+                const ocKept = (gl.outfitConflict.kept || []).filter(Boolean);
+                const ocRem = (gl.outfitConflict.removed || []).filter(Boolean);
+                const ocKeptTxt = ocKept.length ? ('（点名项 ' + ocKept.join('/') + ' 保留）')
+                    : ((gl.outfitConflict.why === 'named-dropped-by-matrix')
+                        ? ('（点名项已按矩阵让位（named-dropped-by-matrix）' + (ocRem.length ? ('：' + ocRem.join('/')) : '') + '）')
+                        : '（点名项无可替代服装词，本条规则空转）');
+                lines.push('  服装让位 ' + gl.outfitConflict.rule + ' 删 ' + ((gl.outfitConflict.dropped || []).join('/') || '—') + ocKeptTxt);
+            }
+            if (Array.isArray(gl.conflictSkipped) && gl.conflictSkipped.length) lines.push('  规则跳过 ' + gl.conflictSkipped.map(function (x) { return String(x.rule) + '(' + String(x.why) + ')'; }).join(' / '));
+            if (Array.isArray(gl.viewRule) && gl.viewRule.length) lines.push('  机位景别 ' + gl.viewRule.map(function (x) { return String(x.group) + '→' + String(x.kept) + '(' + String(x.why) + ')'; }).join(' / '));
+            if (Array.isArray(gl.viewForbid) && gl.viewForbid.length) lines.push('  机位互斥 删 ' + gl.viewForbid.map(function (x) { return String(x.dropped); }).join(' / '));
+            if (Array.isArray(gl.posture) && gl.posture.length) lines.push('  肢势前提 删 ' + gl.posture.map(function (x) { return String(x.key); }).join(' / '));
+            // F10：两侧都被点名保护时把「受保护」写出来——否则用户只看到删一半，以为闸门漏删
+            if (Array.isArray(gl.postureForbid) && gl.postureForbid.length) lines.push('  肢势互斥 删 ' + gl.postureForbid.map(function (x) { return String(x.dropped) + ((x && x.protected) ? '（两侧受保护）' : ''); }).join(' / '));
+            if (Array.isArray(gl.skippedLong) && gl.skippedLong.length) lines.push('  超长跳过 ' + gl.skippedLong.join(' / ') + '（input > 1800 字符，宁可不改）');
+            if (gl.overrideOnly) lines.push('  仅记录不修改：正文改判了主类，但没有词需要动（payload 一字未改）');
+            // t24 R1/R5：正文点名的肢势词与性行为细节词一样属正文权威，保留并上屏（caption 带进来的一律删）
+            if (Array.isArray(gl.mixedKept) && gl.mixedKept.length) lines.push('  细节保留 ' + gl.mixedKept.slice(0, 10).join(' / ') + ((gl.mixedKeptCount > 10) ? (' …共 ' + gl.mixedKeptCount + ' 个') : '') + '（正文写了的手/口/胸/道具/肢势词，不算别类污染）');
+            if (gl.conflictUnresolved) lines.push('  服装冲突未处理 ' + String(gl.conflictUnresolved.rule) + '：点名项 ' + ((gl.conflictUnresolved.kept || []).join('/') || '—') + ' 无可替代服装词 → 本条规则空转，不删任何词');
+            // F07：套签名（行内 套= / 变量 着装.套签名）——「这次穿的是哪一套」要能看见
+            if (gl.outfitSet) lines.push('  套签名 ' + String(gl.outfitSet) + (gl.outfitSetVar ? ('（变量 着装.套签名=' + String(gl.outfitSetVar) + '）') : '（来自服饰行 套=）'));
+            if (Array.isArray(gl.outfitDropped) && gl.outfitDropped.length) lines.push('  服装删词 ' + gl.outfitDropped.join(' / ') + (gl.outfitDeleteWhy ? ('（原因 ' + (gl.outfitDeleteWhy === 'requireText' ? '正文明确跪姿 → 高跟与跪姿互斥' : '触发词命中') + '）') : ''));
+            if (Array.isArray(gl.ucTriggerDropped) && gl.ucTriggerDropped.length) lines.push('  让位删触发词 ' + gl.ucTriggerDropped.join(' / ') + '（正文点名了衣服，nude 让位）');
+            if (gl.outfitGuardOff) lines.push('  服装守卫关闭 ' + String(gl.outfitGuardOff.rule) + '：点名项 ' + ((gl.outfitGuardOff.kept || []).join('/') || '—') + ' 保留，规则不生效（outfitConflictGuard=false）');
+            if (gl.reroll) lines.push('  换牌请求「' + String(gl.reroll.word) + '」：正文里明确要求换姿势');
+        } else {
+            lines.push('【闸门】本轮还没有闸门记录');
+        }
+    } catch (e) { /* ignore */ }
+    // 6.5.72（F10/F16）：世界书写下的「已除去 / 痕迹」+ 诊断容量（挤掉多少条必须看得见）
+    try {
+        const engI = readPoseEngine();
+        const rmI = (engI && engI.removed !== undefined && engI.removed !== null) ? engI.removed : null;
+        const trI = (engI && engI.trace !== undefined && engI.trace !== null) ? engI.trace : null;
+        const flatI = function (v) { return Array.isArray(v) ? v.filter(Boolean).map(String).join(' / ') : (v ? String(v) : ''); };
+        if (rmI || trI) lines.push('【已除去】' + (sdtFactText(flatI(rmI) || '—', 60)) + '｜【痕迹】' + (sdtFactText(flatI(trI) || '—', 60)));
+        const dApi = sdtDiag();
+        const recsI = (dApi && Array.isArray(dApi.records)) ? dApi.records : [];
+        const dMax = (dApi && typeof dApi.maxRecords === 'function') ? (Number(dApi.maxRecords()) || 0) : 0;
+        const dDrop = (dApi && typeof dApi.dropped === 'function') ? (Number(dApi.dropped()) || 0) : 0;
+        lines.push('【诊断】' + recsI.length + '/' + dMax + ' 条' + (dDrop ? ('（已挤掉 ' + dDrop + ' 条早期记录）') : ''));
+    } catch (e) { /* ignore */ }
     } catch (e) { /* ignore */ }
     return lines;
 }
