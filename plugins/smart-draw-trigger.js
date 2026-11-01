@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.79';
+    const PLUGIN_VERSION = '6.5.83';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -5271,6 +5271,7 @@ ${activeRegistrySection}`;
      * Stored baseTags never include the drawing name — name is added only for the caption.
      * @returns {string} Final merged caption for char_caption
      */
+
     function mergeCharacterCaption(name, llmBase, llmOutfit, llmAction, appearanceTags, nameTag = '', wardrobeOutfit = '', outfitName = '') {
         if (!outfitName && wardrobeOutfit && typeof wardrobeOutfit === 'object') outfitName = wardrobeOutfit.outfitName || wardrobeOutfit.outfit_name || '';
         const store = getStore();
@@ -5411,6 +5412,20 @@ ${activeRegistrySection}`;
         // Merge: appearance(lorebook) + base(with weighted name) + outfit + action
         const wrapPreset = ['v40_worldbook_97_opt', 'v35_worldbook_97', 'v33_worldbook_97', 'v31_worldbook_97', 'v29_worldbook_93', 'v28_worldbook_91', 'v27_5', 'v27_universal', 'v26_hybrid', 'v25_hybrid', 'consistent', 'v24_3d'].includes(store.systemPromptPreset);
         const wrappedBase = ((wrapPreset || baseParts.braced) && displayBase) ? '{' + displayBase + '}' : displayBase;
+        // 6.5.80 服装记忆：本镜没写但本场戴过/脱过的，自动补齐（开关 wardrobeMemory，默认开）
+        try {
+            if (store.wardrobeMemory !== false) {
+                const memKey = sdtWardrobeMemKey(chatKey, cleanName);
+                const wmJudge = sdtWardrobeRemovalScan([llmAction, llmBase, sdtLatestMessageText()].filter(Boolean).join(String.fromCharCode(10)));
+                const memRec = sdtWardrobeRemember(store, memKey, finalOutfit, llmAction, wmJudge);
+                const wmStripped = sdtWardrobeStrip(finalOutfit, memRec && memRec.removed);
+                const mergedOutfit = sdtWardrobeApply(wmStripped, memRec);
+                if (mergedOutfit !== finalOutfit) {
+                    finalOutfit = mergedOutfit;
+                    try { RBQ.api.saveSettings(); } catch (_e) { /* ignore */ }
+                }
+            }
+        } catch (_e) { /* ignore */ }
         return [appearanceTags, wrappedBase, finalOutfit, llmAction].filter(Boolean).join(', ');
     }
 
@@ -12565,7 +12580,9 @@ SCHEMA:
             return null;
         }
         return {
-            scene: deduplicateQualityTags(segmentResult.scene || ''), negative: getSegmentNegative(segmentResult),
+            // 6.5.83：scene 也过同一道中文清洗 —— 11-01 的 42 条 nai-payload 实测无中文（AI 只是 rawOutput 里写中文），
+            // 但 10-30 的历史记录里曾有中文动作被拼进 char_caption，这里把 scene 也一起锁进清洗，避免同类回归。
+            scene: sdtCaptionClean(deduplicateQualityTags(segmentResult.scene || '')).text, negative: getSegmentNegative(segmentResult),
             useCoords: !!getStore().multiCharUseCoords,
             enabled: !!getStore().multiCharOutput,
             characters: segmentResult.characters.map(c => {
@@ -13576,7 +13593,235 @@ SCHEMA:
     }
 
     /** 6.5.61：按主类 code 取词面条目（C11 / c11 / 11 都认；找不到返回 null） */
-    function sdtPoseMatrixEntry(className) {
+    // 6.5.80 服装记忆：整场不变的配件自动记住、穿脱状态自动延续（零手填）
+// 判据只有两条：① 配件词表里的东西一旦出现过，本场后续每镜都补；② 穿脱状态词一旦出现，后续每镜延续，直到出现「穿好」类的词。
+const SDT_WARDROBE_PARTS = [
+    'anklet', 'toe_rings', 'toe_ring', 'choker', 'necklace', 'pendant', 'earrings', 'earring',
+    'bracelet', 'ring', 'hairband', 'hair_ornament', 'hairpin', 'hair_clip', 'glasses', 'eyewear',
+    'body_chain', 'belly_chain', 'navel_piercing', 'nipple_piercing', 'collar', 'leash',
+    'armband', 'arm_ring', 'wristband', 'leg_ring', 'thighband', 'thigh_strap', 'garter', 'garter_belt',
+    'tattoo', 'upper_body_tattoo', 'thigh_tattoo', 'pubic_tattoo', 'back_tattoo',
+];
+// 只收「具象的穿脱状态」，不收 nude / topless / bottomless 这类整体判断——那些 AI 每镜自己会写，记下来会误延。
+const SDT_WARDROBE_STATES = [
+    'panties_around_one_leg', 'panties_aside', 'bra_lift', 'bra_pull',
+    'skirt_lift', 'skirt_pull', 'clothes_lift', 'partially_undressed',
+];
+const SDT_WARDROBE_RESTORE = [
+    'fully_clothed', 'dressed', 'clothed', 'panties_pull_up', 'pulled_up',
+];
+
+function sdtWardrobeTokens(text) {
+    return String(text || '').split(/[,，\n]+/).map(function (raw) {
+        let t = String(raw).trim();
+        t = t.replace(/^[0-9.]+::/, '').replace(/::+$/, '');
+        t = t.replace(/[{}()]/g, ' ').trim().toLowerCase().replace(/ +/g, '_');
+        return t;
+    }).filter(Boolean);
+}
+
+function sdtWardrobeMemKey(chatKey, name) {
+    return String(chatKey || '') + '::' + String(name || '').trim().toLowerCase();
+}
+
+/** 读本镜输出并更新记忆。返回 {parts, state, added, restored} */
+function sdtWardrobeRemember(store, key, outfit, action, judge) {
+    if (!store || typeof store !== 'object' || !key) return null;
+    const bag = (store.sdtWardrobeMemory && typeof store.sdtWardrobeMemory === 'object' && !Array.isArray(store.sdtWardrobeMemory))
+        ? store.sdtWardrobeMemory : (store.sdtWardrobeMemory = {});
+    const rec = (bag[key] && typeof bag[key] === 'object') ? bag[key] : (bag[key] = { parts: [], state: '', at: 0 });
+    if (!Array.isArray(rec.parts)) rec.parts = [];
+    const tokens = sdtWardrobeTokens([outfit, action].filter(Boolean).join(', '));
+    const has = new Set(tokens);
+    const added = [];
+    SDT_WARDROBE_PARTS.forEach(function (tag) {
+        if (has.has(tag) && rec.parts.indexOf(tag) < 0) { rec.parts.push(tag); added.push(tag); }
+    });
+    const removedOut = [];
+    if (judge && Array.isArray(judge.removed)) {
+        judge.removed.forEach(function (t) {
+            const at = rec.parts.indexOf(t);
+            if (at >= 0) { rec.parts.splice(at, 1); removedOut.push(t); }
+        });
+    }
+    if (judge && Array.isArray(judge.added)) {
+        judge.added.forEach(function (t) {
+            if (rec.parts.indexOf(t) < 0) { rec.parts.push(t); added.push(t); }
+        });
+    }
+    let restored = '';
+    if (SDT_WARDROBE_RESTORE.some(function (t) { return has.has(t); })) {
+        if (rec.state) { restored = rec.state; rec.state = ''; }
+    } else {
+        const hitsState = SDT_WARDROBE_STATES.filter(function (t) { return has.has(t); });
+        if (hitsState.length) rec.state = hitsState[hitsState.length - 1];
+    }
+    if (rec.parts.length > 24) rec.parts = rec.parts.slice(-24);
+    rec.at = Date.now();
+    if (removedOut.length) rec.removedAt = { tags: removedOut.slice(), at: Date.now() };
+    return { parts: rec.parts.slice(), state: rec.state || '', added: added, removed: removedOut, restored: restored };
+}
+
+/** 把记忆里本镜缺的配件/状态补到 outfit 尾部。没缺就原样返回（零改动）。 */
+function sdtWardrobeApply(outfit, rec) {
+    if (!rec) return outfit;
+    const has = new Set(sdtWardrobeTokens(outfit));
+    const add = [];
+    (rec.parts || []).forEach(function (tag) { if (tag && !has.has(tag)) add.push(tag); });
+    if (rec.state && !has.has(rec.state)) add.push(rec.state);
+    if (!add.length) return outfit;
+    const base = String(outfit || '').trim().replace(/[, ]+$/, '');
+    return (base ? base + ', ' : '') + add.join(', ');
+}
+
+/** 体检行用：本聊天记了哪些配件、当前状态 */
+// 6.5.81 服装记忆·摘除：正文说「她把项圈解下来放在床头」→ 记住摘掉、后续不再补；若 AI 本镜仍写该词，从 outfit 里删掉并上屏。
+// 判据（优先级）：正文显式摘除词 > AI 输出里的显式摘除标记 > 记忆补全。插件只记账，不发明。
+const SDT_WARDROBE_TAKE_OFF = [
+    '摘下来', '摘下', '摘掉', '摘了', '解开', '解下', '解掉', '取下', '取下来', '卸下',
+    '脱掉', '褪下', '扯下', '拔下', '撸下', '拿下', '收了', '收起',
+    'take off', 'took off', 'taking off', 'removed', 'remove',
+];
+const SDT_WARDROBE_PUT_ON = [
+    '重新戴', '戴回', '戴上', '带上', '系上', '套上', '挂上', '扣上', '穿上', '捡回',
+    'put on', 'put back', 'wearing', 'wore',
+];
+// 中文名词 → 英文 tag。只收能唯一指向某个 tag 的说法（「项圈」只算 collar，choker 用「颈链」），避免一句中文误删两件。
+const SDT_WARDROBE_ZH = {
+    collar: ['项圈', '颈圈', '颈环', '脖套'],
+    choker: ['颈链', '颈饰', '脖链'],
+    leash: ['牵引绳', '项圈绳'],
+    anklet: ['脚链', '足链', '踝链', '脚踝链'],
+    necklace: ['项链'],
+    pendant: ['吊坠', '项坠'],
+    earrings: ['耳环', '耳坠', '耳饰'],
+    earring: ['耳钉'],
+    bracelet: ['手镯', '手链'],
+    ring: ['戒指'],
+    hairband: ['发箍'],
+    hair_ornament: ['发饰', '头饰'],
+    hairpin: ['发夹', '发卡'],
+    glasses: ['眼镜', '镜框'],
+    navel_piercing: ['脐环', '脐钉'],
+    nipple_piercing: ['乳环', '乳钉'],
+    leg_ring: ['腿环', '腿圈'],
+    thighband: ['大腿环'],
+    thigh_strap: ['腿带', '大腿绑带'],
+    garter: ['吊袜带'],
+    body_chain: ['身体链'],
+    belly_chain: ['腰链'],
+    armband: ['臂环', '臂带'],
+    wristband: ['腕带', '手环'],
+    toe_rings: ['脚趾环', '趾环'],
+    tattoo: ['纹身', '刺青'],
+};
+
+// 找离 (pos,len) 最近、且间距 ≤12 字符的动词。返回 {w,gap} 或 null。
+function sdtWardrobeNearVerb(text, pos, len, list) {
+    let best = null;
+    for (let i = 0; i < list.length; i++) {
+        const w = list[i];
+        let at = text.indexOf(w);
+        while (at >= 0) {
+            const gap = (at >= pos + len) ? (at - (pos + len)) : ((at + w.length <= pos) ? (pos - (at + w.length)) : 0);
+            if (gap <= 12 && (!best || gap < best.gap || (gap === best.gap && w.length > best.w.length))) best = { w: w, gap: gap };
+            at = text.indexOf(w, at + 1);
+        }
+    }
+    return best;
+}
+
+// 扫正文，返回 {removed:[tag], added:[tag], hits:[{part,verb,kind,word}]}。同一名词既有摘又有戴时取距离更近的那个。
+function sdtWardrobeRemovalScan(text) {
+    const out = { removed: [], added: [], hits: [] };
+    const s = String(text || '');
+    if (!s) return out;
+    const parts = Object.keys(SDT_WARDROBE_ZH);
+    for (let i = 0; i < parts.length; i++) {
+        const tag = parts[i];
+        const words = SDT_WARDROBE_ZH[tag] || [];
+        let verdict = null;
+        for (let j = 0; j < words.length; j++) {
+            const w = words[j];
+            let at = s.indexOf(w);
+            while (at >= 0) {
+                const off = sdtWardrobeNearVerb(s, at, w.length, SDT_WARDROBE_TAKE_OFF);
+                const on = sdtWardrobeNearVerb(s, at, w.length, SDT_WARDROBE_PUT_ON);
+                const pick = (off && (!on || off.gap <= on.gap)) ? { kind: 'off', hit: off } : (on ? { kind: 'on', hit: on } : null);
+                if (pick && (!verdict || pick.hit.gap < verdict.hit.gap)) verdict = { kind: pick.kind, hit: pick.hit, word: w };
+                at = s.indexOf(w, at + 1);
+            }
+        }
+        if (verdict) {
+            if (verdict.kind === 'off' && out.removed.indexOf(tag) < 0) out.removed.push(tag);
+            if (verdict.kind === 'on' && out.added.indexOf(tag) < 0) out.added.push(tag);
+            out.hits.push({ part: tag, verb: verdict.hit.w, kind: verdict.kind, word: verdict.word });
+        }
+    }
+    return out;
+}
+
+// 从 outfit 串里剔除指定 tag（保留其余原文与顺序）。没有命中就原样返回。
+function sdtWardrobeStrip(outfit, tags) {
+    const want = new Set(Array.isArray(tags) ? tags : []);
+    if (!want.size) return outfit;
+    const parts = String(outfit || '').split(/[,，]/);
+    const keep = [];
+    let changed = false;
+    for (let i = 0; i < parts.length; i++) {
+        const raw = String(parts[i]).trim();
+        if (!raw) continue;
+        const plain = raw.replace(/^[0-9.]+::/, '').replace(/::+$/, '').trim().toLowerCase().replace(/ +/g, '_');
+        if (want.has(plain)) { changed = true; continue; }
+        keep.push(raw);
+    }
+    return changed ? keep.join(', ') : outfit;
+}
+
+// 取最近一条聊天正文（拿不到返回空串）。正文是摘除判定的第一权威来源。
+function sdtLatestMessageText() {
+    try {
+        let ctx = null;
+        if (typeof RBQ !== 'undefined' && RBQ && RBQ.api && typeof RBQ.api.getContext === 'function') ctx = RBQ.api.getContext();
+        if (!ctx && typeof globalThis !== 'undefined' && globalThis.SillyTavern && typeof globalThis.SillyTavern.getContext === 'function') ctx = globalThis.SillyTavern.getContext();
+        const chat = (ctx && Array.isArray(ctx.chat)) ? ctx.chat : null;
+        if (!chat || !chat.length) return '';
+        const last = chat[chat.length - 1];
+        const mes = last ? ((typeof last.mes === 'string') ? last.mes : ((typeof last.content === 'string') ? last.content : '')) : '';
+        return mes ? sdtFactText(mes, 4000) : '';
+    } catch (_e) { return ''; }
+}
+function sdtWardrobeMemorySummary() {
+    try {
+        const store = getStore();
+        const bag = (store && store.sdtWardrobeMemory) ? store.sdtWardrobeMemory : null;
+        if (!bag || typeof bag !== 'object') return '';
+        const prefix = String(getChatKey() || '') + '::';
+        const parts = [];
+        const states = [];
+        const removed = [];
+        let removedAt = 0;
+        Object.keys(bag).forEach(function (k) {
+            if (prefix && k.indexOf(prefix) !== 0) return;
+            const rec = bag[k];
+            if (!rec || typeof rec !== 'object') return;
+            (Array.isArray(rec.parts) ? rec.parts : []).forEach(function (t) { if (t && parts.indexOf(t) < 0) parts.push(t); });
+            if (rec.state && states.indexOf(rec.state) < 0) states.push(rec.state);
+            if (rec.removedAt && Array.isArray(rec.removedAt.tags) && (rec.removedAt.at || 0) >= removedAt) {
+                removedAt = rec.removedAt.at || 0;
+                removed.length = 0;
+                rec.removedAt.tags.forEach(function (t) { if (t) removed.push(t); });
+            }
+        });
+        if (!parts.length && !states.length && !removed.length) return '（本聊天还没有记录）';
+        const p = parts.length ? ('常驻 ' + parts.length + ' 件 ' + parts.join(', ')) : '常驻 无';
+        const st = states.length ? ('｜状态 ' + states.join(', ')) : '';
+        const rm = removed.length ? ('｜已摘 ' + removed.join(', ')) : '';
+        return p + st + rm;
+    } catch (_e) { return ''; }
+}
+
+function sdtPoseMatrixEntry(className) {
         try {
             const raw = String(className || '').trim().toUpperCase();
             if (!raw) return null;
@@ -13871,6 +14116,8 @@ SCHEMA:
     function sdtSegmentsFromPayload(payload) {
         try {
             let list = (payload && Array.isArray(payload.segments)) ? payload.segments : [];
+            // 6.5.82：其次回落「整组分镜」（runImageGenerationForWrapper 登记）——单条登记会让逐镜判定失效
+            if (!list.length && Array.isArray(SDT_CURRENT_SEGS) && SDT_CURRENT_SEGS.length) list = SDT_CURRENT_SEGS;
             // 6.5.73：宿主拼的 payload 通常不带 segments → 回落到「本张图的分镜」（generateSdtImage 写入）
             if (!list.length && SDT_CURRENT_SEG) {
                 const one = (SDT_CURRENT_SEG.index === undefined) ? { ...SDT_CURRENT_SEG, index: SDT_CURRENT_SEG_IDX } : SDT_CURRENT_SEG;
@@ -15454,11 +15701,17 @@ SCHEMA:
     // 放进来，闸门缺 segments 时用它（逐图各判各的，不串台）。声明放在桥接块内，闸门与体检行都能直接用。
     let SDT_CURRENT_SEG = null;
     let SDT_CURRENT_SEG_IDX = 0;
+    // 6.5.82（真机 16:13 diag）：只登记「当前这一条」时，payload 又从不带 segments ⇒ 闸门每张图只看得到 1 个分镜，
+    // 逐镜归属退化成恒第 0 镜、carry 永远不可用、判不出类就掉回引擎兜底（真机 6 张里 1 张被塞进 C17 bondage）。
+    // 整组一起登记，pickSegment 才能按真实下标定位、carry 才能沿用前镜。
+    let SDT_CURRENT_SEGS = null;
     /** 6.5.73：登记「本张图的分镜」（由 generateSdtImage 调用；手动/测试通道同样生效） */
-    function sdtSetCurrentSeg(seg, idx) {
+    function sdtSetCurrentSeg(seg, idx, all) {
         SDT_CURRENT_SEG = (seg && typeof seg === 'object') ? seg : null;
         const n = Number(idx);
         SDT_CURRENT_SEG_IDX = (isFinite(n) && n >= 0) ? Math.floor(n) : 0;
+        // 6.5.82：调用方给了整组就记住整组（不传时保留上一次，避免单条登记把整组冲掉）
+        if (Array.isArray(all) && all.length) SDT_CURRENT_SEGS = all;
     }
 // 6.5.72（F09）：闸门最后一次结论——即使 payload 一字未改，面板也要能看见「为什么没改」
 let SDT_GATE_LAST = null;
@@ -15958,6 +16211,9 @@ function sdtOutfitRuleNoteLines(probeText) {
      * 把【体位锁定】段落拼到 system prompt 末尾。
      * S3 契约：storyFacts 为 null → 恒等返回入参（字符串），保证零差异。
      */
+    // 6.5.82：注入结果自证——面板以前用 /【体位锁定】/ 判「进没进 prompt」，正文主导模式下这段本来就不叫这个名字，
+    // 于是每次真机都显示「❌ 没进 prompt」却同时又打印词面（自相矛盾）。改由本函数自己记账。
+    let SDT_APPLY_LAST = null;
     function applyPoseDirective(systemPrompt, storyFacts, opts) {
         const base = typeof systemPrompt === 'string' ? systemPrompt : '';
         try {
@@ -16025,8 +16281,9 @@ function sdtOutfitRuleNoteLines(probeText) {
             // 阶段2：服装段只在服装事实命中时追加；未命中时本函数恒等返回 base（零差异硬契约）
             const outfitLine = sdtOutfitLine(storyFacts.outfit);
             if (outfitLine) parts.push(outfitLine);
-            if (!parts.length) return base;
+            if (!parts.length) { SDT_APPLY_LAST = { injected: false, mode: bodyMode ? 'body' : 'engine', chars: 0 }; return base; }
             const block = parts.join('\n\n');
+            SDT_APPLY_LAST = { injected: true, mode: bodyMode ? 'body' : 'engine', chars: block.length };
             return base ? (base + '\n\n' + block) : block;
         } catch (e) {
             return base;
@@ -16041,7 +16298,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                 formTag: sdtFormTag, formConflicts: sdtFormConflicts, ruleGate: sdtOutfitRuleGate,
                 poseMode: sdtPoseMode, poseSegments: sdtNormalizeSegments, segmentsForFacts: sdtSegmentsForFacts,
                 segmentsFromPayload: sdtSegmentsFromPayload,
-            setCurrentSeg: sdtSetCurrentSeg, poseClassMenu: sdtPoseClassMenu,
+            setCurrentSeg: sdtSetCurrentSeg, poseClassMenu: sdtPoseClassMenu, wardrobeTokens: sdtWardrobeTokens, wardrobeRemember: sdtWardrobeRemember, wardrobeApply: sdtWardrobeApply, wardrobeRemovalScan: sdtWardrobeRemovalScan, wardrobeStrip: sdtWardrobeStrip, wardrobeSummary: sdtWardrobeMemorySummary,
                 pickSegment: sdtPickSegmentForPayload, resolveSegmentPose: sdtResolveSegmentPose,
                 dropAllGuarded: sdtDropAllGuarded, skeletonLine: sdtSegmentSkeletonLine, variantHit: sdtVariantHitInText,
                 crossClassTags: sdtCrossClassTags, adviceText: sdtAdviceText,
@@ -17395,6 +17652,11 @@ function sdtRoundInspectLines() {
         // F07：世界书 t23 起的 套= 字段——缺失时 tierSetShown 为空串，整行与旧版逐字一致（零影响）
         const tierSetShown = (diag && diag.outfitSet) ? String(diag.outfitSet) : '';
         lines.push(`  档位原值 ${tierRawShown}｜档位来源 ${tierSrcShown}｜着装行 ${rowNameShown}${rowWhy}${tierSetShown ? ('｜套 ' + tierSetShown) : ''}`);
+        // 6.5.80：服装记忆（零手填）
+        try {
+            const wmSum = sdtWardrobeMemorySummary();
+            if (wmSum) lines.push('  服装记忆 ' + wmSum);
+        } catch (_e) { /* ignore */ }
     } catch (e) { /* ignore */ }
     // 6.5.72：服装冲突三消费点的跳过 / 让位留痕——「静默删衣服」是本轮修的病根，改完必须在面板上看得见
     try {
@@ -17848,7 +18110,9 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const lbEjs = lbList.filter(e => /<%|%>/.test(String((e && e.content) || '')));
             window.__SDT_DIAG_CTX = {
                 storyFacts: (payload && payload.storyFacts) || null,
-                poseLockInPrompt: /【体位锁定】/.test(String(fullSystemPrompt || '')),
+                // 6.5.82：优先读 applyPoseDirective 的自记账；取不到才退回老的字面检测（兼容未走该函数的通道）
+                poseLockInPrompt: SDT_APPLY_LAST ? !!SDT_APPLY_LAST.injected : /【体位锁定】/.test(String(fullSystemPrompt || '')),
+                poseInjectMode: (SDT_APPLY_LAST && SDT_APPLY_LAST.mode) || '',
                 systemPromptLen: String(fullSystemPrompt || '').length,
                 promptBundle: !!promptBundle,
                 toolMode: !!(store && store.toolCallMode),
@@ -19401,7 +19665,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             if (seg && seg.pose === undefined && segs) {
                 // 缓存里的分镜可能是编辑过的浅拷贝：pose 在原分镜上，取不到就退回 null（闸门按词表判，不瞎猜）
             }
-            sdtSetCurrentSeg(seg, idx >= 0 ? idx : 0);
+            sdtSetCurrentSeg(seg, idx >= 0 ? idx : 0, segs);   // 6.5.82：整组一起登记
             return seg;
         } catch (e) { return null; }
     }
