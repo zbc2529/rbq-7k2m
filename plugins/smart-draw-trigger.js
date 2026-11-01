@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.74';
+    const PLUGIN_VERSION = '6.5.75';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14424,7 +14424,7 @@ SCHEMA:
                 lines.push('【体位词面 · 建议】' + irregular + entry.code + ' ' + sdtFactText(entry.label, 40) + ' → 主类几何参考 ' + main.join(','));
                 if (variants.length) lines.push('  可用变体：' + variants.slice(0, 5).join('｜'));
                 if (neg.length) lines.push('  本镜不建议出现的主类词（仅提示，不删词）：' + neg.join(','));
-                lines.push('【分镜级词面约束】每个分镜自己声明主类（segment.pose.class）；同一镜内不得并列两个主类的 main tag（同镜混类即判错）；不同分镜可以换主类、可以沿用同一主类的不同变体；一段（同主类连续镜）至少 1 张含该主类全 main tag，单镜几何 tag ≤ 3。');
+                lines.push('【分镜级词面约束】每个分镜自己声明主类（segment.pose.class）；同一镜内不得并列两个主类的主锚词（同镜混类即判错；手/口/胸/道具等性行为细节词不算第二套姿势）；不同分镜可以换主类、可以沿用同一主类的不同变体；一段（同主类连续镜）至少 1 张含该主类全 main tag，单镜几何 tag ≤ 3。');
                 return lines;
             }
             lines.push('【体位词面】锁定 ' + entry.code + ' ' + sdtFactText(entry.label, 40) + ' → 必含 ' + main.join(','));
@@ -16764,7 +16764,8 @@ function sdtOutfitRuleNoteLines(probeText) {
     const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。'
         + '\n3. 【体位判定归你】每个 segment 都要在 pose 里给出该镜的体位主类（C01~C18）、变体键、以及判定依据原词 word（必须是 anchor.text 里逐字出现的中文词）。'
         + '\n4. 【判不出就留空】正文没有体位线索时 pose.class 留空，绝不猜测、绝不套用任何引擎/世界书掷骰结果或上一镜的类；宁可空着，也不许为了填满而编。'
-        + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。';
+        + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。'
+        + '\n6. 【一镜一套主类锚词】同一 segment 的 base / action / caption 里只写本镜 pose.class 那一个主类的主锚词（例如判 C04 就写 cowgirl_position / girl_on_top，不要再写 all_fours / on_stomach / prone_bone 这些别类的主锚词）；正文同时提到两种姿态时，选主导的那一种写进 pose.class，另一种的主锚词不要写进 tag。手/口/胸/道具等性行为细节词（fellatio / handjob / paizuri / anal）照写，不算第二套姿势。';
 
     function getReorganizedSystemPrompt(store) {
         if (store?.geminiJailbreak && store?.geminiJailbreakPreset === 'kami_gase') {
