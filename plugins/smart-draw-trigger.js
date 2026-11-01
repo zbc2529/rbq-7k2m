@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.78';
+    const PLUGIN_VERSION = '6.5.79';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14124,10 +14124,19 @@ SCHEMA:
             // 一旦正文另有主类实词（后入/side 等）→ 以主类实词定类，变体名只作几何描述
             const variantAmb = !!(hitVariant && sdtVariantAmbiguous(hitVariant.variant));
             const useVariant = !!(hitVariant && !(variantAmb && hitText && hitText.class !== hitVariant.class));
-            const aiPose = (segPose && segPose.ai && segPose.class) ? sdtPoseMatrixEntry(segPose.class) : null;
+            const aiPoseRaw = (segPose && segPose.ai && segPose.class) ? sdtPoseMatrixEntry(segPose.class) : null;
+            // 6.5.79（用户 2026-11-01「怎么还是按这个，不按正文」）：AI 判类被世界书掷骰结果带偏时（真机：五个分镜全填 C17，
+            // word 却是「轻轻一勾」这种非姿势词），正文里明确写出的强体位词才是原文证据。规则：正文强词与 AI 不同 → 正文胜。
+            // 只有模糊词（weak：趴着/站着/坐着…）时仍按 AI，仅记账 aiConflict（6.5.73 口径不变）。
+            const aiWordInBody = !!(aiPoseRaw && segPose && segPose.word && bodyText.indexOf(String(segPose.word).trim()) >= 0);
+            const bodyWins = !!(aiPoseRaw && hitText && hitText.class && !hitText.weak && hitText.class !== aiPoseRaw.code);
+            const aiPose = (aiPoseRaw && !bodyWins) ? aiPoseRaw : null;
+            const aiOverruled = bodyWins
+                ? { ai: aiPoseRaw.code, body: String(hitText.class), word: String(hitText.word || ''), aiWord: String((segPose && segPose.word) || ''), aiWordInBody: aiWordInBody }
+                : null;
             // 词表与 AI 判决不一致 → 只记账上屏，按 AI 执行（用户 6.5.73 口径：判定权在 AI，词表只做交叉校验）
-            const aiConflict = (aiPose && hitText && hitText.class && hitText.class !== aiPose.code)
-                ? { ai: aiPose.code, dict: String(hitText.class), word: String(hitText.word || '') }
+            const aiConflict = (aiPoseRaw && hitText && hitText.class && hitText.class !== aiPoseRaw.code)
+                ? { ai: aiPoseRaw.code, dict: String(hitText.class), word: String(hitText.word || '') }
                 : null;
             let ent = null;
             let source = '';
@@ -14175,8 +14184,10 @@ SCHEMA:
                 protected: tags.slice(0, 8),
                 source: source,
                 hitSrc: hitSrc,
-                aiDeclared: !!aiPose,
+                aiDeclared: !!aiPoseRaw,
                 aiConflict: aiConflict,
+                aiOverruled: aiOverruled,
+                aiWordInBody: aiWordInBody,
                 segIndex: seg ? seg.index : null,
                 // 6.5.73：AI 判类时，体检行显示的原词必须是 AI 从 anchor.text 逐字引的那一个（不是词表的近义词）
                 word: aiPose ? (segPose.word || '') : (useVariant ? hitVariant.word : (hitText ? hitText.word : '')),
@@ -15095,6 +15106,9 @@ SCHEMA:
                 bodyWord: bodyPose ? bodyPose.word : '', l1Class: entry ? entry.code : '',
                 // 6.5.73：AI 判类要被看见 —— aiDeclared 回答「本镜主类是不是 AI 判的」，aiConflict 回答「词表当时怎么说」
                 aiDeclared: !!(bodyPose && bodyPose.aiDeclared), aiConflict: (bodyPose && bodyPose.aiConflict) ? bodyPose.aiConflict : null,
+                // 6.5.79：AI 判类被正文强词推翻时留证（谁判的、被谁改的、AI 引的原词在不在正文里）
+                aiOverruled: (bodyPose && bodyPose.aiOverruled) ? bodyPose.aiOverruled : null,
+                aiWordInBody: bodyPose ? !!bodyPose.aiWordInBody : false,
                 added: rec.added, dropped: rec.dropped.slice(0, 16), uc: rec.uc.slice(0, 16),
                 mixedDropped: rec.mixedDropped || [], protectedKept: rec.protectedKept || [],
                 outfitConflict: rec.outfitConflict || null, conflictSkipped: rec.conflictSkipped || [],
@@ -17507,6 +17521,7 @@ function sdtRoundInspectLines() {
                 const whyMap = { segCarry: '正文没写主类 → 沿用同段前镜（变体连续）', fallback: '正文与前镜都没有主类 → 兜底', 'switch': '正文主类与引擎不同 → 以正文为准', sexish: '正文与引擎都缺 → 补一次引擎主类' };
                 lines.push('  判定说明 ' + (whyMap[gl.gateWhy] || gl.gateWhy));
             }
+            if (gl.aiOverruled) lines.push('  正文压过 AI ' + String(gl.aiOverruled.ai || '-') + ' → ' + String(gl.aiOverruled.body || '-') + '（正文实词「' + String(gl.aiOverruled.word || '') + '」，AI 原词「' + String(gl.aiOverruled.aiWord || '-') + '」' + (gl.aiOverruled.aiWordInBody ? ' 在正文里' : ' 不在正文里') + '）');
             if (gl.aiConflict) lines.push('  词表交叉校验 ' + String(gl.aiConflict.dict || '-') + ' ≠ AI ' + String(gl.aiConflict.ai || '-') + '（正文命中「' + String(gl.aiConflict.word || '') + '」；按 AI 判类执行，词表不改判）');
             if (gl.added) lines.push('  补词 +' + gl.added + '（只补一次）');
             if (gl.switched) lines.push('  跨类改判 ' + String(gl.switched) + '（正文主类覆盖旧锁定类，旧类锚词一并换掉）');
