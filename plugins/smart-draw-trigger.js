@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.73';
+    const PLUGIN_VERSION = '6.5.74';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -261,7 +261,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 - 配角：faceless male / faceless female
 - 7 维外貌矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
   ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
@@ -500,7 +500,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 characters[i].base 是角色外貌的底层唯一身份标识，专用于「角色外貌跨图记忆缓存（Character Memory）」，严禁写入临时着装与动作：
 - 7 维全息矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
   ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
@@ -731,7 +731,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 严格按 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
 ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
@@ -897,7 +897,7 @@ Scene 字段是整幅画面的空间坐标基座与全场总纲。严禁平面�
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 必须严格按照 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定精致二次元面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+② 族裔/面相：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定精致二次元面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
 ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
@@ -1073,7 +1073,7 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系或未写明族裔时默认带 japanese 或 delicate_face 锚定动漫美学面相，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词 锚定动漫美学面相，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
 ③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, blonde_hair, twin_tails）
 ⑤ 瞳色眼型（如 blue_eyes, tsurime, large_eyes）
@@ -1201,7 +1201,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 ══ 角色外貌防伪码（Base 7 维矩阵，100% 锁死不变脸）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系或未写明族裔时默认带 japanese 或 delicate_face，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
 ③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, 1.2::pink_hair::, twin_tails）
 ⑤ 瞳色眼型（如 red_eyes, tsurime, large_eyes）
@@ -1369,7 +1369,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 2. **base**（外貌防伪码，跨图锁定）：
    - 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
      ① 性别：girl / boy（禁带数字，1girl/1boy 属于 scene）
-     ② 族裔/国籍/面相（必须推断填写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系角色或未写明族裔时默认带 japanese 或 delicate_face 锚定动漫萌系面相（默认值，正文写明别的族裔必须让位）；西方角色带 caucasian 或 western）
+     ② 族裔/国籍/面相（必须推断填写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系角色才带 japanese 或 delicate_face 锚定动漫萌系面相（未写明族裔不追加，正文写明别的族裔必须让位）；西方角色带 caucasian 或 western）
      ③ 年龄阶段（必须填写：adolescent, teenager, mature_female, child 等；young_girl 仅正文明确幼态时取）
      ④ 发型发色（发长+发型+发色，如 long_hair, blonde_hair, twin_tails）
      ⑤ 瞳色眼型（如 green_eyes, tareme/tsurime/large_eyes）
@@ -1470,7 +1470,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 **characters[i] 字段**：
 1. **name**：精确角色标识。
 2. **base**（外貌防伪码，跨图锁定）：
-   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(japanese, delicate_face, caucasian等；写明族裔按明写落词，未写明默认 japanese, delicate_face) ③年龄(adolescent, teenager, mature_female；young_girl 仅正文明确幼态时取) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
+   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(japanese, delicate_face, caucasian等；写明族裔按明写落词，未写明不追加族裔词) ③年龄(adolescent, teenager, mature_female；young_girl 仅正文明确幼态时取) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
 3. **outfit**（当前服装，拆解到部件）：主服装款式材质 → 次要配饰鞋袜 → 穿着状态(open/lifted) → 裸露梯度
 4. **action**（当前姿态动作）：朝向(facing_another, profile) → 基础姿态(sitting, kneeling) → 肢体动作与持有物 → [细腻微表情] → 视线(looking_at_partner, eye_contact) → 3D物理体液(sweat, blush, cum)
 5. **center**：空间网格坐标 A1~E5
@@ -1556,7 +1556,7 @@ lorebook: payload.lorebook 含匹配到的 Tag 模板库（服装/场景/多角�
 ⛔ 禁填中文名 ⛔ 禁省略作品名/original后缀 ⛔ 禁在 base 中重复填写姓名
 
 **base**（→ char_caption 外貌防伪码，跨图绝对锁定不变）
-顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 年龄段(teenager/mature_female) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 胸围(flat_chest/large_breasts) → 体格(petite/tall) → 肤色 → 标志修饰(mole/scar/tattoo)
+顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时不追加族裔词（不凭画风与姓名猜国籍，正文写明才落词）) → 年龄段(teenager/mature_female) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 胸围(flat_chest/large_breasts) → 体格(petite/tall) → 肤色 → 标志修饰(mole/scar/tattoo)
 ⚠️ 穷举所有维度，缺失则推断！遗漏任何维度=角色变脸！
 ⚠️ 原创角色差异化: 基本特征之外追加 5~10 专属 Tag（标志性发型/异色瞳/专属配饰/身体特征）作为视觉防伪码
 ⛔ 禁在此处写服装/动作/表情——属于 outfit/action，混入会污染记忆
@@ -1654,7 +1654,7 @@ DNA锁定: 首次出场建立 base+outfit，跨图锁定。仅文本明确描述
 }`;
 
     const CONSISTENT_SYSTEM_PROMPT_V22 = CONSISTENT_SYSTEM_PROMPT_V23.replace(
-        '顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 年龄段(teenager/mature_female)',
+        '顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时不追加族裔词（不凭画风与姓名猜国籍，正文写明才落词）) → 年龄段(teenager/mature_female) → 发长+发型+发色 → 瞳色+眼型(tareme/tsu',
         '顺序: girl/boy(不带数字) → 年龄段(teenager/mature_female)'
     );
 
@@ -1684,7 +1684,7 @@ lorebook: payload.lorebook 含匹配到的 Tag 模板库（服装/场景/多角�
 ⚠️ pov 模式: 男主身体部位(large_penis, veiny_penis 等)写入 scene 作为环境道具
 
 **base**（→ char_caption 固定部分，跨图锁定不变）
-顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时默认追加 japanese 或 delicate_face 锁定日系动漫面相（默认值，正文写明别的族裔必须让位）) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 体型+罩杯 → 肤色 → 修饰(痣/疤/纹身)
+顺序: girl/boy(不带数字) → 族裔/国籍/面相(依剧情背景与人名合理推断，如 japanese, east asian, chinese, caucasian；未写明族裔时不追加族裔词（不凭画风与姓名猜国籍，正文写明才落词）) → 发长+发型+发色 → 瞳色+眼型(tareme/tsurime/fox_eyes) → 体型+罩杯 → 肤色 → 修饰(痣/疤/纹身)
 
 **outfit**（→ char_caption 服装部分，随场景变化）
 顺序: 主要服装(款式+颜色+细节) → 次要服装/配饰 → 穿着状态(open/off/half-off) → 裸露部位+细节
@@ -2058,7 +2058,7 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 命名标准（仅资产库外的新角色；已建档角色逐字复制档案 name_tag）：同人角色 2::Name (Series)::；同人官方皮肤 2::Name (Series) (skin name)::；原创 OC (original)；配角 faceless male / faceless female。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
      ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
@@ -2312,7 +2312,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
 中文感受只写进 reason，要它上画面就换 tag：余韵→after_sex、呼吸急促→heavy_breathing、颤抖→trembling、脸红→blush、被抱起→princess_carry、脱力瘫软→after_sex, trembling。本文示例里的英文散句只是示意，落地必须收敛成 tag。
 1.【7 维外貌防伪矩阵】base 字段纯净无临时服装与动作。
    ① 性别：girl / boy（严禁带数字，防人数干扰）
-   ② 面相族裔：japanese, delicate_face（仅正文/角色卡写明日系才带；未写明默认带，正文写别的族裔即让位）/ caucasian / western
+   ② 面相族裔：japanese, delicate_face（仅正文/角色卡写明日系才带；未写明不追加，正文写别的族裔即让位）/ caucasian / western
    ③ 判定顺序＝性别 → 年龄 → 体型，三步走完再落笔。禁止默认女性、禁止默认幼态。
       判定依据优先级：角色卡正文 → 角色档案 base → 世界书 → 剧情上下文 → 代词与称谓。
       ── 第一步 性别（决定后面整套标签，判错全盘皆错）：
@@ -4775,7 +4775,7 @@ ${globalEntries.map(([k, p]) => formatGlobalCharacterForPrompt(k, p)).join('\n')
      * 次要配角/路人：faceless male / faceless female 或简要外貌，禁止喧宾夺主。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系或未写明族裔时带，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
      ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
