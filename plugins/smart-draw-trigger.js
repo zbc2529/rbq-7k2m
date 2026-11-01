@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.87';
+    const PLUGIN_VERSION = '6.5.88';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2984,8 +2984,11 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         // 6.5.86：与 autoRetry 拆开。「模型没走工具调用」时用同一个模型、同一个渠道再问一次纯文本 JSON。
         // 不换模型、不重试 3 次、不多吃额度以外的钱；只在用户明确关掉它时才彻底不回落。
         toolJsonFallback: true,
-        // 6.5.87：tagger 单次输出上限。真机事故：不给上限时用中转默认值，5 个分镜的 JSON 被砍成半截。
-        taggerMaxTokens: 8192,
+        // 6.5.87：tagger 单次输出上限。默认 0 = 不传这个字段，跟旧版一样用中转自己的默认值。
+        // 真机事故的根因是「JSON 被砍断却被误报成不支持工具调用」，不是「默认值太小」；
+        // 插件凭空塞一个数只会两头不讨好：比中转默认小 → 反而更容易截断；比模型上限大 → 中转回 400。
+        // 所以默认不动请求，只在用户自己填了正数时才传。
+        taggerMaxTokens: 0,
         manualDrawEnabled: false,
         comicDrawerFloatingEnabled: true,
         systemPromptPreset: DEFAULT_SYSTEM_PROMPT_PRESET,
@@ -8850,7 +8853,7 @@ ${getCharacterMemoryTagSpecification()}
         const truncated = sdtLooksTruncatedJson(rawText);
         let msg;
         if (truncated) {
-            msg = `大模型返回的分镜 JSON 写到一半就断了${finishReasonInfo}。这不是「不支持工具调用」，是输出被长度上限截断了。建议：把面板「每条消息最少生图数」调小（5 镜的 JSON 很容易超限），或把「tagger 输出上限」调大。${retried ? '（已自动用普通 JSON 模式重试一次，仍然被截断）' : ''}`;
+            msg = `大模型返回的分镜 JSON 写到一半就断了${finishReasonInfo}。这不是「不支持工具调用」，是输出被长度上限截断了。最稳的办法是把面板「每条消息最少生图数」调小（5 镜的 JSON 很容易超限），分批出图；其次才是把面板「tagger 输出上限」从 0 填成一个更大的数（如 16384），填得比模型真实上限还大会被中转回 400。${retried ? '（已自动用普通 JSON 模式重试一次，仍然被截断）' : ''}`;
         } else if (retried) {
             msg = `大模型没有按工具调用返回分镜${finishReasonInfo}，自动改用普通 JSON 模式重试后仍未得到有效结果。这个模型/渠道可能不支持工具调用，或中转站没有正确转发，请换一个模型或渠道再试。`;
         } else {
@@ -21890,7 +21893,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     </div>
                     <div class="st-scene-trigger-modal-grid">
                         <label class="st-scene-trigger-field" title="要求 tagger 每条消息至少输出几个分镜（0 = 智能自适应推演，根据前情与剧情节拍自然提取；设为 2~3 则强制长文至少出 2~3 张图）"><span>每条消息最少生图数</span><input id="rbq-sdt-min-segments" type="number" min="0" max="10" step="1" style="width:80px" placeholder="0"></label>
-                        <label class="st-scene-trigger-field" title="tagger 单次输出上限（tokens，默认 8192）。分镜写成 JSON 很长，上限太小会被截断成半截 JSON——真机表现就是「没有按工具调用返回分镜」。填 0 = 不传这个参数，用中转默认值。"><span>tagger 输出上限</span><input id="rbq-sdt-tagger-max-tokens" type="number" min="0" max="32768" step="256" style="width:100px" placeholder="8192"></label>
+                        <label class="st-scene-trigger-field" title="tagger 单次输出上限（tokens）。留 0 = 不传这个参数，用中转/模型自己的默认值（推荐，和旧版完全一致）。只有在报错说「JSON 写到一半就断了」时才需要填，例如 16384 / 32768。填得比模型真实上限还大，部分中转会直接回 400。"><span>tagger 输出上限</span><input id="rbq-sdt-tagger-max-tokens" type="number" min="0" max="32768" step="256" style="width:100px" placeholder="0"></label>
                         <label class="st-scene-trigger-field" title="设置未解析时的生图/Tag卡片在消息中的默认呈现位置"><span>初始生图按钮位置</span><select id="rbq-sdt-card-position"><option value="bottom">消息末尾 (默认)</option><option value="top">消息开头 (置顶封面，免滑屏)</option><option value="message_actions">消息操作栏小图标 (纯净免占位)</option></select></label>
                     </div>
                 </div>
@@ -22076,7 +22079,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         document.getElementById('rbq-sdt-autorun').checked = !!store.autoRunTagger;
         document.getElementById('rbq-sdt-auto-generate').checked = !!store.autoRunGenerate;
         document.getElementById('rbq-sdt-min-segments').value = store.minSegments || 0;
-        document.getElementById('rbq-sdt-tagger-max-tokens').value = store.taggerMaxTokens === undefined ? 8192 : store.taggerMaxTokens;
+        document.getElementById('rbq-sdt-tagger-max-tokens').value = store.taggerMaxTokens === undefined ? 0 : store.taggerMaxTokens;
         document.getElementById('rbq-sdt-card-position').value = store.cardPosition || 'bottom';
         document.getElementById('rbq-sdt-auto-retry').checked = store.autoRetry === true;
         document.getElementById('rbq-sdt-tool-json-fallback').checked = store.toolJsonFallback !== false;
