@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.75';
+    const PLUGIN_VERSION = '6.5.76';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2979,6 +2979,8 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         autoRunTagger: false,
         autoRunGenerate: false,
         minSegments: 0,
+        // 6.5.76：默认关闭一切自动重试/降级（用户 m03049：一次失败只吃一次额度，换模型由人决定）
+        autoRetry: false,
         manualDrawEnabled: false,
         comicDrawerFloatingEnabled: true,
         systemPromptPreset: DEFAULT_SYSTEM_PROMPT_PRESET,
@@ -13608,6 +13610,16 @@ SCHEMA:
         return null;
     }
 
+    /** 6.5.76：本次请求的判定权模式（正文主导=true）。
+     *  applyPoseDirective 只拿得到 storyFacts，而 storyFacts.poseMode 只在「世界书写了剧本」时才存在；
+     *  真机事故：正文主导 + 无剧本 → 退回「锁定 Cxx → 必含 …」，AI 把引擎类照抄成 pose.class。
+     *  所以调用点先算一次模式放进这个变量，applyPoseDirective 直读它。 */
+    let SDT_APPLY_BODY_MODE = false;
+
+    function sdtApplyBodyModeNow(store) {
+        try { return sdtPoseMode(store, readPoseEngine()) === 'body'; } catch (e) { return false; }
+    }
+
     /** 判定权模式：'body' 分镜级正文优先 | 'engine' 引擎主导（= 6.5.71 原路径）
      *  优先级：世界书 姿势引擎.模式 > store.poseAuthority > 无 store 时回落 engine */
     function sdtPoseMode(store, engine) {
@@ -14042,6 +14054,15 @@ SCHEMA:
             const sf = (p.storyFacts && typeof p.storyFacts === 'object') ? p.storyFacts : null;
             hit = byIndex(sf ? sf.segIndex : null, 'storyFacts');
             if (hit) return hit;
+            // 6.5.76（真机事故）：宿主拼的 payload 里既没有 meta.segIndex 也没有剧本变量时，旧码一律 return index 0，
+            // 于是 5 个分镜全部按第 0 镜的词面清洗/补词（panel 显示「镜 #0（default）」×5），逐镜判定形同失效。
+            // runImageGenerationForWrapper 在每张图生成前已登记本张的真实镜号，这里回落到它。
+            try {
+                if (typeof SDT_CURRENT_SEG !== 'undefined' && SDT_CURRENT_SEG && typeof SDT_CURRENT_SEG_IDX !== 'undefined') {
+                    hit = byIndex(SDT_CURRENT_SEG_IDX, 'current');
+                    if (hit) return hit;
+                }
+            } catch (e) { /* ignore */ }
             return { seg: list[0], index: 0, why: 'default' };
         } catch (e) { return { seg: null, index: -1, why: 'error' }; }
     }
@@ -15876,13 +15897,16 @@ function sdtOutfitRuleNoteLines(probeText) {
      * 把【体位锁定】段落拼到 system prompt 末尾。
      * S3 契约：storyFacts 为 null → 恒等返回入参（字符串），保证零差异。
      */
-    function applyPoseDirective(systemPrompt, storyFacts) {
+    function applyPoseDirective(systemPrompt, storyFacts, opts) {
         const base = typeof systemPrompt === 'string' ? systemPrompt : '';
         try {
             if (!storyFacts) return base;                    // 无事实卡片 → 逐字节恒等（S3 契约）
             const parts = [];
             // 6.5.72：正文主导模式（世界书 姿势引擎.模式 / store.poseAuthority）→ 词面只给建议，判定交给正文
-            const bodyMode = (storyFacts.poseMode === 'body');
+            // 6.5.76：模式由「判定权」直读，不再依赖 storyFacts.poseMode 这个只在「有剧本」时才写的键。
+            // 真机事故（m03049）：正文主导 + 没写剧本 → poseMode 缺失 → 退回「锁定 C17 → 必含 bondage,restrained」，
+            // AI 于是把 C17 照抄进 pose.class，闸门再按 caption 改判并删掉 bondage —— 模型与插件互相打架。
+            const bodyMode = (storyFacts.poseMode === 'body') || (SDT_APPLY_BODY_MODE === true) || !!(opts && opts.bodyMode);
             const pose = (storyFacts.pose && storyFacts.pose.id) ? storyFacts.pose : null;
             // F12（6.5.72）：正文主导模式 facts.pose 恒为 null（不许当渲染指令源），本块仍要出词面与骨架
             if (pose || bodyMode) {
@@ -16765,7 +16789,9 @@ function sdtOutfitRuleNoteLines(probeText) {
         + '\n3. 【体位判定归你】每个 segment 都要在 pose 里给出该镜的体位主类（C01~C18）、变体键、以及判定依据原词 word（必须是 anchor.text 里逐字出现的中文词）。'
         + '\n4. 【判不出就留空】正文没有体位线索时 pose.class 留空，绝不猜测、绝不套用任何引擎/世界书掷骰结果或上一镜的类；宁可空着，也不许为了填满而编。'
         + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。'
-        + '\n6. 【一镜一套主类锚词】同一 segment 的 base / action / caption 里只写本镜 pose.class 那一个主类的主锚词（例如判 C04 就写 cowgirl_position / girl_on_top，不要再写 all_fours / on_stomach / prone_bone 这些别类的主锚词）；正文同时提到两种姿态时，选主导的那一种写进 pose.class，另一种的主锚词不要写进 tag。手/口/胸/道具等性行为细节词（fellatio / handjob / paizuri / anal）照写，不算第二套姿势。';
+        + '\n6. 【一镜一套主类锚词】同一 segment 的 base / action / caption 里只写本镜 pose.class 那一个主类的主锚词（例如判 C04 就写 cowgirl_position / girl_on_top，不要再写 all_fours / on_stomach / prone_bone 这些别类的主锚词）；正文同时提到两种姿态时，选主导的那一种写进 pose.class，另一种的主锚词不要写进 tag。手/口/胸/道具等性行为细节词（fellatio / handjob / paizuri / anal）照写，不算第二套姿势。'
+        + '\n7. 【年龄性别照角色卡】characters[i].base 的性别与年龄段必须跟角色卡（characterCardInfo）或角色库档案一致：成年男性写 man / mature_male（严禁写成 boy / adolescent），成年女性写 woman / mature_female，儿童写 child / petite。角色卡没写年龄就按正文写，绝不擅自给成年角色降龄、也绝不把儿童升龄；同一个角色在一组分镜里年龄段必须始终一致。'
+        + '\n8. 【正文点名的衣物必须落成 tag】正文写到具体衣物（内裤 / 胸罩 / 长筒袜 / 裙摆 / 围裙 / 和服 / 外套…）及其状态（褪到膝弯、拉到腰上、解开、只挂一边、湿透、撕破）时，必须在 characters[i].outfit 或 action 里出现对应英文 tag（例：内裤褪到膝弯 → panties 仍在 + 动作 pulling down，或只挂一条腿 → panties_around_one_leg；裙摆推到腰上 → skirt_lift / clothes_lift），不得只写 partially_undressed 糊过去；正文没脱的绝不给 nude / bottomless。';
 
     function getReorganizedSystemPrompt(store) {
         if (store?.geminiJailbreak && store?.geminiJailbreakPreset === 'kami_gase') {
@@ -17173,6 +17199,7 @@ function sdtDiag() {
                 env: {
                     baseUrl: store.openaiBaseUrl || '',
                     model: String(store.openaiModelCustom || '').trim() || store.openaiModel || '',
+                    autoRetry: store.autoRetry === true,
                     fallbackEnabled: store.modelFallbackEnabled !== false,
                     fallbackList: store.modelFallbackList || '',
                     preset: store.systemPromptPreset || '',
@@ -17314,7 +17341,9 @@ function sdtRoundInspectLines() {
     try { dc = (typeof window !== 'undefined' && window.__SDT_DIAG_CTX) || null; } catch (e) { dc = null; }
     if (dc) {
         // F14（6.5.72）：正文主导模式不许出现「锁定」——世界书只出建议，判定看正文
-        const dcMode = (dc.storyFacts && dc.storyFacts.poseMode === 'body') ? 'body' : 'engine';
+        // 6.5.76：面板模式也直读判定权——「正文主导但没写剧本」以前会被误标成【体位锁定】
+        const dcMode = ((dc.storyFacts && dc.storyFacts.poseMode === 'body')
+            || (function () { try { return sdtPoseMode(sdtPoseStore(), readPoseEngine()) === 'body'; } catch (e) { return false; } })()) ? 'body' : 'engine';
         const dcHead = (dcMode === 'body') ? '【体位来源】' : '【体位锁定】';
         lines.push(`${dcHead}${dc.poseLockInPrompt ? '✅ 已进 system prompt' : '❌ 没进 prompt'}（prompt ${dc.systemPromptLen || 0} 字符）`);
         const dcSegs = (dcMode === 'body' && dc.storyFacts && Array.isArray(dc.storyFacts.segments)) ? dc.storyFacts.segments : [];
@@ -17503,12 +17532,20 @@ function sdtIsRetryableError(err, signal) {
     return true;
 }
 
+// 6.5.76：自动重试总开关。关（默认）＝只跑首选模型一次；开＝沿用旧的「模型链 + 每模型重试」。
+function sdtAutoRetryOn(store) {
+    const s = store || {};
+    return s.autoRetry === true;
+}
+
 function sdtBuildModelChain(store, target) {
     // 6.5.58 多渠道：模型名优先取渠道自己的，渠道没填才退回全局字段
     const primary = String((target && target.model) || '').trim() || String((store.openaiModelCustom || '').trim() || store.openaiModel || '').trim();
     const chain = [];
     const push = (m) => { const v = String(m || '').trim(); if (v && !chain.includes(v)) chain.push(v); };
     push(primary);
+    // 6.5.76：自动重试关闭时链上只有首选模型，绝不悄悄换模型
+    if (!sdtAutoRetryOn(store)) return chain;
     const enabled = store.modelFallbackEnabled !== false;
     const chainBaseUrl = String((target && target.baseUrl) || store.openaiBaseUrl || '');
     if (enabled && /blqs\.cc/i.test(chainBaseUrl)) {
@@ -17525,7 +17562,9 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
     if (o.__noFallback) return await callOpenAiCompatibleOnce(messageId, trigger, o);
     const store = o.storeSnapshot || getStore();
     // 6.5.58 多渠道：外层按渠道链切换，内层沿用「模型降级 + 每模型重试」的旧逻辑
-    const channels = resolveChannelChain(store);
+    const channelsAll = resolveChannelChain(store);
+    // 6.5.76：自动重试关闭时只用第一条渠道（用户手动换渠道，不自动漂移）
+    const channels = sdtAutoRetryOn(store) ? channelsAll : channelsAll.slice(0, 1);
     if (!channels.length) throw sdtChannelChainEmptyError(store);
     const useTool = !!store.toolCallMode;
     // 工具调用模式下全部渠道都明确「不支持」时直接报错，禁止静默降级成普通 JSON 解析
@@ -17573,7 +17612,8 @@ async function callOpenAiCompatible(messageId, trigger, opts = {}) {
         for (let ci = 0; ci < models.length; ci++) {
             if (budgetHit) break;
             const model = models[ci];
-            const attempts = ci === 0 ? (SDT_RETRY_PER_MODEL + 1) : SDT_RETRY_PER_MODEL;
+            // 6.5.76：关闭自动重试时每个模型只请求一次（原 anti 连吃 3 次额度的元凶）
+            const attempts = sdtAutoRetryOn(store) ? (ci === 0 ? (SDT_RETRY_PER_MODEL + 1) : SDT_RETRY_PER_MODEL) : 1;
             for (let a = 1; a <= attempts; a++) {
                 if (Date.now() - startedAt > SDT_RETRY_BUDGET_MS) { budgetHit = true; break; }
                 if (a > 1) {
@@ -17721,6 +17761,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
 
         // Keep system directives together at the start of the request.
         // [阶段1·桥接] 体位锁定段落套在组装点：layered manga 的 instructionText 在 getSystemPromptWithPresets 提前 return，套这里才能全通道覆盖
+        SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
         const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
 
         // [6.5.59 诊断自证] 把「桥接是否真的生效 / 世界书是否真的进了 prompt」落进诊断包：
@@ -17843,6 +17884,13 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             if (signal?.aborted) {
                 throw signal.reason && typeof signal.reason.message === 'string'
                     ? signal.reason : Object.assign(new Error('大模型请求已取消'), { name: 'AbortError' });
+            }
+            // 6.5.76：自动重试关闭时不再「去掉 tools 用普通 JSON 再打一次」——那一次同样吃额度，直接失败交给用户换模型
+            if (!sdtAutoRetryOn(store)) {
+                const noToolErr = new Error('大模型没有按工具调用返回分镜' + (finishReason ? ` (finish_reason: ${finishReason})` : '') + '。自动重试已按设置关闭，不会再用普通 JSON 模式重试。请手动换一个支持工具调用的模型/渠道，或打开「自动重试/降级」。');
+                noToolErr.code = 'SDT_NO_TOOL_NO_RETRY';
+                noToolErr.rawOutput = String(rawText || '').slice(0, 4000);
+                throw noToolErr;
             }
             console.warn(`[${PLUGIN_NAME}] ⚠️ 模型未返回工具调用参数${finishReason ? ` (finish_reason: ${finishReason})` : ''}，自动去掉 tools 改用普通 JSON 模式重试一次`);
             if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') toastr.info('模型没按工具调用返回，已自动改用普通模式重试', PLUGIN_NAME);
@@ -18452,6 +18500,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                             ? signal.reason : Object.assign(new Error('大模型请求已取消'), { name: 'AbortError' });
                     }
                     if (_toolFallbackRetried) throw makeToolFallbackError(finishReason, rawReply || rawOutput, true);
+                    // 6.5.76：自动重试关闭时不再「去 tools 普通 JSON 再打一次」
+                    if (!sdtAutoRetryOn(store)) throw makeToolFallbackError(finishReason, rawReply || rawOutput, false);
                     console.warn(`[${PLUGIN_NAME}] ⚠️ 模型未返回 ${toolName} 工具调用参数${finishReason ? ` (finish_reason: ${finishReason})` : ''}，自动去掉 tools 改用普通 JSON 模式重试一次`);
                     if (typeof toastr !== 'undefined' && typeof toastr.info === 'function') toastr.info('模型没按工具调用返回，已自动改用普通模式重试', PLUGIN_NAME);
                     const schemaText = (() => { try { return JSON.stringify(tool?.function?.parameters || {}); } catch (_) { return '{}'; } })();
@@ -21377,6 +21427,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                         <label class="st-scene-trigger-field"><span>监听消息</span><select id="rbq-sdt-target-role"><option value="assistant">仅角色消息</option><option value="user">仅用户消息</option><option value="all">全部消息</option></select></label>
                         <div id="rbq-sdt-auto-generate-field" class="st-scene-trigger-field switch" title="tagger 分析完成后自动调用生图 API，无需手动点击生成按钮"><span>分析完自动生图</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-auto-generate" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <div id="rbq-sdt-autorun-field" class="st-scene-trigger-field switch" title="酒馆正文输出完毕后，自动对最新楼层调用 tagger API 解析。不会影响历史楼层，刷新/切卡也不会触发。"><span>自动调用 tagger API</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-autorun" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
+                        <div id="rbq-sdt-auto-retry-field" class="st-scene-trigger-field switch" title="关闭（默认）：tagger 只用首选模型请求一次，失败就直接报错，换模型/换渠道由你手动决定——一次失败只吃一次额度。打开：旧行为，自动按模型链逐个试、每个模型重试 2~3 次，还会在「没拿到工具调用」时自动改普通 JSON 再打一次（很耗额度）。"><span>自动重试/降级（耗额度）</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-auto-retry" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                         <div id="rbq-sdt-manual-draw-field" class="st-scene-trigger-field switch" title="在悬浮球菜单中添加‘手动描述生图’按钮，点击后可输入自定义场景描述，由 tagger 生成 tag 并出图"><span>悬浮球手动生图按钮</span><span class="st-scene-trigger-toggle"><input id="rbq-sdt-manual-draw" type="checkbox"><span class="st-scene-trigger-toggle-ui"></span></span></div>
                     </div>
                 </div>
@@ -21573,6 +21624,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         document.getElementById('rbq-sdt-auto-generate').checked = !!store.autoRunGenerate;
         document.getElementById('rbq-sdt-min-segments').value = store.minSegments || 0;
         document.getElementById('rbq-sdt-card-position').value = store.cardPosition || 'bottom';
+        document.getElementById('rbq-sdt-auto-retry').checked = store.autoRetry === true;
         document.getElementById('rbq-sdt-manual-draw').checked = !!store.manualDrawEnabled;
         document.getElementById('rbq-sdt-comic-drawer-floating').checked = store.comicDrawerFloatingEnabled !== false;
         const validPresetKeys = Object.keys(SYSTEM_PROMPT_PRESETS);
@@ -21637,6 +21689,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         bindSwitch('rbq-sdt-inject-presets-field', 'rbq-sdt-inject-presets');
         bindSwitch('rbq-sdt-autorun-field', 'rbq-sdt-autorun');
         bindSwitch('rbq-sdt-auto-generate-field', 'rbq-sdt-auto-generate');
+        bindSwitch('rbq-sdt-auto-retry-field', 'rbq-sdt-auto-retry');
         bindSwitch('rbq-sdt-manual-draw-field', 'rbq-sdt-manual-draw');
         bindSwitch('rbq-sdt-lorebook-field', 'rbq-sdt-lorebook-enabled');
         bindSwitch('rbq-sdt-lorebook-current-floor-field', 'rbq-sdt-lorebook-current-floor');
@@ -21938,6 +21991,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             s.autoRunGenerate = checked('rbq-sdt-auto-generate');
             s.minSegments = Math.max(0, Math.min(10, Number(val('rbq-sdt-min-segments')) || 0));
             s.cardPosition = val('rbq-sdt-card-position') || 'bottom';
+            s.autoRetry = checked('rbq-sdt-auto-retry');
             s.manualDrawEnabled = checked('rbq-sdt-manual-draw');
             s.comicDrawerFloatingEnabled = checked('rbq-sdt-comic-drawer-floating');
             s.systemPromptPreset = val('rbq-sdt-system-preset') || DEFAULT_SYSTEM_PROMPT_PRESET;
@@ -22748,7 +22802,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const ecSysPrompt = promptBundle ? '' : getEnhancedContextSystemPrompt(getRequestEnhancedContext(store));
             const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
             // [阶段1·桥接] 手动补画通道同样带体位锁定段落
-            const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
+            SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
+        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
             const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
             let messages = standardRequest?.messages;
             let requestTool = standardRequest?.tool;
@@ -24335,6 +24390,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
 
         const toolRule = !promptBundle && store.provider !== 'custom' && store.toolCallMode ? DRAW_SPEC_TOOL_RULE.trim() : '';
         // [阶段1·桥接] 生图测试通道同样带体位锁定段落
+        SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
         const fullSystemPrompt = applyPoseDirective([systemPrompt, toolRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
         let messages = standardRequest?.messages;
