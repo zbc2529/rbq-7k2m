@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.84';
+    const PLUGIN_VERSION = '6.5.85';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -14118,6 +14118,8 @@ function sdtPoseMatrixEntry(className) {
             let list = (payload && Array.isArray(payload.segments)) ? payload.segments : [];
             // 6.5.82：其次回落「整组分镜」（runImageGenerationForWrapper 登记）——单条登记会让逐镜判定失效
             if (!list.length && Array.isArray(SDT_CURRENT_SEGS) && SDT_CURRENT_SEGS.length) list = SDT_CURRENT_SEGS;
+            // 6.5.85：再退一步用「tagger 最近一次解析出的整组」（宿主既不传 segments、也不登记时唯一的整组来源）
+            if (!list.length && Array.isArray(SDT_LAST_SEGS) && SDT_LAST_SEGS.length) list = SDT_LAST_SEGS;
             // 6.5.73：宿主拼的 payload 通常不带 segments → 回落到「本张图的分镜」（generateSdtImage 写入）
             if (!list.length && SDT_CURRENT_SEG) {
                 const one = (SDT_CURRENT_SEG.index === undefined) ? { ...SDT_CURRENT_SEG, index: SDT_CURRENT_SEG_IDX } : SDT_CURRENT_SEG;
@@ -14145,7 +14147,9 @@ function sdtPoseMatrixEntry(className) {
                     for (let k = 0; k < s.characters.length && k < 4; k++) {
                         const c = s.characters[k];
                         if (!c || typeof c !== 'object') continue;
-                        push(c.action, true);
+                        // 6.5.85：action 是 AI 写出来的英文 tag 串，不是正文原句——旧码把它当「正文证据」喂给判类，
+                        // 于是 action 里抄来的 lying on stomach 反过来推翻 AI 自己的 pose.class。只进 texts，不进 bodyTexts。
+                        push(c.action, false);
                         push(c.outfit, false);
                         push(c.base, false);
                     }
@@ -14376,7 +14380,13 @@ function sdtPoseMatrixEntry(className) {
             // word 却是「轻轻一勾」这种非姿势词），正文里明确写出的强体位词才是原文证据。规则：正文强词与 AI 不同 → 正文胜。
             // 只有模糊词（weak：趴着/站着/坐着…）时仍按 AI，仅记账 aiConflict（6.5.73 口径不变）。
             const aiWordInBody = !!(aiPoseRaw && segPose && segPose.word && bodyText.indexOf(String(segPose.word).trim()) >= 0);
-            const bodyWins = !!(aiPoseRaw && hitText && hitText.class && !hitText.weak && hitText.class !== aiPoseRaw.code);
+            // 6.5.85（真机 17:13 diag）：旧口径让「英文 tag」也能推翻 AI 声明——AI 判 C02/all_fours，它自己写的
+            // action 里留着上一镜抄来的 "lying on stomach"（C03 main on_stomach 的空格形态），词表据此判 C03
+            // 并当强词压过 AI ⇒ all_fours 被换类清洗删掉，画面从「跪趴」变「趴平」。
+            // 正文证据只能是「中文实词」且真出现在正文里；英文 tag（含 AI 自己写的 action / caption）只作交叉校验。
+            const hitWordZh = !!(hitText && /[\u4e00-\u9fff]/.test(String(hitText.word || '')));
+            const hitWordInBody = !!(hitText && hitText.word && bodyText.indexOf(String(hitText.word)) >= 0);
+            const bodyWins = !!(aiPoseRaw && hitText && hitText.class && !hitText.weak && hitWordZh && hitWordInBody && hitText.class !== aiPoseRaw.code);
             const aiPose = (aiPoseRaw && !bodyWins) ? aiPoseRaw : null;
             const aiOverruled = bodyWins
                 ? { ai: aiPoseRaw.code, body: String(hitText.class), word: String(hitText.word || ''), aiWord: String((segPose && segPose.word) || ''), aiWordInBody: aiWordInBody }
@@ -15705,6 +15715,18 @@ function sdtPoseMatrixEntry(className) {
     // 逐镜归属退化成恒第 0 镜、carry 永远不可用、判不出类就掉回引擎兜底（真机 6 张里 1 张被塞进 C17 bondage）。
     // 整组一起登记，pickSegment 才能按真实下标定位、carry 才能沿用前镜。
     let SDT_CURRENT_SEGS = null;
+    // 6.5.85（真机 17:13 diag）：宿主批量出图时不经过 runImageGenerationForWrapper，缓存也读不到 ⇒ 闸门只看到 1 条
+    // 分镜，5 张图全按第 0 镜判（diag 里 segIndex 全是 0），第 3 张因此丢类掉回引擎兜底被塞进 C17 bondage。
+    // 修法：tagger 每次成功解析后把「整组分镜」缓存下来，闸门在 payload 与登记都拿不到时用它。
+    let SDT_LAST_SEGS = null;
+    /** 6.5.85：tagger 解析成功后缓存整组分镜（参数可空，空则不覆盖） */
+    function sdtCacheGroupSegs(list) {
+        try {
+            const norm = Array.isArray(list) ? list.filter(function (s) { return s && typeof s === 'object'; }) : [];
+            if (norm.length) SDT_LAST_SEGS = norm;
+        } catch (e) { /* ignore */ }
+        return SDT_LAST_SEGS;
+    }
     /** 6.5.73：登记「本张图的分镜」（由 generateSdtImage 调用；手动/测试通道同样生效） */
     function sdtSetCurrentSeg(seg, idx, all) {
         SDT_CURRENT_SEG = (seg && typeof seg === 'object') ? seg : null;
@@ -16251,7 +16273,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                     '② 正文没有姿势线索 → pose.class 留空（null），不要用世界书掷骰的类填空（下方只给环境与着装事实，不给答案）；兜底由插画侧做；',
                     '③ 正文与建议都没有 → 才允许按剧情推测（兜底）。',
                     '【只锁一镜，不锁一组】同一镜内不得并列两个主类的 main tag（同镜混类即判错）；不同分镜换主类是合法的。',
-                    '【机位与景别 · 需求驱动】后入/趴姿的第三人称镜 → 选 from_side（侧面客观机位）；pov 只在正文明确第一人称时出现，不与 from_side / from_behind / profile 并用（正文没写第一人称就删 pov，别删侧面）。景别按本镜需求选：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 → 必须 full_body（禁 close-up / cowboy_shot / upper_body），Char uc 不得写 feet, shoes；没有足部需求时才允许 close-up / cowboy_shot 优先。【点名保护】正文点名写下的服装/配件词不被任何冲突规则删除，冲突时删的是没点名的细节。',
+                    '【机位与景别 · 一组要有变化】6.5.85：同一组内机位不许重复堆叠——3 镜以上至少要出现 3 种不同机位（from_side / from_behind / from_above / profile 轮着用），禁止整组 5 镜全部写 from_side（真机 17:13 就是这样，6 张图像同一个视角）；后入/趴姿的第三人称镜可以用 from_side，但只能占一两镜；pov 只在正文明确第一人称时出现，不与 from_side / from_behind / profile 并用（正文没写第一人称就删 pov，别删侧面）。景别按本镜需求选：正文/分镜出现 high_heels / tip_toe / 踮脚 / 脚尖 / 丝袜 / 脚背 → 必须 full_body（禁 close-up / cowboy_shot / upper_body），Char uc 不得写 feet, shoes；没有足部需求时才允许 close-up / cowboy_shot 优先。【点名保护】正文点名写下的服装/配件词不被任何冲突规则删除，冲突时删的是没点名的细节。',
                 ] : [
                     // F09：引擎模式是「世界书还没有剧本时的回滚态」——措辞必须限定，别让用户以为这是推荐工作模式
                     '【体位锁定】（回滚态）本组锁定：本轮体位已由引擎直读，优先级高于正文与任何 tag 模板：',
@@ -16298,6 +16320,7 @@ function sdtOutfitRuleNoteLines(probeText) {
                 formTag: sdtFormTag, formConflicts: sdtFormConflicts, ruleGate: sdtOutfitRuleGate,
                 poseMode: sdtPoseMode, poseSegments: sdtNormalizeSegments, segmentsForFacts: sdtSegmentsForFacts,
                 segmentsFromPayload: sdtSegmentsFromPayload,
+            cacheGroupSegs: sdtCacheGroupSegs,
             setCurrentSeg: sdtSetCurrentSeg, poseClassMenu: sdtPoseClassMenu, wardrobeTokens: sdtWardrobeTokens, wardrobeRemember: sdtWardrobeRemember, wardrobeApply: sdtWardrobeApply, wardrobeRemovalScan: sdtWardrobeRemovalScan, wardrobeStrip: sdtWardrobeStrip, wardrobeSummary: sdtWardrobeMemorySummary,
                 pickSegment: sdtPickSegmentForPayload, resolveSegmentPose: sdtResolveSegmentPose,
                 dropAllGuarded: sdtDropAllGuarded, skeletonLine: sdtSegmentSkeletonLine, variantHit: sdtVariantHitInText,
@@ -17118,7 +17141,9 @@ function sdtOutfitRuleNoteLines(probeText) {
         + '\n9. 【景别与机位每镜各只写一个】同一 segment 只写一个景别（close-up / cowboy_shot / upper_body / full_body / wide_shot 选一）与一个机位（pov / from_side / from_behind / profile / from_above / from_below 选一）；足部、鞋、袜履、脚背等细节可见时用 full_body（或 wide_shot），不要用 close-up。肢势词要自洽：写 arm_support 必须同时写 all_fours / prone_bone / bent_over 之一；standing 与 lying、on_back 与 on_stomach 不能同时出现。'
         + '\n8. 【正文点名的衣物必须落成 tag】正文写到具体衣物（内裤 / 胸罩 / 长筒袜 / 裙摆 / 围裙 / 和服 / 外套…）及其状态（褪到膝弯、拉到腰上、解开、只挂一边、湿透、撕破）时，必须在 characters[i].outfit 或 action 里出现对应英文 tag（例：内裤褪到膝弯 → panties 仍在 + 动作 pulling down，或只挂一条腿 → panties_around_one_leg；裙摆推到腰上 → skirt_lift / clothes_lift），不得只写 partially_undressed 糊过去；正文没脱的绝不给 nude / bottomless。';
         + '\n10. 【穿着状态要写全】characters[i].outfit 必须列出该角色此刻身上还穿着的全部部件（上装 / 下装 / 内裤 / 袜履 / 配饰），内裤没脱就得写 panties 或 panties_around_one_leg，不许只写 partially_undressed 蒙过去。'
-        + '\n11. 【看得见才算数】本镜要表现的衣物状态必须在画面里可见：内裤 / 袜履 / 膝部动作 / 足部细节时用 full_body 或 wide_shot，不要用 close-up 把关键部位切出画外。';
+        + '\n11. 【看得见才算数】本镜要表现的衣物状态必须在画面里可见：内裤 / 袜履 / 膝部动作 / 足部细节时用 full_body 或 wide_shot，不要用 close-up 把关键部位切出画外。'
+        + '\n12. 【整组服装必须连续】同一角色的 outfit 在本组内只允许按剧情一件件变少，不许凭空消失：本组第一镜必须写全内衣层（panties / bra；正文明确没穿才写 no_panties、bottomless、commando），后续镜沿用上一镜写过的部件，脱掉的必须用状态词（panties_around_one_leg、panties_aside、skirt_lift、bra_lift、clothing_aside），禁止用 partially_undressed 含糊代替——真机事故：前两镜没写 panties，NAI 每张自己随机构造，于是第一张有内裤、第三张起就没有了。'
+        + '\n13. 【机位不许全组一个】同一组内机位要有变化：3 镜以上至少 3 种（from_side / from_behind / from_above / profile），禁止整组全写 from_side；同一个机位最多连续两镜。';
     const DRAW_SPEC_TOOL_RULE = '\n\n[System Rule]: 严格执行以下输出规范：1. 必须调用 generate_draw_spec 工具提交你的最终生图分镜与分析 2. 不要在普通文本中输出任何外部内容。'
         + DRAW_SPEC_HARD_RULES;
 
@@ -19983,6 +20008,8 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 key: cacheKey,
             };
             store.cache[cacheKey] = cacheEntry;
+            // 6.5.85：整组分镜缓存给闸门兜底（宿主出图时不传 segments、也不走 wrapper 登记时唯一可用的整组来源）
+            try { if (typeof sdtCacheGroupSegs === 'function') sdtCacheGroupSegs(cacheEntry && cacheEntry.segments); } catch (e) { /* ignore */ }
             pruneCache();
             save();
 
