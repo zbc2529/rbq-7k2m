@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.83';
+    const PLUGIN_VERSION = '6.5.84';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -17613,6 +17613,19 @@ function sdtDiagTaggerBits() {
     } catch (e) { return { diagCtx: null }; }
 }
 
+/** 6.5.84 体检摘要导出正文：纯函数，方便闸门直接断言（不带 DOM、不读时钟）。
+ *  头部四行 + 空行 + 体检原文，结尾补换行；`stampText` 由调用方给，测试可固定。 */
+function sdtInspectExportText(lines, version, stampText) {
+    const head = [
+        '# 智能生图触发器 · 本轮体检摘要',
+        '# 插件版本：' + String(version || ''),
+        '# 导出时间：' + String(stampText || ''),
+        '# 说明：这张表就是面板「本轮体检」里的原文，逐行照抄，方便直接贴文件而不是整段发消息。',
+        '',
+    ];
+    return head.concat(Array.isArray(lines) ? lines.map(function (x) { return String(x == null ? '' : x); }) : []).join('\n') + '\n';
+}
+
 /** 6.5.60 本轮体检：把「姿势变量 / 体位锁定 / 世界书预算 / 出图重复」压成几行纯文本。
  *  手机端没有控制台，面板上要能直接看到这一轮到底带了什么。 */
 function sdtRoundInspectLines() {
@@ -21884,6 +21897,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     <div class="st-scene-trigger-buttons" style="margin: 4px 0 8px 0; display:flex; flex-wrap:wrap; gap:8px;">
                         <button id="rbq-sdt-round-refresh" class="menu_button" type="button"><i class="fa-solid fa-rotate"></i> 刷新体检</button>
                         <button id="rbq-sdt-round-copy" class="menu_button" type="button"><i class="fa-solid fa-copy"></i> 复制体检摘要</button>
+                        <button id="rbq-sdt-round-export" class="menu_button" type="button"><i class="fa-solid fa-download"></i> 导出体检摘要 (TXT)</button>
                     </div>
                 </div>
 
@@ -22684,6 +22698,28 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                 await copyToClipboard(sdtRoundInspectLines().join('\n'));
                 toastr.success('体检摘要已复制', PLUGIN_NAME);
             } catch (e) { toastr.error(`复制失败：${e?.message || e}`, PLUGIN_NAME); }
+        });
+
+        // 6.5.84 体检摘要导出：手机上复制整段太容易超长/被截断，这里直接落成一个 txt 文件发过来即可
+        document.getElementById('rbq-sdt-round-export')?.addEventListener('click', () => {
+            try {
+                const lines = sdtRoundInspectLines();
+                const now = new Date();
+                const txt = sdtInspectExportText(lines, PLUGIN_VERSION, now.toLocaleString());
+                const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.href = url;
+                a.download = `sdt-inspect-${stamp}.txt`;
+                document.body.append(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 4000);
+                toastr.success(`已导出体检摘要 ${lines.length} 行`, PLUGIN_NAME);
+            } catch (e) {
+                toastr.error(`导出失败：${e?.message || e}`, PLUGIN_NAME);
+            }
         });
 
         document.getElementById('rbq-sdt-export-diag')?.addEventListener('click', () => {
