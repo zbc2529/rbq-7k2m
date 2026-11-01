@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.76';
+    const PLUGIN_VERSION = '6.5.77';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2332,8 +2332,8 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
         严禁 muscular, abs, toned, beard, body hair
       ▸ 男·少年（bishounen / 清秀 / 瘦弱 / 纤细少年）：bishounen 或 handsome + slim 或 slender + no abs + narrow shoulders + fair skin
         严禁 muscular, abs, toned, beard
-      ── 男性默认排除（除非角色卡明确写大叔或壮汉角色）：mature_male, muscular, abs, toned, hairy, beard, old man
-      ── 无年龄信息：女性落少女档、男性落少年档，严禁默认幼态。
+      ── 男分档：用户本人（「你」「我」）＝成年 man，严禁 boy, shota；其余男性＝少年 bishounen, slim, no abs，写明正太才 shota
+      ── 无年龄：女落少女档、男除用户外落少年档，严禁默认幼态
       任何一档都必须落明确标签，不得留空、不得只写 adolescent 了事。
    ④ 发型发色：long hair, 1.2::black hair::, straight bangs, twintails
    ⑤ 瞳色眼型：blue eyes, tsurime, large eyes, droopy eyes
@@ -14858,6 +14858,9 @@ SCHEMA:
                 }
                 // ②③ 只在本类已落词时剪枝
                 if (hasOwn) {
+                    // 6.5.77：AI 已明确判类（pose.class）时，景别 / 机位 / 肢势这四类手写规则一律只记账、不动 tag
+                    const aiJudged = !!(bodyPose && bodyPose.source === 'ai');
+                    const aiLoose = [];
                     const vr = (M.viewRules && typeof M.viewRules === 'object') ? M.viewRules : {};
                     const oneOf = Array.isArray(vr.oneOf) ? vr.oneOf : [];
                     // 6.5.72 rev5（问题①）：组内消解不能是数组下标——景别按「本镜需求」选，机位按「谁在说话」选
@@ -14877,6 +14880,7 @@ SCHEMA:
                         const group = Array.isArray(oneOf[i]) ? oneOf[i].map(String) : [];
                         const present = group.filter(function (t) { return sdtTagHas(input, t); });
                         if (present.length <= 1) continue;
+                        if (aiJudged) { aiLoose.push({ kind: 'view', group: i, present: present.slice(0, 6) }); continue; }
                         let kept = present[0];                       // 缺省仍是矩阵序第一个（老口径）
                         let why = 'matrix-order';
                         const isShot = present.some(function (t) { return SHOT_TAGS.indexOf(t) >= 0; });
@@ -14904,6 +14908,7 @@ SCHEMA:
                         const pair = Array.isArray(vForbid[i]) ? vForbid[i].map(String) : [];
                         if (pair.length < 2) continue;
                         if (!sdtTagHas(input, pair[0]) || !sdtTagHas(input, pair[1])) continue;
+                        if (aiJudged) { aiLoose.push({ kind: 'viewForbid', pair: pair.join('+') }); continue; }
                         // 6.5.72 rev5（问题①）：旧码无条件删 pair[1] → 侧面/背面视角永远被 pov 吞掉
                         let vDrop = pair[1];
                         if (pair[0] === 'pov' && !firstPerson) vDrop = pair[0];
@@ -14921,6 +14926,7 @@ SCHEMA:
                         if (!sdtTagHas(input, key)) continue;
                         const ok = need.some(function (t) { return sdtTagHas(input, t); });
                         if (!ok) {
+                            if (aiJudged) { aiLoose.push({ kind: 'requires', key: key, need: need.slice(0, 4) }); continue; }
                             input = sdtDropAllGuarded(input, [key], rec, protTags);            // requires 前提不成立 → 剔除肢势词
                             if (!Array.isArray(rec.posture)) rec.posture = [];
                             rec.posture.push({ rule: 'requires', key: key, need: need.slice(0, 4), keptByProtect: protTags.indexOf(key) >= 0 });
@@ -14935,6 +14941,7 @@ SCHEMA:
                         if (pair.length < 2) continue;
                         if (!sdtTagHas(rulesProbe, pair[0]) || !sdtTagHas(rulesProbe, pair[1])) continue;
                         // 更贴锁定体位的一侧留下：主类 main 里出现过的那侧优先，都没有 → 按矩阵序保留第一个
+                        if (aiJudged) { aiLoose.push({ kind: 'postureForbid', pair: pair.join('+') }); continue; }
                         const dropIdx = (main.indexOf(pair[1]) >= 0 && main.indexOf(pair[0]) < 0) ? 0 : 1;
                         // 6.5.72 rev5（问题④）：删了哪一侧必须看得见（旧码静默）
                         // F10：两侧都在点名/体位保护集里时 sdtDropAllGuarded 一个都删不掉——面板必须说「两侧受保护」，
@@ -14945,6 +14952,7 @@ SCHEMA:
                         if (!Array.isArray(rec.postureForbid)) rec.postureForbid = [];
                         rec.postureForbid.push({ pair: pair.join('+'), dropped: pair[dropIdx], protected: bothProt, kept: stillThere && bothProt });
                     }
+                    if (aiLoose.length) rec.aiLoose = aiLoose.slice(0, 12);
                 }
                 // ④ 服装冲突（仅当服装事实存在且有组装输出）：uc 已进上方清单，这里只做 drop / dropTrig
                 // 6.5.72 rev4：dropTrig 只丢触发它的服装细节；kill 恒为空 ⇒ 服装冲突永远不让用户写的体位让位
@@ -16790,7 +16798,8 @@ function sdtOutfitRuleNoteLines(probeText) {
         + '\n4. 【判不出就留空】正文没有体位线索时 pose.class 留空，绝不猜测、绝不套用任何引擎/世界书掷骰结果或上一镜的类；宁可空着，也不许为了填满而编。'
         + '\n5. 【正文写的优先】正文写「抱着」「坐上来」「压在她身上」这类原文时，按正文语义判类，不要被任何外部建议或词典表改写。'
         + '\n6. 【一镜一套主类锚词】同一 segment 的 base / action / caption 里只写本镜 pose.class 那一个主类的主锚词（例如判 C04 就写 cowgirl_position / girl_on_top，不要再写 all_fours / on_stomach / prone_bone 这些别类的主锚词）；正文同时提到两种姿态时，选主导的那一种写进 pose.class，另一种的主锚词不要写进 tag。手/口/胸/道具等性行为细节词（fellatio / handjob / paizuri / anal）照写，不算第二套姿势。'
-        + '\n7. 【年龄性别照角色卡】characters[i].base 的性别与年龄段必须跟角色卡（characterCardInfo）或角色库档案一致：成年男性写 man / mature_male（严禁写成 boy / adolescent），成年女性写 woman / mature_female，儿童写 child / petite。角色卡没写年龄就按正文写，绝不擅自给成年角色降龄、也绝不把儿童升龄；同一个角色在一组分镜里年龄段必须始终一致。'
+        + '\n7. 【年龄性别照角色卡】characters[i].base 的年龄段按以下口径：正文里的「你」「我」就是用户本人 → 成年男性 man / 1boy（严禁 boy / shota / adolescent / 正太）；除用户本人以外的男性角色 → 少年档 bishounen / slim / no abs / narrow shoulders，正文明确写正太或幼男才升 shota；成年女性 woman / mature_female，儿童 child / petite。角色卡写明大叔或壮汉才加 mature_male / muscular；绝不擅自给用户本人降龄，也绝不把儿童升龄；同一个角色在一组分镜里年龄段必须始终一致。'
+        + '\n9. 【景别与机位每镜各只写一个】同一 segment 只写一个景别（close-up / cowboy_shot / upper_body / full_body / wide_shot 选一）与一个机位（pov / from_side / from_behind / profile / from_above / from_below 选一）；足部、鞋、袜履、脚背等细节可见时用 full_body（或 wide_shot），不要用 close-up。肢势词要自洽：写 arm_support 必须同时写 all_fours / prone_bone / bent_over 之一；standing 与 lying、on_back 与 on_stomach 不能同时出现。'
         + '\n8. 【正文点名的衣物必须落成 tag】正文写到具体衣物（内裤 / 胸罩 / 长筒袜 / 裙摆 / 围裙 / 和服 / 外套…）及其状态（褪到膝弯、拉到腰上、解开、只挂一边、湿透、撕破）时，必须在 characters[i].outfit 或 action 里出现对应英文 tag（例：内裤褪到膝弯 → panties 仍在 + 动作 pulling down，或只挂一条腿 → panties_around_one_leg；裙摆推到腰上 → skirt_lift / clothes_lift），不得只写 partially_undressed 糊过去；正文没脱的绝不给 nude / bottomless。';
 
     function getReorganizedSystemPrompt(store) {
@@ -17484,6 +17493,7 @@ function sdtRoundInspectLines() {
             }
             if (Array.isArray(gl.conflictSkipped) && gl.conflictSkipped.length) lines.push('  规则跳过 ' + gl.conflictSkipped.map(function (x) { return String(x.rule) + '(' + String(x.why) + ')'; }).join(' / '));
             if (Array.isArray(gl.viewRule) && gl.viewRule.length) lines.push('  机位景别 ' + gl.viewRule.map(function (x) { return String(x.group) + '→' + String(x.kept) + '(' + String(x.why) + ')'; }).join(' / '));
+        if (Array.isArray(gl.aiLoose) && gl.aiLoose.length) lines.push('  交给 AI ' + gl.aiLoose.map(function (x) { return String(x.kind) + (x.group !== undefined ? ('#' + x.group) : '') + ':' + ((x.present || x.pair || x.key || '')).toString().replace(/,/g, '/') + (x.need && x.need.length ? (' 需 ' + x.need.join('/')) : ''); }).join(' / ') + '（AI 已判类，插件只记账不动 tag）');
             if (Array.isArray(gl.viewForbid) && gl.viewForbid.length) lines.push('  机位互斥 删 ' + gl.viewForbid.map(function (x) { return String(x.dropped); }).join(' / '));
             if (Array.isArray(gl.posture) && gl.posture.length) lines.push('  肢势前提 删 ' + gl.posture.map(function (x) { return String(x.key); }).join(' / '));
             // F10：两侧都被点名保护时把「受保护」写出来——否则用户只看到删一半，以为闸门漏删
