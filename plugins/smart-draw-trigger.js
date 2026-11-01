@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.86';
+    const PLUGIN_VERSION = '6.5.87';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2984,6 +2984,8 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         // 6.5.86：与 autoRetry 拆开。「模型没走工具调用」时用同一个模型、同一个渠道再问一次纯文本 JSON。
         // 不换模型、不重试 3 次、不多吃额度以外的钱；只在用户明确关掉它时才彻底不回落。
         toolJsonFallback: true,
+        // 6.5.87：tagger 单次输出上限。真机事故：不给上限时用中转默认值，5 个分镜的 JSON 被砍成半截。
+        taggerMaxTokens: 8192,
         manualDrawEnabled: false,
         comicDrawerFloatingEnabled: true,
         systemPromptPreset: DEFAULT_SYSTEM_PROMPT_PRESET,
@@ -8811,13 +8813,53 @@ ${getCharacterMemoryTagSpecification()}
         return err;
     }
 
+    // 6.5.87：判断「模型吐的 JSON 是不是写到一半被砍断」。
+    // 中转常把被截断的响应报成 finish_reason: stop（不是 length），所以不能只看 finish_reason。
+    // 判据：从第一个 { 或 [ 起，括号必须配平、且不能停在字符串内部。
+    function sdtLooksTruncatedJson(text) {
+        const s = String(text || '').trim();
+        if (!s) return false;
+        // 全部按码点比较：SC_BRACE_L / SC_BRACKET_L / SC_BRACE_R / SC_BRACKET_R / SC_QUOTE / SC_BSLASH
+        // 这样函数体内不含裸的大括号与方括号字面量，编辑器与静态切片工具都不会被配对逻辑带偏。
+        const SC_BRACE_L = 123, SC_BRACKET_L = 91, SC_BRACE_R = 125, SC_BRACKET_R = 93, SC_QUOTE = 34, SC_BSLASH = 92;
+        let start = -1;
+        for (let k = 0; k < s.length; k++) {
+            const c = s.charCodeAt(k);
+            if (c === SC_BRACE_L || c === SC_BRACKET_L) { start = k; break; }
+        }
+        if (start < 0) return false;
+        const body = s.slice(start);
+        let depth = 0, opened = 0, inStr = false, esc = false;
+        for (let k = 0; k < body.length; k++) {
+            const ch = body.charCodeAt(k);
+            if (inStr) {
+                if (esc) { esc = false; continue; }
+                if (ch === SC_BSLASH) { esc = true; continue; }
+                if (ch === SC_QUOTE) inStr = false;
+                continue;
+            }
+            if (ch === SC_QUOTE) { inStr = true; continue; }
+            if (ch === SC_BRACE_L || ch === SC_BRACKET_L) { depth++; opened++; }
+            else if (ch === SC_BRACE_R || ch === SC_BRACKET_R) depth--;
+        }
+        return opened > 0 && (depth > 0 || inStr);
+    }
+
     function makeToolFallbackError(finishReason, rawText, retried) {
         const finishReasonInfo = finishReason ? ` (finish_reason: ${finishReason})` : '';
-        const err = new Error(retried
-            ? `大模型没有按工具调用返回分镜${finishReasonInfo}，自动改用普通 JSON 模式重试后仍未得到有效结果。这个模型/渠道可能不支持工具调用，或中转站没有正确转发，请换一个模型或渠道再试。`
-            : `大模型没有按工具调用返回分镜${finishReasonInfo}，正文里也没有可用的分镜 JSON。这个模型/渠道可能不支持工具调用，或中转站没有正确转发。`);
+        const truncated = sdtLooksTruncatedJson(rawText);
+        let msg;
+        if (truncated) {
+            msg = `大模型返回的分镜 JSON 写到一半就断了${finishReasonInfo}。这不是「不支持工具调用」，是输出被长度上限截断了。建议：把面板「每条消息最少生图数」调小（5 镜的 JSON 很容易超限），或把「tagger 输出上限」调大。${retried ? '（已自动用普通 JSON 模式重试一次，仍然被截断）' : ''}`;
+        } else if (retried) {
+            msg = `大模型没有按工具调用返回分镜${finishReasonInfo}，自动改用普通 JSON 模式重试后仍未得到有效结果。这个模型/渠道可能不支持工具调用，或中转站没有正确转发，请换一个模型或渠道再试。`;
+        } else {
+            msg = `大模型没有按工具调用返回分镜${finishReasonInfo}，正文里也没有可用的分镜 JSON。这个模型/渠道可能不支持工具调用，或中转站没有正确转发。`;
+        }
+        const err = new Error(msg);
         err.code = 'SDT_TOOL_RESPONSE_MISSING';
-        err.rawOutput = `【错误】: 请求了工具调用 (Tool Call)，但大模型 / 中转站没有返回 generate_draw_spec 工具参数，正文中也解析不出分镜 JSON${retried ? '；已自动去掉工具调用用普通 JSON 模式重试一次，仍然失败' : ''}。\n【服务端原始响应正文】:\n${rawText || '（空）'}\n\n【排查建议】: 换一个支持 Function Calling 的模型或渠道；或在设置中关闭「结构化工具调用 (Tool Call)」并点保存，直接走普通 JSON 模式。`;
+        err.truncated = truncated;
+        err.rawOutput = `【错误】: 请求了工具调用 (Tool Call)，但大模型 / 中转站没有返回 generate_draw_spec 工具参数，正文中也解析不出分镜 JSON${retried ? '；已自动去掉工具调用用普通 JSON 模式重试一次，仍然失败' : ''}。${truncated ? '\n【判定】: 返回内容是一段未闭合的 JSON（括号没配平 / 停在字符串内），属于「输出被长度上限截断」，不是模型不支持工具调用。' : ''}\n【服务端原始响应正文】:\n${rawText || '（空）'}\n\n【排查建议】: ${truncated ? '调小「每条消息最少生图数」或调大「tagger 输出上限」；仍不够就换输出上限更大的模型。' : '换一个支持 Function Calling 的模型或渠道；或在设置中关闭「结构化工具调用 (Tool Call)」并点保存，直接走普通 JSON 模式。'}`;
         return err;
     }
 
@@ -17279,6 +17321,14 @@ function sdtOutfitRuleNoteLines(probeText) {
         return params;
     }
 
+    // 6.5.87：tagger 输出上限。0 或空 = 不传这个字段（留给不接受 max_tokens 的中转）。
+    // 真机事故：请求里从来没带过输出上限，用中转默认值；5 个分镜的 JSON 写到第一镜就被砍断，
+    // 而中转把截断报成 finish_reason: stop，于是插件误判成「不支持工具调用」。
+    function sdtTaggerMaxTokens(store) {
+        const n = Number((store || {}).taggerMaxTokens);
+        return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    }
+
     async function callApiWithJsonFallback(url, fetchOptions, reqBodyObj, customFetch = smartFetch) {
         let currentBody = { ...reqBodyObj };
         let response = await customFetch(url, {
@@ -17563,6 +17613,7 @@ function sdtDiag() {
                     preset: store.systemPromptPreset || '',
                     customPromptLen: String(store.customSystemPrompt || '').length,
                     minSegments: store.minSegments,
+                    taggerMaxTokens: store.taggerMaxTokens,
                     contextCount: store.contextCount,
                     multiCharOutput: !!store.multiCharOutput,
                     multiCharUseCoords: !!store.multiCharUseCoords,
@@ -18225,6 +18276,9 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             messages,
             ...buildThinkingParams(store),
         };
+        // 6.5.87：显式给输出上限（默认 8192），否则用中转默认值，长 JSON 会被砍断
+        const _taggerMt = sdtTaggerMaxTokens(store);
+        if (_taggerMt > 0) reqBody.max_tokens = _taggerMt;
 
         if (store.toolCallMode) {
             reqBody.tools = [requestTool || getDrawSpecTool(store, promptBundle, payload, store.toolInputInDescription ? fullSystemPrompt : '')];
@@ -18721,6 +18775,9 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             messages: Array.isArray(messages) ? messages.map(m => ({ ...m })) : [],
             ...buildThinkingParams(store),
         };
+        // 6.5.87：显式给输出上限（默认 8192），否则用中转默认值，长 JSON 会被砍断
+        const _taggerMt = sdtTaggerMaxTokens(store);
+        if (_taggerMt > 0) reqBody.max_tokens = _taggerMt;
 
         const useToolCall = !!(store.toolCallMode && tool);
         if (useToolCall) {
@@ -21833,6 +21890,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     </div>
                     <div class="st-scene-trigger-modal-grid">
                         <label class="st-scene-trigger-field" title="要求 tagger 每条消息至少输出几个分镜（0 = 智能自适应推演，根据前情与剧情节拍自然提取；设为 2~3 则强制长文至少出 2~3 张图）"><span>每条消息最少生图数</span><input id="rbq-sdt-min-segments" type="number" min="0" max="10" step="1" style="width:80px" placeholder="0"></label>
+                        <label class="st-scene-trigger-field" title="tagger 单次输出上限（tokens，默认 8192）。分镜写成 JSON 很长，上限太小会被截断成半截 JSON——真机表现就是「没有按工具调用返回分镜」。填 0 = 不传这个参数，用中转默认值。"><span>tagger 输出上限</span><input id="rbq-sdt-tagger-max-tokens" type="number" min="0" max="32768" step="256" style="width:100px" placeholder="8192"></label>
                         <label class="st-scene-trigger-field" title="设置未解析时的生图/Tag卡片在消息中的默认呈现位置"><span>初始生图按钮位置</span><select id="rbq-sdt-card-position"><option value="bottom">消息末尾 (默认)</option><option value="top">消息开头 (置顶封面，免滑屏)</option><option value="message_actions">消息操作栏小图标 (纯净免占位)</option></select></label>
                     </div>
                 </div>
@@ -22018,6 +22076,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         document.getElementById('rbq-sdt-autorun').checked = !!store.autoRunTagger;
         document.getElementById('rbq-sdt-auto-generate').checked = !!store.autoRunGenerate;
         document.getElementById('rbq-sdt-min-segments').value = store.minSegments || 0;
+        document.getElementById('rbq-sdt-tagger-max-tokens').value = store.taggerMaxTokens === undefined ? 8192 : store.taggerMaxTokens;
         document.getElementById('rbq-sdt-card-position').value = store.cardPosition || 'bottom';
         document.getElementById('rbq-sdt-auto-retry').checked = store.autoRetry === true;
         document.getElementById('rbq-sdt-tool-json-fallback').checked = store.toolJsonFallback !== false;
@@ -22387,6 +22446,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             s.autoRunTagger = checked('rbq-sdt-autorun');
             s.autoRunGenerate = checked('rbq-sdt-auto-generate');
             s.minSegments = Math.max(0, Math.min(10, Number(val('rbq-sdt-min-segments')) || 0));
+            s.taggerMaxTokens = Math.max(0, Math.min(32768, Number(val('rbq-sdt-tagger-max-tokens')) || 0));
             s.cardPosition = val('rbq-sdt-card-position') || 'bottom';
             s.autoRetry = checked('rbq-sdt-auto-retry');
             s.toolJsonFallback = checked('rbq-sdt-tool-json-fallback');
