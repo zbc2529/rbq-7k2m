@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.91';
+    const PLUGIN_VERSION = '6.5.92';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2509,8 +2509,8 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
 若你要说的话不属于 schema 里的任何字段，那句话就不要说。`;
 
     const SYSTEM_PROMPT_PRESETS = {
-        v41_local: { label: 'V41·本地精简版 (内置默认/六档性别体型/男娘正太/机位轮转)', prompt: V41_BUILTIN_SYSTEM_PROMPT },
-        v40_worldbook_97_opt: { label: 'V40·文生图9.7全功能优化版 (默认推荐/四模块自洽架构/全场景覆盖)', prompt: V40_SPEC_97_OPTIMIZED_SYSTEM_PROMPT },
+        v41_local: { label: 'V41·本地精简版 (当前默认/六档性别体型/族裔年龄体型均为条件项/机位轮转)', prompt: V41_BUILTIN_SYSTEM_PROMPT },
+        v40_worldbook_97_opt: { label: 'V40·文生图9.7全功能优化版 (历史·示例含日系幼态锚点，勿手切)', prompt: V40_SPEC_97_OPTIMIZED_SYSTEM_PROMPT },
         v35_worldbook_97: { label: 'V35·文生图9.7完整详尽版 (.53实装版/绝杀肚脐机位/无接触留白)', prompt: V35_SPEC_97_SYSTEM_PROMPT },
         consistent: { label: 'V24·8.30全能规范版 (经典)', prompt: CONSISTENT_SYSTEM_PROMPT },
         classic: { label: 'V20·经典版 (历史)', prompt: STORYBOARDER_CLASSIC_PROMPT },
