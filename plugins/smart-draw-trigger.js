@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.89';
+    const PLUGIN_VERSION = '6.5.90';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2505,12 +2505,11 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
 
 【输出形态】
 只输出符合 schema 的 JSON，或只发起指定工具调用。第一个字符必须是左花括号或工具调用本身。禁止前后缀、禁止解释、禁止代码块围栏、禁止「以下是」。
+这两种出口在本环节里完全等价：调用工具时把结构放进参数，不调用工具时把同一个结构直接写成 JSON——字段名、判定规则、内容尺度一字不差。不要因为这一次走的是哪种出口，就改变你写什么。
 若你要说的话不属于 schema 里的任何字段，那句话就不要说。`;
-    const SDT_UNCENSORED_SYSTEM_PROMPT = SDT_CAST_BREAK_PREFIX + '\n\n' + V41_BUILTIN_SYSTEM_PROMPT;
 
     const SYSTEM_PROMPT_PRESETS = {
         v41_local: { label: 'V41·本地精简版 (内置默认/六档性别体型/男娘正太/机位轮转)', prompt: V41_BUILTIN_SYSTEM_PROMPT },
-        sdt_uncensored: { label: '🔥 生图破限版 (V41 + 转写员身份 / 禁说教 / 标签锚定)', prompt: SDT_UNCENSORED_SYSTEM_PROMPT },
         v40_worldbook_97_opt: { label: 'V40·文生图9.7全功能优化版 (默认推荐/四模块自洽架构/全场景覆盖)', prompt: V40_SPEC_97_OPTIMIZED_SYSTEM_PROMPT },
         v35_worldbook_97: { label: 'V35·文生图9.7完整详尽版 (.53实装版/绝杀肚脐机位/无接触留白)', prompt: V35_SPEC_97_SYSTEM_PROMPT },
         consistent: { label: 'V24·8.30全能规范版 (经典)', prompt: CONSISTENT_SYSTEM_PROMPT },
@@ -2566,6 +2565,17 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
     }
 
     const JAILBREAK_PRESETS = {
+        // [6.5.90] 生图破限档：只给「破限词」，不设 toolCallMode / squashMessages /
+        // postProcessPrompt —— 选了它不会改动你的「结构化工具调用」开关，两条出口（工具调用 /
+        // 纯文本 JSON）拿到的是同一段破限词与同一套判定规则。
+        sdt_image: {
+            label: '🔥 生图转写破限 (不改你的工具开关 / 推荐 DeepSeek·GLM·本地)',
+            prompt: SDT_CAST_BREAK_PREFIX,
+            geminiJailbreak: true,
+            // 不依赖后处理注入：本档破限词自带输出形态约束，再多一轮假 assistant
+            // 反而在纯文本 JSON 模式下多一次截断机会。
+            postProcessEnabled: false,
+        },
         sandbox: {
             label: '酒馆沙盒纯净版 (System 声明 / 推荐 Gemini 3.7+)',
             prompt: [
