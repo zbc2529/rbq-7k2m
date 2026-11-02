@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.93';
+    const PLUGIN_VERSION = '6.5.94';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -8427,23 +8427,43 @@ ${getCharacterMemoryTagSpecification()}
             if (pass > 0) debugInfo(`递归第 ${pass + 1} 轮: 新增条目`);
         }
 
+        // ── 6.5.94 剥 EJS 再算预算 ──────────────────────────────────────
+        // 插件从不执行世界书里的 EJS，所以「进了 prompt 的 EJS 条目」= 把 <%% … %%> 源码原样喂给模型。
+        // 姿势书 uid62「姿势与名器掷骰」一条 35,256 字符，比整个预算还大：totalLen + len > budget 直接
+        // return false，它永远进不来；预算抬到能装下它，进来的又是一大段没人执行的模板代码。
+        // 这里把 EJS 块剥掉只留说明文字——掷骰结果本来就在 chat_metadata 变量里，tagger 侧不需要再掷一次。
+        const sdtStripEjsBlocks = (raw) => String(raw || '')
+            .replace(/<%[\s\S]*?%>/g, '')
+            .replace(/[ \t]+$/gm, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        const ejsStripped = [];
+        const afterStrip = afterGroup.map(e => {
+            const raw = String(e.content || '');
+            if (!/<%|%>/.test(raw)) return e;
+            const clean = sdtStripEjsBlocks(raw);
+            ejsStripped.push({ uid: e.uid, source: e.sourceName || '', rawLen: raw.length, keptLen: clean.length });
+            if (!clean) return null;
+            return { ...e, content: clean };
+        }).filter(Boolean);
+
         // Phase 4: Sort by order (higher = higher priority) and apply budget
-        afterGroup.sort((a, b) => {
+        afterStrip.sort((a, b) => {
             if (a.constant !== b.constant) return a.constant ? -1 : 1;
             return (b.order || 0) - (a.order || 0);
         });
 
         const budget = Math.max(500, Number(store.lorebookBudget) || DEFAULT_LOREBOOK_BUDGET);
         let totalLen = 0;
-        const budgeted = afterGroup.filter(entry => {
+        const budgeted = afterStrip.filter(entry => {
             const len = (entry.content || '').length;
             if (totalLen + len > budget) return false;
             totalLen += len;
             return true;
         });
 
-        sdtLorebookStats = { activated: afterGroup.length, selected: budgeted.length, chars: totalLen, budget: budget };
-        debugInfo(`世界书匹配: ${afterGroup.length} 条激活, ${budgeted.length} 条入选 (预算 ${totalLen}/${budget} 字符)`);
+        sdtLorebookStats = { activated: afterStrip.length, selected: budgeted.length, chars: totalLen, budget: budget, ejsStripped: ejsStripped };
+        debugInfo(`世界书匹配: ${afterStrip.length} 条激活, ${budgeted.length} 条入选 (预算 ${totalLen}/${budget} 字符)`);
         return budgeted;
     }
 
@@ -18302,7 +18322,10 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
                     activated: (sdtLorebookStats && Number(sdtLorebookStats.activated)) || lbList.length,
                     selected: (sdtLorebookStats && Number(sdtLorebookStats.selected)) || lbList.length,
                     chars: lbChars,
-                    ejsEntries: lbEjs.map(e => ({ uid: e.uid, source: e.sourceName || '', len: String((e && e.content) || '').length })),
+                    // 6.5.94：rawLorebooks 已经是剥过 EJS 的内容，所以这里改读剥离记账，
+                    // 字段名保留 ejsEntries 以免旧的分析脚本炸；keptLen/rawLen 说明剥掉了多少。
+                    ejsEntries: ((sdtLorebookStats && Array.isArray(sdtLorebookStats.ejsStripped)) ? sdtLorebookStats.ejsStripped : [])
+                        .map(e => ({ uid: e.uid, source: e.source || '', len: e.rawLen, keptLen: e.keptLen })),
                     titles: lbList.slice(0, 40).map(e => String((e && e.comment) || '').slice(0, 32)),
                 },
                 sources: (Array.isArray(store && store.lorebookSources) ? store.lorebookSources : []).map(s => ({
