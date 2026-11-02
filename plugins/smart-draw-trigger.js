@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.95';
+    const PLUGIN_VERSION = '6.5.96';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -1369,13 +1369,13 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 2. **base**（外貌防伪码，跨图锁定）：
    - 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
      ① 性别：girl / boy（禁带数字，1girl/1boy 属于 scene）
-     ② 族裔/国籍/面相（必须推断填写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系角色才带 japanese 或 delicate_face 锚定动漫萌系面相（未写明族裔不追加，正文写明别的族裔必须让位）；西方角色带 caucasian 或 western）
+     ② 族裔/国籍/面相（有的才写：japanese, east_asian, delicate_face, caucasian, western, chinese 等；日系角色才带 japanese 或 delicate_face 锚定动漫萌系面相（未写明族裔不追加、也不许猜，正文写明别的族裔必须让位）；西方角色带 caucasian 或 western；判不出就不写这一维）
      ③ 年龄阶段（必须填写：adolescent, teenager, mature_female, child 等；young_girl 仅正文明确幼态时取）
      ④ 发型发色（发长+发型+发色，如 long_hair, blonde_hair, twin_tails）
      ⑤ 瞳色眼型（如 green_eyes, tareme/tsurime/large_eyes）
      ⑥ 胸型体态（如 large_breasts, slender/curvy/petite）
      ⑦ 肤色与专属身体标记（如 fair_skin, pale_skin, mole, freckles）
-   - ⛔ 严禁遗漏族裔面相与年龄段！⛔ 禁写服装/动作/表情（属于 outfit/action）
+   - ⛔ 严禁遗漏年龄段（漏了会变脸）！⛔ 族裔面相判不出就不写，不许猜；禁写服装/动作/表情（属于 outfit/action）
 3. **outfit**（当前服装，拆解到部件）：
    - 顺序：主服装款式颜色材质 → 次要配饰鞋袜 → 穿着状态(open/off_shoulder/lifted) → 损耗/透视(wet_clothes, see-through) → 裸露梯度
 4. **action**（当前姿态动作，每帧不同）：
@@ -2313,7 +2313,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
 1.【7 维外貌防伪矩阵】base 字段纯净无临时服装与动作。
    ① 性别：girl / boy（严禁带数字，防人数干扰）
    ② 面相族裔：japanese, delicate_face（仅正文/角色卡写明日系才带；未写明不追加，正文写别的族裔即让位）/ caucasian / western
-   ③ 判定顺序＝性别 → 年龄 → 体型，三步走完再落笔。禁止默认女性、禁止默认幼态。
+   ③ 判定顺序＝性别 → 年龄 → 体型，三步走完再落笔。禁止默认女性、禁止默认幼态；年龄判不出就按成年骨架落笔（slender/average build、medium height），不许拿 petite 顶替成年。
       判定依据优先级：角色卡正文 → 角色档案 base → 世界书 → 剧情上下文 → 代词与称谓。
       ── 第一步 性别（决定后面整套标签，判错全盘皆错）：
          男性：男 / 正太 / 少年 / 学弟 / 男娘 / 伪娘 / 女装少年 / otokonoko / femboy / shota / boy / male
@@ -2323,7 +2323,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
       ── 第三步 性别 × 年龄 选标签组，只允许下列六种组合：
       ▸ 女·幼态（loli / 幼女 / 萝莉 / 女童）：loli, petite, child 中≥2 + short stature + flat_chest 或 small_breasts
         肉感默认关闭：仅正文写明 chubby、肉嘟嘟、微胖、丰满 才落 chubby, soft belly, wide hips, thick thighs；未写明按 ⑥ 补全
-      ▸ 女·少女（teenager / 学生 / JK）：petite 或 slender + small_breasts 或 medium breasts + medium height；可带 wide hips, thick thighs
+      ▸ 女·少女（teenager / 学生 / JK）：slender 或 average build + small_breasts 或 medium breasts + medium height；petite 仅正文写明娇小/小个子/个子矮才用；可带 wide hips, thick thighs
       ▸ 女·成熟（mature_female / milf / 人妻 / 熟女）：mature_female + curvy 或 voluptuous + large breasts + wide hips, thick thighs + narrow waist
       ▸ 男·正太（shota / 正太 / 幼男）：shota 或 boy + slim 或 petite + flat_chest + no abs + short stature + delicate_face, beautiful face, clear skin, narrow shoulders
         严禁 muscular, abs, toned, mature_male, beard, body hair
@@ -2347,7 +2347,7 @@ base / outfit / action / uc 只写英文 danbooru tag，逗号分隔；禁止中
    - 纯净法则：base 严禁混入衣服或姿势。
     - 体型档位强化（按 ③ 的判定结果套用，不得跨档混写）：
       女·幼态 → 锚定「年龄感 + 小个头 + 平或小胸」三件事，缺一项就会被画成成年女性。组合：loli, petite, child, flat_chest 或 small_breasts, short stature；肉感仅正文写明才叠加 wide hips / soft belly / chubby（默认不加，纯干瘦不算错）。
-      女·少女 → slender 或 petite, small_breasts 或 medium breasts, 不写 loli / child。
+      女·少女 → slender 或 average_build, small_breasts 或 medium breasts, 不写 loli / child；petite 仅正文写明小个子。
       女·成熟 → 锚定「曲线 + 腰胯 + 丰满」，缺一项就会被画成单薄少女。组合：curvy 或 voluptuous, large breasts, wide hips, thick thighs, narrow waist。这是「魔鬼身材」的标准写法，voluptuous 单写强度不够，必须配 wide hips 与 thick thighs 才出沙漏比例。
       男·正太 / 男娘 / 少年 → 锚定「瘦 + 平 + 无肌」三件事：slim 或 slender, flat_chest, no abs 必写；缺 no abs 会自己长出肌肉块。男娘另加 androgynous 或 otokonoko，正太另加 shota, short stature。
    - 发色兜底铁律（⚠️优先于「base 原样复用」）：base 必须含明确发色（black_hair / blonde_hair / silver_hair 等，或 1.2::xxx_hair:: 加权）。若档案 base 只有 short_hair / long_hair 这类无颜色词，视为不完整，必须追加一个与角色气质协调的发色标签——这属于补全，不算漂移，不加才违规。选定后在全部后续分镜 100% 复用。
