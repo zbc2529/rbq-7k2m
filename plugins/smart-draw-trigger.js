@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.96';
+    const PLUGIN_VERSION = '6.5.97';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -261,7 +261,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 - 配角：faceless male / faceless female
 - 7 维外貌矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ② 面相/族裔：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
   ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
@@ -325,12 +325,12 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
     {
       "label": "细雨递信",
       "anchor": {"text": "她小心翼翼地递过那封带着粉色爱心封口的信件，微红着脸不敢抬头看我"},
-      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
+      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a slim girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
       "negative": "nude, completely nude, nipples, pussy, penis, topless, bottomless, boy, male, camera",
       "characters": [
         {
           "name": "Mira (original)",
-          "base": "girl, japanese, delicate_face, long hair, 1.2::brown hair::, brown eyes, flat chest, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, petite, white skin, black round-frame glasses, yellow star hairpin",
+          "base":"girl, long hair, 1.2::brown hair::, brown eyes, small_breasts, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, white skin, black round-frame glasses, yellow star hairpin",
           "outfit": "blue knee-length pleated skirt, blue serafuku, white sailor collar, blue neckerchief, buttons, wet clothes, white knee socks",
           "action": "standing, leaning forward, 1.3::left hand, holding umbrella, transparent plastic umbrella, umbrella over shoulder::, 1.4::right hand, arm extended, holding love letter, a white envelope with a pink heart seal::, looking down, shy, full face blush, wavy mouth, slightly teary, parted lips, not daring to look up at him, 2::speech bubble::, text\\\"请和我交往吧\\\"",
           "center": { "x": 0.5, "y": 0.5 },
@@ -394,7 +394,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, petite, fair skin",
+          "base":"girl, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, fair skin",
           "outfit": "white sailor serafuku, unbuttoned, open collar, bottomless, black thighhighs",
           "action": "straddling viewer, 1.4::lowering hips, imminent penetration, spreading labia::, looking down at viewer, head lowered, disgusted expression, heavy blush, condescending gaze, parted lips, heavy breathing",
           "center": { "x": 0.5, "y": 0.5 },
@@ -500,7 +500,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 characters[i].base 是角色外貌的底层唯一身份标识，专用于「角色外貌跨图记忆缓存（Character Memory）」，严禁写入临时着装与动作：
 - 7 维全息矩阵公式：
   ① 性别：girl / boy（禁带数字，防人数干扰）
-  ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+  ② 面相/族裔：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化漂移；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
   ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
   ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
   ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes
@@ -600,12 +600,12 @@ characters[i].center 负责在画面中给角色精准定位，实现受控布�
     {
       "label": "细雨递信",
       "anchor": {"text": "她小心翼翼地递过那封带着粉色爱心封口的信件，微红着脸不敢抬头看我"},
-      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
+      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a slim girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
       "negative": "nude, completely nude, nipples, pussy, penis, topless, bottomless, boy, male, camera",
       "characters": [
         {
           "name": "Mira (original)",
-          "base": "girl, japanese, delicate_face, long hair, 1.2::brown hair::, brown eyes, flat chest, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, petite, white skin, black round-frame glasses, yellow star hairpin",
+          "base":"girl, long hair, 1.2::brown hair::, brown eyes, small_breasts, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, white skin, black round-frame glasses, yellow star hairpin",
           "outfit": "blue knee-length pleated skirt, blue serafuku, white sailor collar, blue neckerchief, buttons, wet clothes, white knee socks",
           "action": "standing, leaning forward, 1.3::left hand, holding umbrella, transparent plastic umbrella, umbrella over shoulder::, 1.4::right hand, arm extended, holding love letter, a white envelope with a pink heart seal::, looking down, shy, full face blush, wavy mouth, slightly teary, parted lips, not daring to look up at him, 2::speech bubble::, text\\\"请和我交往吧\\\"",
           "center": { "x": 0.5, "y": 0.5 },
@@ -653,7 +653,7 @@ characters[i].center 负责在画面中给角色精准定位，实现受控布�
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, petite, fair skin",
+          "base":"girl, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, fair skin",
           "outfit": "white sailor serafuku, unbuttoned, open collar, bottomless, black thighhighs",
           "action": "straddling viewer, 1.4::lowering hips, imminent penetration, spreading labia::, looking down at viewer, disgusted expression, heavy blush, condescending gaze, parted lips, heavy breathing",
           "center": { "x": 0.5, "y": 0.5 },
@@ -731,7 +731,7 @@ Scene 是整幅画面的空间坐标基座与全场总纲：
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 严格按 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+② 面相/族裔：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定动漫面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
 ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
@@ -792,7 +792,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Kaguya Shinomiya (Kaguya-sama: Love Is War)",
-          "base": "girl, japanese, delicate_face, teenager, very_long_hair, 1.2::black_hair::, straight_hair, wet_hair, 1.2::red_ribbon::, slender, fair_skin",
+          "base":"girl, teenager, very_long_hair, 1.2::black_hair::, straight_hair, wet_hair, 1.2::red_ribbon::, slender, fair_skin",
           "outfit": "black long-sleeved serafuku, white sailor collar, red front bow tie, black pleated knee-length skirt, wet_clothes",
           "action": "standing on pavement, facing away, static pose, 1.4::right hand, holding umbrella, black umbrella, umbrella over head::, 1.3::left hand, holding satchel, brown leather satchel, satchel in hand::",
           "center": "C3",
@@ -815,7 +815,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Cartethyia (Wuthering Waves)",
-          "base": "girl, caucasian, delicate_face, adolescent, long_hair, 1.2::blonde_hair::, blue_eyes, small_breasts, silver_circlet, purple_flower_hair_ornament, fair_skin",
+          "base":"girl, caucasian, adolescent, long_hair, 1.2::blonde_hair::, blue_eyes, small_breasts, silver_circlet, purple_flower_hair_ornament, fair_skin",
           "outfit": "white camisole, blue-and-white striped panties, barefoot",
           "action": "sitting on floor, leaning back against couch, legs stretched out, 1.3::right hand, holding popsicle, green popsicle in mouth, eating::, left hand supporting herself on the floor, looking at viewer, relaxed expression",
           "center": "C3",
@@ -838,7 +838,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, petite, fair_skin",
+          "base":"girl, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, fair_skin",
           "outfit": "white sailor serafuku, unbuttoned, open_collar, bottomless, black thighhighs",
           "action": "straddling viewer, 1.4::lowering hips, imminent penetration, spreading labia::, looking down at viewer, disgusted expression, heavy blush, condescending gaze, parted lips, heavy breathing",
           "center": "C3",
@@ -897,7 +897,7 @@ Scene 字段是整幅画面的空间坐标基座与全场总纲。严禁平面�
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 characters[i].base 必须严格按照 7 维全息外貌公式输出，严禁包含临时服装与动作：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定精致二次元面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+② 族裔/面相：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定精致二次元面相；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
 ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
 ④ 发型发色：如 long_hair, 1.2::black_hair::, straight_bangs, twin_tails
 ⑤ 瞳色眼型：如 blue_eyes, tsurime, large_eyes
@@ -954,7 +954,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Kaguya Shinomiya (Kaguya-sama: Love Is War)",
-          "base": "girl, japanese, delicate_face, teenager, very_long_hair, 1.2::black_hair::, straight_hair, 1.2::red_ribbon::, slender, fair_skin",
+          "base":"girl, teenager, very_long_hair, 1.2::black_hair::, straight_hair, 1.2::red_ribbon::, slender, fair_skin",
           "outfit": "black long-sleeved serafuku, white sailor collar, red front bow tie, black pleated knee-length skirt, wet_clothes",
           "action": "standing on pavement, facing away, static pose, 1.4::right hand holding umbrella, black umbrella over head::, 1.3::left hand holding satchel, brown leather satchel at side::",
           "center": "C3",
@@ -977,7 +977,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Hanako (original)",
-          "base": "girl, japanese, delicate_face, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, petite, fair_skin",
+          "base":"girl, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, fair_skin",
           "outfit": "navy blue sailor serafuku, white sailor collar, red neckerchief, pleated knee-length skirt",
           "action": "leaning forward, 1.4::both hands holding pink love letter toward viewer::, blushing, shy expression, looking down, biting lip, trembling slightly",
           "center": "C3",
@@ -1000,7 +1000,7 @@ characters[i].action 必须将全身姿势、手部与神态细化拆解：
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, petite, fair_skin",
+          "base":"girl, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, fair_skin",
           "outfit": "white sailor serafuku, unbuttoned, open_collar, bottomless, black thighhighs",
           "action": "straddling viewer, 1.4::lowering hips, imminent penetration, spreading labia::, looking down at viewer, disgusted expression, heavy blush, condescending gaze, parted lips, heavy breathing",
           "center": "C3",
@@ -1073,7 +1073,7 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
 ══ 角色外貌防伪码（Base 7 维矩阵，跨图锁定）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=角色变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词 锚定动漫美学面相，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+② 族裔/面相（有的才写：japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词 锚定动漫美学面相，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
 ③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, blonde_hair, twin_tails）
 ⑤ 瞳色眼型（如 blue_eyes, tsurime, large_eyes）
@@ -1106,7 +1106,7 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, petite, fair_skin",
+          "base":"girl, teenager, gyaru, long_blonde_hair, twin_tails, blue_eyes, small_breasts, fair_skin",
           "outfit": "white sailor serafuku, open_collar, bottomless, black_thighhighs",
           "action": "straddling viewer, lowering hips, looking_down_at_viewer, disgusted_expression, slight_blush, condescending_gaze, parted_lips",
           "center": "C3",
@@ -1129,7 +1129,7 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
       "characters": [
         {
           "name": "Hanako (original)",
-          "base": "girl, japanese, delicate_face, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, petite, fair_skin",
+          "base":"girl, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, fair_skin",
           "outfit": "navy blue sailor serafuku, white sailor collar, red neckerchief, pleated skirt",
           "action": "holding love letter with both hands toward viewer, leaning forward, blushing, shy expression, looking down, trembling",
           "center": "C3",
@@ -1152,7 +1152,7 @@ uc（角色负面词）的内容必须根据实际画面判定，不能一刀切
       "characters": [
         {
           "name": "Iris (original)",
-          "base": "girl, caucasian, delicate_face, adolescent, long_silver_hair, high_ponytail, crimson_eyes, slender_athletic, fair_skin",
+          "base":"girl, caucasian, adolescent, long_silver_hair, high_ponytail, crimson_eyes, slender_athletic, fair_skin",
           "outfit": "leather combat tunic, dark hooded cape billowing, fingerless gloves, armored boots",
           "action": "leaping in mid-air, left hand outstretched projecting intricate glowing magic circle, fierce shouting expression, looking forward",
           "center": "C3",
@@ -1201,7 +1201,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 ══ 角色外貌防伪码（Base 7 维矩阵，100% 锁死不变脸）══
 必须按 7 维全息外貌公式输出，严禁遗漏任何维度（遗漏任何一项=变脸）：
 ① 性别：girl / boy（禁带数字）
-② 族裔/面相（japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
+② 族裔/面相（有的才写：japanese, east_asian, delicate_face, caucasian, western 等；日系才带 japanese 或 delicate_face；未写明族裔不追加任何族裔词，写明欧美→caucasian / western、中式/韩式→按明写落词，正文族裔优先）
 ③ 年龄段（adolescent, teenager, mature_female 等；young_girl 仅正文明确幼态时取）
 ④ 发型发色（如 long_hair, 1.2::pink_hair::, twin_tails）
 ⑤ 瞳色眼型（如 red_eyes, tsurime, large_eyes）
@@ -1220,7 +1220,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
       "characters": [
         {
           "name": "Hanako (original)",
-          "base": "girl, japanese, delicate_face, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, petite, fair_skin",
+          "base":"girl, teenager, medium_black_hair, straight_bangs, brown_eyes, glasses, fair_skin",
           "outfit": "navy blue sailor serafuku uniform, white sailor collar, red neckerchief, pleated skirt",
           "action": "leaning forward holding letter with both hands toward viewer, blushing, shy expression, looking down, trembling",
           "center": "C3",
@@ -1243,7 +1243,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
       "characters": [
         {
           "name": "Yuki (original)",
-          "base": "girl, japanese, delicate_face, teenager, long_brown_hair, brown_eyes, medium_breasts, slender, fair_skin",
+          "base":"girl, teenager, long_brown_hair, brown_eyes, medium_breasts, slender, fair_skin",
           "outfit": "white long sleeve knit sweater, pleated plaid skirt, black thighhighs",
           "action": "sitting on windowsill looking out, gently holding boy forearms with peaceful smiling expression, closed eyes",
           "center": "C3",
@@ -1251,7 +1251,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
         },
         {
           "name": "Ren (original)",
-          "base": "boy, japanese, young_adult, short_black_hair, dark_eyes, tall, broad_shoulders",
+          "base":"boy, young_adult, short_black_hair, dark_eyes, tall, broad_shoulders",
           "outfit": "black school blazer, white collared shirt, dark trousers",
           "action": "standing behind girl, gently wrapping arms around her shoulders in protective backhug, resting chin lightly near her hair",
           "center": "C3",
@@ -1274,7 +1274,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
       "characters": [
         {
           "name": "Iris (original)",
-          "base": "girl, caucasian, delicate_face, adolescent, long_silver_hair, high_ponytail, crimson_eyes, slender_athletic, fair_skin",
+          "base":"girl, caucasian, adolescent, long_silver_hair, high_ponytail, crimson_eyes, slender_athletic, fair_skin",
           "outfit": "leather combat tunic, dark hooded cape billowing in wind, fingerless gloves, armored boots",
           "action": "leaping forward in mid-air, left hand outstretched projecting brilliant cyan magic circle, fierce shouting expression, looking forward",
           "center": "C3",
@@ -1396,7 +1396,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
       "characters": [
         {
           "name": "Fujiwara Chika (Kaguya-sama wa Kokurasetai)",
-          "base": "girl, japanese, delicate_face, adolescent, long_hair, 1.2::pink_hair::, black_hair_bow, blue_eyes, large_breasts, gyaru, fair_skin",
+          "base":"girl, adolescent, long_hair, 1.2::pink_hair::, black_hair_bow, blue_eyes, large_breasts, gyaru, fair_skin",
           "outfit": "white_serafuku, see-through_shirt, white_sailor_collar, pink_neckerchief, pleated_micro_skirt",
           "action": "in_centers, standing, leaning_back, against_wall, 1.3::holding_money::, seductive_smile, looking_at_viewer, blush",
           "center": "D3",
@@ -1404,7 +1404,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
         },
         {
           "name": "faceless male",
-          "base": "boy, japanese, mature_female, short_hair, black_hair, dark_eyes, slender",
+          "base":"boy, mature_male, short_hair, black_hair, dark_eyes, slender",
           "outfit": "business_suit, dark_jacket",
           "action": "in_centers, standing, from_behind, faceless_male, giving_money, looking_at_partner",
           "center": "B3",
@@ -1419,7 +1419,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
       "characters": [
         {
           "name": "Fujiwara Chika (Kaguya-sama wa Kokurasetai)",
-          "base": "girl, japanese, delicate_face, adolescent, long_hair, 1.2::pink_hair::, black_hair_bow, blue_eyes, large_breasts, gyaru, fair_skin",
+          "base":"girl, adolescent, long_hair, 1.2::pink_hair::, black_hair_bow, blue_eyes, large_breasts, gyaru, fair_skin",
           "outfit": "white_serafuku, see-through_shirt, white_sailor_collar, open_collar, disheveled_clothes",
           "action": "in_centers, smoking, cigarette_in_mouth, exhaling_smoke, half-closed_eyes, parted_lips, blush, sweat, satisfied_smile",
           "center": "C3",
@@ -1470,7 +1470,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
 **characters[i] 字段**：
 1. **name**：精确角色标识。
 2. **base**（外貌防伪码，跨图锁定）：
-   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(japanese, delicate_face, caucasian等；写明族裔按明写落词，未写明不追加族裔词) ③年龄(adolescent, teenager, mature_female；young_girl 仅正文明确幼态时取) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
+   - 按 7 维全息外貌公式：①性别(girl/boy) ②族裔面相(有的才写：japanese, delicate_face, caucasian 等；写明族裔按明写落词，未写明不追加族裔词) ③年龄(adolescent, teenager, mature_female；young_girl 仅正文明确幼态时取) ④发型发色 ⑤瞳色眼型 ⑥胸型体态 ⑦肤色与标记(fair_skin, pale_skin, mole)
 3. **outfit**（当前服装，拆解到部件）：主服装款式材质 → 次要配饰鞋袜 → 穿着状态(open/lifted) → 裸露梯度
 4. **action**（当前姿态动作）：朝向(facing_another, profile) → 基础姿态(sitting, kneeling) → 肢体动作与持有物 → [细腻微表情] → 视线(looking_at_partner, eye_contact) → 3D物理体液(sweat, blush, cum)
 5. **center**：空间网格坐标 A1~E5
@@ -1498,7 +1498,7 @@ NovelAI V4.5/V5 拥有强大的自然语言长句与三维空间解析力。为�
         },
         {
           "name": "Sakura Momo (original)",
-          "base": "girl, japanese, delicate_face, adolescent, long_hair, black_hair, air_bangs, brown_eyes, mole_under_eye, slender, fair_skin",
+          "base":"girl, adolescent, long_hair, black_hair, air_bangs, brown_eyes, mole_under_eye, slender, fair_skin",
           "outfit": "black_silk_nightgown, spaghetti_strap, deep_v-neck, side_cutout, lace-up_side, braless",
           "action": "in_centers, sitting, facing_another, profile, eye_contact, 1.2::pale_skin_female_hand, small_hands, holding_hands::, source#handjob, trembling, blush",
           "center": "D3",
@@ -2058,7 +2058,7 @@ Zimage 擅长理解复杂的英文长句和语境。
    - 命名标准（仅资产库外的新角色；已建档角色逐字复制档案 name_tag）：同人角色 2::Name (Series)::；同人官方皮肤 2::Name (Series) (skin name)::；原创 OC (original)；配角 faceless male / faceless female。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ② 面相/族裔：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
      ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
@@ -2153,12 +2153,12 @@ Zimage 擅长理解复杂的英文长句和语境。
     {
       "label": "细雨递信",
       "anchor": {"text": "她小心翼翼地递过那封带着粉色爱心封口的信件，微红着脸不敢抬头看我"},
-      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
+      "scene": "Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a slim girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, her upper body clearly visible, not daring to look up. Character occupying around 65% of the image height. Background: the school gate and iron fence receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, solo focus, front three-quarter view, high-angle, 0.6::diffused light, blue-grey ambient light::, shade;",
       "negative": "nude, completely nude, nipples, pussy, penis, topless, bottomless, boy, male, camera",
       "characters": [
         {
           "name": "Mira (original)",
-          "base": "girl, japanese, delicate_face, long hair, 1.2::brown hair::, brown eyes, flat chest, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, petite, fair skin, black round-frame glasses, yellow star hairpin",
+          "base":"girl, long hair, 1.2::brown hair::, brown eyes, small_breasts, low braided twintails, blue hair ribbon, blunt bangs, ahoge, adolescent, fair skin, black round-frame glasses, yellow star hairpin",
           "outfit": "blue knee-length pleated skirt, blue serafuku, white sailor collar, blue neckerchief, wet clothes, white knee socks",
           "action": "standing, leaning forward, 1.3::left hand, holding umbrella, transparent plastic umbrella, umbrella over shoulder::, 1.4::right hand, arm extended, holding love letter, a white envelope with a pink heart seal::, looking down, shy, full face blush, wavy mouth, slightly teary, parted lips, not daring to look up at him, 2::speech bubble::, text\\\"请和我交往吧\\\"",
           "center": { "x": 0.5, "y": 0.5 },
@@ -2222,7 +2222,7 @@ Zimage 擅长理解复杂的英文长句和语境。
       "characters": [
         {
           "name": "Ami (original)",
-          "base": "girl, japanese, delicate_face, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, petite, fair skin",
+          "base":"girl, teenager, gyaru, long blonde hair, twintails, blue eyes, small breasts, fair skin",
           "outfit": "white sailor serafuku, unbuttoned, open collar, bottomless, black thighhighs",
           "action": "straddling viewer, 1.4::lowering hips, imminent penetration, spreading labia::, looking down at viewer, head lowered, disgusted expression, heavy blush, condescending gaze, parted lips, heavy breathing",
           "center": { "x": 0.5, "y": 0.5 },
@@ -2443,14 +2443,14 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
    持久状态（sweat, blush, 战损, cum 残留, 衣物移位, 湿衣）不自动复原，逐图渐进；仅明确触发（擦干/整理/换衣/第二天）才清零。
 2.【反冲突】语义去重（保留 white shirt 删 shirt）；矛盾词互斥（blindfold ↔ eyes；bra ↔ nude；panties ↔ bottomless；clothes ↔ nude；standing ↔ sitting；cowgirl ↔ prone bone）。
    冲突下放：全场不能有的进 Scene UC；通用词会误伤个别角色时（如全裸角色的 clothes, dressed）必须下放该角色的 Char UC。只排真实有风险的词。
-3.【可见性隔离表】
-   特写 close-up → 移除颈以下着装与动作，Char UC 补 feet, shoes, legs, lower body
-   近景 bust shot → 移除腰以下，Char UC 补 feet, shoes, legs
-   牛仔 cowboy shot → 移除小腿以下，Char UC 补 feet, shoes
-   局部特写 → 移除头部，Char UC 补 head, face, eyes, hair
-   背位 from behind → 移除面部，Char UC 补 face, front view, eyes
-   pov → 移除自身不可见部位，Char UC 补 face, eyes, hair
-   防构图漂移：cowboy shot → Char UC 补 full body, wide shot；close-up → 补 full body, wide shot；low-angle → 补 high-angle
+3.【可见性隔离表】（6.5.95 起 uc 字段由插件统一生成，你不写 uc；下表只决定「画面里放什么」）
+   特写 close-up → 只画颈以上，不写颈以下的着装与动作
+   近景 bust shot → 只画腰以上
+   牛仔 cowboy shot → 只画到小腿以上
+   局部特写 → 不写面部
+   背位 from behind → 不写正面五官
+   pov → 不写自身不可见的部位
+   防构图漂移：上述景别不要再叠加 full body / wide shot
 4.【权重】数字 n::tag::：同人名 2::Name::；发色与核心着装 1.2::发色::；核心动作 1.2~1.4::动作::；次要 0.6::mountain::。括号等效 {{tag}}=1.1、[[tag]]=0.90。
    负面强调：High 档正常用 negative 字段；若引擎走 Medium 档（无 UC 通道），改用负权重写进正面，如 -3::hat::。
 
@@ -2464,16 +2464,16 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
 
 ══ 精简示例（格式模板，内容不照抄）══
 [示例1 · SFW 单人 POV]
-{"shouldDraw":true,"reason":"①递情书瞬间 ②L0复用 ③Safe ④双层无直接接触 ⑤主观POV cowboy shot, from above ⑥鞋脚下放UC ⑦自检","segments":[{"label":"细雨递信","anchor":{"text":"她小心翼翼递过那封信，微红着脸不敢抬头"},"scene":"Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a petite girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, not daring to look up. Character occupying around 65% of the image height. Background: the school gate receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, front three-quarter view, 0.6::diffused light, blue-grey ambient light::, shade;","negative":"nude, completely nude, nipples, pussy, penis, bottomless, boy, male, camera","characters":[{"name":"Mira (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::brown hair::, brown eyes, flat chest, blunt bangs, fair skin, black round-frame glasses","outfit":"blue serafuku, white sailor collar, blue neckerchief, blue knee-length pleated skirt, white knee socks, wet clothes","action":"standing, leaning forward, 1.3::left hand holding transparent umbrella over shoulder::, 1.4::right hand extended, holding a white envelope with a pink heart seal::, looking down, shy, full face blush, parted lips","center":{"x":0.5,"y":0.5},"uc":"feet, shoes, full body, large breasts, looking at viewer, wide shot"}]}]}
+{"shouldDraw":true,"reason":"①递情书瞬间 ②L0复用 ③Safe ④双层无直接接触 ⑤主观POV cowboy shot, from above ⑥鞋脚下放UC ⑦自检","segments":[{"label":"细雨递信","anchor":{"text":"她小心翼翼递过那封信，微红着脸不敢抬头"},"scene":"Scene: SFW, love confession, {1girl}, pov, face-to-face. Middle ground: a slim girl with glasses leaning forward, holding out a love letter toward the viewer with both hands, not daring to look up. Character occupying around 65% of the image height. Background: the school gate receding into light rain, wet pavement with faint ripples, softly blurred. Middle ground girl, Background rainy school gate. pov, cowboy shot, from above, front three-quarter view, 0.6::diffused light, blue-grey ambient light::, shade;","negative":"nude, completely nude, nipples, pussy, penis, bottomless, boy, male, camera","characters":[{"name":"Mira (original)","base":"girl, adolescent, long hair, 1.2::brown hair::, brown eyes, small_breasts, blunt bangs, fair skin, black round-frame glasses","outfit":"blue serafuku, white sailor collar, blue neckerchief, blue knee-length pleated skirt, white knee socks, wet clothes","action":"standing, leaning forward, 1.3::left hand holding transparent umbrella over shoulder::, 1.4::right hand extended, holding a white envelope with a pink heart seal::, looking down, shy, full face blush, parted lips","center":{"x":0.5,"y":0.5},"uc":"feet, shoes, full body, large breasts, looking at viewer, wide shot"}]}]}
 
 [示例2 · NSFW 第三人称双人 · 首镜客观机位]
-{"shouldDraw":true,"reason":"①背入体位 ②L0复用 ③X级 ④三层 ⑤首镜取C上帝视角非侧面 ⑥可见性隔离 ⑦自检","segments":[{"label":"全景·背后","anchor":{"text":"他从身后搂住她的腰，把她压向床沿"},"scene":"Scene: NSFW, sex from behind, {1boy, 1girl}, couple. Foreground: the rumpled bedsheet edge, strongly out of focus. Middle ground: a boy kneeling behind a girl bent over the bed, both fully in frame, her hands gripping the sheet. Character occupying around 70% of the image height. Background: dim room, single warm lamp. Foreground sheet, Middle ground couple, Background room. bird's-eye view, full body, depth of field, rim light;","negative":"censored, mosaic, solo, solo focus, close-up, from_side","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"on all fours, arched back, 1.4::hips pushed back::, looking back, flushed sweaty face, mouth open","center":{"x":0.5,"y":0.55},"uc":"face hidden, front view, extra limbs"},{"name":"Partner (original)","base":"boy, japanese, short_hair, 1.2::black hair::, dark eyes, slim, flat_chest, no abs, delicate_face, narrow shoulders, fair skin","outfit":"nude","action":"kneeling behind her, 1.4::both hands on her waist::, leaning forward","center":{"x":0.5,"y":0.33},"uc":"female body, extra limbs"}]}]}
+{"shouldDraw":true,"reason":"①背入体位 ②L0复用 ③X级 ④三层 ⑤首镜取C上帝视角非侧面 ⑥可见性隔离 ⑦自检","segments":[{"label":"全景·背后","anchor":{"text":"他从身后搂住她的腰，把她压向床沿"},"scene":"Scene: NSFW, sex from behind, {1boy, 1girl}, couple. Foreground: the rumpled bedsheet edge, strongly out of focus. Middle ground: a boy kneeling behind a girl bent over the bed, both fully in frame, her hands gripping the sheet. Character occupying around 70% of the image height. Background: dim room, single warm lamp. Foreground sheet, Middle ground couple, Background room. bird's-eye view, full body, depth of field, rim light;","negative":"censored, mosaic, solo, solo focus, close-up, from_side","characters":[{"name":"Lin Xia (original)","base":"girl, adolescent, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"on all fours, arched back, 1.4::hips pushed back::, looking back, flushed sweaty face, mouth open","center":{"x":0.5,"y":0.55},"uc":"face hidden, front view, extra limbs"},{"name":"Partner (original)","base":"boy, short_hair, 1.2::black hair::, dark eyes, slim, no abs, narrow shoulders, fair skin","outfit":"nude","action":"kneeling behind her, 1.4::both hands on her waist::, leaning forward","center":{"x":0.5,"y":0.33},"uc":"female body, extra limbs"}]}]}
 
 [示例3 · NSFW 局部特写 · 无面部]
-{"shouldDraw":true,"reason":"①结合部特写 ②L0复用 ③X级 ④三层 ⑤F类局部特写 ⑥面部整体下放UC ⑦自检","segments":[{"label":"结合部","anchor":{"text":"两人交合的地方泛着水光"},"scene":"Scene: NSFW, sex, {1boy, 1girl}, macro. Foreground: her trembling thigh and his hand gripping her hip, strongly out of focus. Middle ground: extreme close-up of the joined junction, wet glistening skin, sweat beads. Character occupying around 80% of the image height. Background: blurred bedsheet. Foreground thigh, Middle ground junction, Background sheet. pussy_focus, macro shot, shallow depth of field, warm low light;","negative":"censored, mosaic, face, head, full body, wide shot","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, adolescent, petite, 1.2::black hair::, small_breasts, fair skin","outfit":"nude","action":"lying on back, 1.3::legs spread, toes curled::","center":{"x":0.5,"y":0.6},"uc":"head, face, eyes, hair, full body"},{"name":"Partner (original)","base":"boy, slim, flat_chest, no abs, delicate_face, fair skin","outfit":"nude","action":"1.3::hand gripping her hip::","center":{"x":0.5,"y":0.35},"uc":"head, face, eyes, hair"}]}]}
+{"shouldDraw":true,"reason":"①结合部特写 ②L0复用 ③X级 ④三层 ⑤F类局部特写 ⑥面部整体下放UC ⑦自检","segments":[{"label":"结合部","anchor":{"text":"两人交合的地方泛着水光"},"scene":"Scene: NSFW, sex, {1boy, 1girl}, macro. Foreground: her trembling thigh and his hand gripping her hip, strongly out of focus. Middle ground: extreme close-up of the joined junction, wet glistening skin, sweat beads. Character occupying around 80% of the image height. Background: blurred bedsheet. Foreground thigh, Middle ground junction, Background sheet. pussy_focus, macro shot, shallow depth of field, warm low light;","negative":"censored, mosaic, face, head, full body, wide shot","characters":[{"name":"Lin Xia (original)","base":"girl, adolescent, 1.2::black hair::, small_breasts, fair skin","outfit":"nude","action":"lying on back, 1.3::legs spread, toes curled::","center":{"x":0.5,"y":0.6},"uc":"head, face, eyes, hair, full body"},{"name":"Partner (original)","base":"boy, slim, no abs, fair skin","outfit":"nude","action":"1.3::hand gripping her hip::","center":{"x":0.5,"y":0.35},"uc":"head, face, eyes, hair"}]}]}
 
 [示例4 · NSFW 骑乘女上 · 仰视双人同框]
-{"shouldDraw":true,"reason":"①女上位骑乘 ②L0复用 ③X级 ④三层 ⑤仰视高差from below非侧面 ⑥双人各带center且女上男下 ⑦自检","segments":[{"label":"骑乘·仰视","anchor":{"text":"她跨坐在他身上，双手撑着他的胸口慢慢沉下腰"},"scene":"Scene: NSFW, cowgirl position, girl on top, straddling, {1boy, 1girl}, couple, sex. Foreground: the near end of a rumpled pillow, strongly out of focus. Middle ground: a girl straddling a boy lying on his back, her hands planted on his chest, hips lowered onto him, both fully in frame. Character occupying around 72% of the image height. Background: dim bedroom, single warm lamp. Foreground pillow, Middle ground couple, Background bedroom. from below, low angle, full body, depth of field;","negative":"censored, mosaic, sex from behind, doggystyle, on all fours, prone bone, solo, solo focus, close-up","characters":[{"name":"Lin Xia (original)","base":"girl, japanese, delicate_face, adolescent, petite, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"straddling him, 1.4::lowering hips::, riding, hands on his chest, looking down at him, flushed, mouth open","center":{"x":0.5,"y":0.3},"uc":"on all fours, from behind, extra limbs"},{"name":"Partner (original)","base":"boy, japanese, short_hair, 1.2::black hair::, dark eyes, slim, flat_chest, no abs, delicate_face, fair skin","outfit":"nude","action":"lying on back, 1.3::hands gripping her hips::, looking up at her","center":{"x":0.5,"y":0.62},"uc":"female body, standing, extra limbs"}]}]}
+{"shouldDraw":true,"reason":"①女上位骑乘 ②L0复用 ③X级 ④三层 ⑤仰视高差from below非侧面 ⑥双人各带center且女上男下 ⑦自检","segments":[{"label":"骑乘·仰视","anchor":{"text":"她跨坐在他身上，双手撑着他的胸口慢慢沉下腰"},"scene":"Scene: NSFW, cowgirl position, girl on top, straddling, {1boy, 1girl}, couple, sex. Foreground: the near end of a rumpled pillow, strongly out of focus. Middle ground: a girl straddling a boy lying on his back, her hands planted on his chest, hips lowered onto him, both fully in frame. Character occupying around 72% of the image height. Background: dim bedroom, single warm lamp. Foreground pillow, Middle ground couple, Background bedroom. from below, low angle, full body, depth of field;","negative":"censored, mosaic, sex from behind, doggystyle, on all fours, prone bone, solo, solo focus, close-up","characters":[{"name":"Lin Xia (original)","base":"girl, adolescent, long hair, 1.2::black hair::, brown eyes, small_breasts, fair skin","outfit":"nude","action":"straddling him, 1.4::lowering hips::, riding, hands on his chest, looking down at him, flushed, mouth open","center":{"x":0.5,"y":0.3},"uc":"on all fours, from behind, extra limbs"},{"name":"Partner (original)","base":"boy, short_hair, 1.2::black hair::, dark eyes, slim, no abs, fair skin","outfit":"nude","action":"lying on back, 1.3::hands gripping her hips::, looking up at her","center":{"x":0.5,"y":0.62},"uc":"female body, standing, extra limbs"}]}]}
 
 输出前自检：
 (1) 顶层第一个键是 shouldDraw，且是布尔值不是字符串；
@@ -4865,7 +4865,7 @@ ${globalEntries.map(([k, p]) => formatGlobalCharacterForPrompt(k, p)).join('\n')
      * 次要配角/路人：faceless male / faceless female 或简要外貌，禁止喧宾夺主。
    - 7 维外貌公式（写在 base 字段，纯净无临时服装与临时动作）：
      ① 性别：girl / boy（严禁带数字如 1girl，防人数干扰）
-     ② 面相/族裔：japanese, delicate_face（条件项：正文/角色卡写明日系才带；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
+     ② 面相/族裔：（正文/角色卡写明日系才填 japanese, delicate_face；未写明族裔不追加任何族裔词，锁定动漫秀气五官防欧美化；写明欧美→caucasian / western，写明中式/韩式→按明写落词，正文族裔优先）/ caucasian / western 等
      ③ 年龄段：adolescent, teenager, mature_female 等（young_girl 仅正文明确幼态时取，未写明不取）
      ④ 发型发色：如 long hair, 1.2::black hair::, straight bangs, twintails
      ⑤ 瞳色眼型：如 blue eyes, tsurime, large eyes, droopy eyes
@@ -13472,8 +13472,8 @@ SCHEMA:
         const ecPrompts = {
             v_manga: activeEc === 'v_manga' ? getMangaProtocol().planningPrompt(ec) : '',
             v14: "【V14·自适应节拍与极简四公理推演 (分析生图位置与数量)】\n在输出 JSON 前，必须在思考区（输出到 reason 字段）完成推演：\n\n①【正文场景选取与生图数量决策（核心：分析哪里生图、需要生几张）】：\n- 扫描正文（仅限 currentMessage，绝对严禁提取历史）：顺着正文时间线地毯式扫描，推演正文中【哪里需要生图】与【需要生几张】：\n  * 哪里生图（视觉全流程节点覆盖法则 · 绝不遗漏）：小说/RP是由连续动态画面构成的，绝不仅有最后的大高潮才算画面！正文中凡是出现以下视觉跃迁节点（①造型服饰高光/换装脱衣/湿身暴露、②动作演进/肢体接触/体位姿态升级、③神态特写/动情红晕/眼神对视、④空间场景或机位景别转换、⑤显式图组[图组XX]/插画），每一个节点都属于【该生图的地方】，必须分别提取为一个独立分镜，绝严禁只挑最后一个动作而把前面的精彩画面全部漏掉！每个选定画面精准摘取 10~40 字逐字原文 anchor.text 并拟定 label；\n  * 需要生几张（数量自然衍生准则）：生图数量完全由正文包含的独立视觉时刻自然决定，只要该生图的地方就必须有图，几张不设死板指标；单一瞬间=1张；多节拍推进=自然拆分多张独立分镜填入 segments，绝不草率压缩为单张；纯抽象理论探讨/毫无画面的纯闲聊才判 0 张（shouldDraw: false）。\n②【主题与分层】：确立主体层级（无近身实体接触则自然省略 Foreground 降级为双层，严禁强凑）。\n③【视点位姿与高差】：明确观察者自身体态（站/坐/跪/躺/覆身）与视点坐标；判定与目标高差——垂直落差 ≥ 50cm 绝对禁止单纯 close-up，强制使用俯/仰角度景别配合透视短缩链（head tilted back / foreshortening）；同高度特写才成立。\n④【视锥探入与受力闭环】：探入实体（手脚/道具/武器/器官）一律从画框下边缘向前上方延伸，严禁上方逆向垂落；必须具备物理接触受力面闭环（抓胯/托脸/握柄/按压），无接触则留白。\n⑤【实体解耦与分级底线】：POV 观察者绝对不出镜、严禁创建为 Character，其探入实体归入 Scene 前景，Scene 负面必补 boy, male 防骨骼分裂；判定 Safe / R / X 并填齐底线负面词。\n⑥【自检输出】：确认字段自洽后直接输出合法 JSON，禁止输出任何多余标记。",
-            v13: "【9.7 全息节拍推演与自适应视点动力学七步思维链 (V13 · 推荐)】\n在输出 JSON 前，必须在思考区（输出到 reason 字段）严格执行 9.7 全息节拍与自适应视点强化七步推演：\n\n①【正文场景选取与生图数量决策（核心：分析哪里生图、需要生几张）】：\n- 扫描正文（仅限 currentMessage，绝对严禁提取历史楼层）：通读并深入推演当前消息正文，准确分析正文中【哪里需要生图】以及【需要生几张】：\n  * 哪里需要生图（视觉全流程节点覆盖法则 · 绝不遗漏）：顺着正文时间线自上而下地毯式扫描，绝不仅有最后的大高潮才算画面！凡是出现具备独立画面表现力与叙事价值的节点，每一个节点都属于【该生图的地方】，必须分别提取为一个独立分镜并精准锚定，绝严禁只挑最后一个大动作而掠过前文的精彩画面：\n    - 角色造型与服装高光（登场外貌展现、换装、解衣、脱衣暴露、湿身透视、发型散乱等造型亮点）；\n    - 动作阶段演进与互动升级（肢体接触、牵手拥抱、推倒抚摸、动作升级、体位转变、攻守互换、姿势切换）；\n    - 情感张力与神态特写（动情红晕、咬唇隐忍、落泪、四目相对、眼神拉丝等特写表情）；\n    - 空间机位转换与环境氛围（场景地点转移、景别与俯仰视角切换）；\n    - 显式媒介内容（如 [图组XX]、[插画]、照片、手机屏幕等）：必须 1:1 提取对应数量的分镜；\n    - 每一个选定画面，必须从 currentMessage 中精准摘取对应段落的逐字原文（10~40字）作为 anchor.text，并拟定 5~15 字中文分镜名（label）；\n  * 需要生几张（数量自然衍生准则）：生图数量完全由正文包含的独立视觉时刻数量自然决定——只要该生图的地方就必须有图，几张不设固定指标；正文篇幅紧凑且仅包含单一瞬间动作则提取 1 张；长文多阶段演进自然拆分对应数量的独立分镜全部填入 segments 数组；纯日常闲聊/纯抽象内心独白无画面变化才判 0 张（shouldDraw: false）。\n②【L0~L2 一致性控制与状态流转】：\n- L0 角色一致性：从 recentMessages 继承固有外貌特征与气质气场；同人角色 OOC 严禁脑补，用基础标签+自然语言覆盖差异，UC 排斥原设特征；原创角色必须细节丰满、辨识度高；\n- L1 场景一致性：同空间时间连续沿用环境与光影，换地点新建；同场景光影随时间推移逻辑渐变；\n- L2 瞬态痕迹：汗水(sweat)、红晕(blush)、战损、体液残留(cumdrip)、湿衣、发型散乱遵循渐进消退法则，禁止自动复原；仅当明确触发擦干/整理/沐浴/换衣/休息/第二天时才清零；\n- 多角色特征强隔离：各角色独立追踪，严禁特征串味；分清动作施受方（source#/target#/mutual#）。\n③【Q1~Q3 独立分级判定】：\n- Q1 有裸体？Q2 有性器官露出？Q3 有性行为？全无→Safe | 有裸无器官无行为→R | 有器官或行为→X；\n- Safe 必含 nude, completely nude 到 uc；R 严禁器官直述，强化 see-through, cleavage, wet clothes 等遮挡暗示，uc 填 nipples, genitals, penetration；X 必须器官与行为实写齐全，uc 填 censored, mosaic；体液/事后痕迹显性呈现强制判 R。\n④【全息分层空间哲学】：\n- 前景四大合法形态：框架借景(door frame/window)/物理承载(desk/steering wheel)/视锥探入实体(anchored limb/prop/weapon)/氛围粒子(rain/cherry blossoms blur)。\n- 空即是景：无近身接触或前景物时自然降级为双层（Middle ground + Background），严禁为了凑层硬编断肢或杂物；前景必须带 strongly out of focus / foreground blur / depth of field 虚化与边缘裁切。\n⑤【观察者体态位姿与自适应人眼视点几何】：\n- 【机位锚定：摄像机 ＝ 观察者双眼当前三维坐标】：POV 摄像机严格绑定观察者当前动作与体态下的真实人眼视点：\n  * 站姿(Standing, ~1.7m)：看站姿为平视(eye level)，看坐姿为微俯视，看跪/趴/躺为大俯视(steep high angle from standing height)；\n  * 坐姿(Sitting, ~1.1m~1.2m)：看坐姿为平视，看跪在腿间/地面为俯视(looking down between knees, from seated height)，看站立为仰视(low angle from below)；\n  * 跪姿(Kneeling, ~0.9m~1.0m)：同跪为平视(kneeling face-to-face)，看站立为大仰视(steep low angle looking up)；\n  * 躺卧/仰卧(Lying on back, ~0.2m~0.4m)：看被跨坐/骑乘为大仰视(steep low angle, looking up from below, lying on back looking up at her)，同躺为枕边平视(eye level, lying side by side)；\n  * 俯身/覆身在上(Leaning over / Missionary)：居高临下直视笼罩(leaning over her, looking down close-up)。\n- ⛔【垂直高差与特写互斥铁律】：凡观察者视点与目标面部存在显著垂直落差（落差 ≥ 50cm，如站看跪/躺、跪看站、仰卧看骑乘），绝对禁止使用单纯 close-up！强制使用带俯仰透视景别（bust shot from above / looking up from below），配合仰头/低头短缩链（head tilted back / head lowered, foreshortening）；平视特写仅限双方同等高度；\n- 【视锥探入与物理受力闭环】：凡探入视锥近景的实体（肢体/道具/武器/器官），其透视起点一律锁定画框下边缘/底角向前上方延伸（仰卧被跨坐时向上托扶），严禁上方逆向垂落；探入必须具备「动作+物理接触受力面/受体」闭环；无接触则自然留白；探入肢体默认单侧防多肢体；\n- 【零角色解耦】：POV 观察者的一切身体部位与探入实体 100% 写入 Scene 或单人交互描述，绝对禁入 characters 数组，Scene 负面补 boy, male 防鬼影与多骨骼分裂。\n⑥【可见性清理与 UC 冲突下放】：\n- 景别裁切下放：特写移除颈以下，Char UC 补 feet, shoes, legs；近景移除腰以下；局部特写剔除无关面貌；朝向背位移除正面细节（Char UC 填 face, front_view）；遮挡闭眼移除瞳色；性质替换束胸换 flat chest；\n- 冲突下放与克制原则：全场不能有进 Scene UC；通用词误伤个别角色时（如混穿）下放进特定角色 Char UC；不堆万能默认词，每个词答得出防什么。\n⑦【自检确认】：确认观察者位姿与机位视角自洽、高差与景别自洽、探入实体受力闭环、服装四要素签名完备、坐标网格清晰后输出合法 JSON。\n\n严格输出包含所有选定 segment 的合法 JSON，禁止输出任何多余标记。",
-            v11: "【9.7 全息空间七步思维链推演 (V11)】\n在输出 JSON 前，必须在思考区（输出到 reason 字段）严格执行 9.7 全息七步推演：\n\n①【正文场景选取与生图数量决策（核心：分析哪里生图、需要生几张）】：\n- 扫描 currentMessage 正文（严禁提取历史）：深入推演【哪里需要生图】（顺着正文时间线地毯式扫描造型服饰、肢体动作演进、体位切换、神态特写、显式图组等关键节点，每一个画面节点均提取独立分镜与 10~40 字逐字 anchor.text，绝不只挑最后一幕）与【需要生几张】（数量由视觉节点自然衍生，只要该生图的地方就必须有图；单一瞬间=1张；长文多阶段推进=自然拆分多张独立分镜入 segments；纯抽象无画面闲聊=0张）。\n②【L0~L2 一致性控制与状态流转】：\n- L0 角色一致性：从 recentMessages 继承固有外貌特征与气质气场；同人角色 OOC 严禁脑补，用基础标签+自然语言覆盖差异，UC 排斥原设特征；原创角色必须细节丰满、辨识度高；\n- L1 场景一致性：同空间时间连续沿用环境与光影，换地点新建；同场景光影随时间推移逻辑渐变；\n- L2 瞬态痕迹：汗水(sweat)、红晕(blush)、战损、体液残留(cumdrip)、湿衣、发型散乱遵循渐进消退法则，禁止自动复原；仅当明确触发擦干/整理/沐浴/换衣/休息/第二天时才清零；\n- 多角色特征强隔离：各角色独立追踪，严禁特征串味；分清动作施受方（source#/target#/mutual#）。\n③【Q1~Q3 独立分级判定】：\n- Q1 有裸体？Q2 有性器官露出？Q3 有性行为？全无→Safe | 有裸无器官无行为→R | 有器官或行为→X；\n- Safe 必含 nude, completely nude 到 uc；R 严禁器官直述，强化 see-through, cleavage, wet clothes 等遮挡暗示，uc 填 nipples, genitals, penetration；X 必须器官与行为实写齐全，uc 填 censored, mosaic；体液/事后痕迹显性呈现强制判 R。\n④【全息分层空间矩阵】：\n- 前景(Foreground) / 中景(Middle ground) / 背景(Background), 主体落层自由；【前景克制】：日常对话/开门/对视场景天然为双层，严禁强行编造入镜断手(reaching hands/pov hands)，无直接接触道具时直接省略 Foreground 降为双层！\n⑤【镜头组合与情境速查】：\n- 视角：第三人称客观（角色均入 characters，面对彼此 facing_another/eye_contact）/ 第一人称 POV（视角主人⛔严禁创建为 Character，非直接接触场景严禁生成入镜手，仅保留出镜角色；Scene 负面补 boy/male 防鬼影）；\n- 景别与机位：按情境意图精准匹配景别（特写 close-up/近景 bust_shot/中景 cowboy_shot/全景 full_body/远景 wide_shot）与水平机位（正位/前侧3/4/侧位/后侧3/4/背位）、垂直机位（平视/俯视/仰视/顶视/虫视）。\n⑥【可见性清理与 UC 冲突下放】：\n- 景别裁切下放：特写移除颈以下，Char UC 补 feet, shoes, legs；近景移除腰以下；局部特写剔除无关面貌；朝向背位移除正面细节（Char UC 填 face, front_view）；遮挡闭眼移除瞳色；性质替换束胸换 flat chest；\n- 冲突下放与克制原则：全场不能有进 Scene UC；通用词误伤个别角色时（如混穿）下放进特定角色 Char UC；不堆万能默认词，每个词答得出防什么。\n⑦【自检确认】：确认字段自洽、服装四要素签名完备（带长度/颜色）、左右手动作独立、坐标网格清晰后输出合法 JSON。\n\n严格输出包含所有选定 segment 的合法 JSON，禁止输出任何多余标记。",
+            v13: "【9.7 全息节拍推演与自适应视点动力学七步思维链 (V13 · 推荐)】\n在输出 JSON 前，必须在思考区（输出到 reason 字段）严格执行 9.7 全息节拍与自适应视点强化七步推演：\n\n①【正文场景选取与生图数量决策（核心：分析哪里生图、需要生几张）】：\n- 扫描正文（仅限 currentMessage，绝对严禁提取历史楼层）：通读并深入推演当前消息正文，准确分析正文中【哪里需要生图】以及【需要生几张】：\n  * 哪里需要生图（视觉全流程节点覆盖法则 · 绝不遗漏）：顺着正文时间线自上而下地毯式扫描，绝不仅有最后的大高潮才算画面！凡是出现具备独立画面表现力与叙事价值的节点，每一个节点都属于【该生图的地方】，必须分别提取为一个独立分镜并精准锚定，绝严禁只挑最后一个大动作而掠过前文的精彩画面：\n    - 角色造型与服装高光（登场外貌展现、换装、解衣、脱衣暴露、湿身透视、发型散乱等造型亮点）；\n    - 动作阶段演进与互动升级（肢体接触、牵手拥抱、推倒抚摸、动作升级、体位转变、攻守互换、姿势切换）；\n    - 情感张力与神态特写（动情红晕、咬唇隐忍、落泪、四目相对、眼神拉丝等特写表情）；\n    - 空间机位转换与环境氛围（场景地点转移、景别与俯仰视角切换）；\n    - 显式媒介内容（如 [图组XX]、[插画]、照片、手机屏幕等）：必须 1:1 提取对应数量的分镜；\n    - 每一个选定画面，必须从 currentMessage 中精准摘取对应段落的逐字原文（10~40字）作为 anchor.text，并拟定 5~15 字中文分镜名（label）；\n  * 需要生几张（数量自然衍生准则）：生图数量完全由正文包含的独立视觉时刻数量自然决定——只要该生图的地方就必须有图，几张不设固定指标；正文篇幅紧凑且仅包含单一瞬间动作则提取 1 张；长文多阶段演进自然拆分对应数量的独立分镜全部填入 segments 数组；纯日常闲聊/纯抽象内心独白无画面变化才判 0 张（shouldDraw: false）。\n②【L0~L2 一致性控制与状态流转】：\n- L0 角色一致性：从 recentMessages 继承固有外貌特征与气质气场；同人角色 OOC 严禁脑补，用基础标签+自然语言覆盖差异，UC 排斥原设特征；原创角色必须细节丰满、辨识度高；\n- L1 场景一致性：同空间时间连续沿用环境与光影，换地点新建；同场景光影随时间推移逻辑渐变；\n- L2 瞬态痕迹：汗水(sweat)、红晕(blush)、战损、体液残留(cumdrip)、湿衣、发型散乱遵循渐进消退法则，禁止自动复原；仅当明确触发擦干/整理/沐浴/换衣/休息/第二天时才清零；\n- 多角色特征强隔离：各角色独立追踪，严禁特征串味；分清动作施受方（source#/target#/mutual#）。\n③【Q1~Q3 独立分级判定】：\n- Q1 有裸体？Q2 有性器官露出？Q3 有性行为？全无→Safe | 有裸无器官无行为→R | 有器官或行为→X；\n- Safe 必含 nude, completely nude 到 uc；R 严禁器官直述，强化 see-through, cleavage, wet clothes 等遮挡暗示，uc 填 nipples, genitals, penetration；X 必须器官与行为实写齐全，uc 填 censored, mosaic；体液/事后痕迹显性呈现强制判 R。\n④【全息分层空间哲学】：\n- 前景四大合法形态：框架借景(door frame/window)/物理承载(desk/steering wheel)/视锥探入实体(anchored limb/prop/weapon)/氛围粒子(rain/cherry blossoms blur)。\n- 空即是景：无近身接触或前景物时自然降级为双层（Middle ground + Background），严禁为了凑层硬编断肢或杂物；前景必须带 strongly out of focus / foreground blur / depth of field 虚化与边缘裁切。\n⑤【观察者体态位姿与自适应人眼视点几何】：\n- 【机位锚定：摄像机 ＝ 观察者双眼当前三维坐标】：POV 摄像机严格绑定观察者当前动作与体态下的真实人眼视点：\n  * 站姿(Standing, ~1.7m)：看站姿为平视(eye level)，看坐姿为微俯视，看跪/趴/躺为大俯视(steep high angle from standing height)；\n  * 坐姿(Sitting, ~1.1m~1.2m)：看坐姿为平视，看跪在腿间/地面为俯视(looking down between knees, from seated height)，看站立为仰视(low angle from below)；\n  * 跪姿(Kneeling, ~0.9m~1.0m)：同跪为平视(kneeling face-to-face)，看站立为大仰视(steep low angle looking up)；\n  * 躺卧/仰卧(Lying on back, ~0.2m~0.4m)：看被跨坐/骑乘为大仰视(steep low angle, looking up from below, lying on back looking up at her)，同躺为枕边平视(eye level, lying side by side)；\n  * 俯身/覆身在上(Leaning over / Missionary)：居高临下直视笼罩(leaning over her, looking down close-up)。\n- ⛔【垂直高差与特写互斥铁律】：凡观察者视点与目标面部存在显著垂直落差（落差 ≥ 50cm，如站看跪/躺、跪看站、仰卧看骑乘），绝对禁止使用单纯 close-up！强制使用带俯仰透视景别（bust shot from above / looking up from below），配合仰头/低头短缩链（head tilted back / head lowered, foreshortening）；平视特写仅限双方同等高度；\n- 【视锥探入与物理受力闭环】：凡探入视锥近景的实体（肢体/道具/武器/器官），其透视起点一律锁定画框下边缘/底角向前上方延伸（仰卧被跨坐时向上托扶），严禁上方逆向垂落；探入必须具备「动作+物理接触受力面/受体」闭环；无接触则自然留白；探入肢体默认单侧防多肢体；\n- 【零角色解耦】：POV 观察者的一切身体部位与探入实体 100% 写入 Scene 或单人交互描述，绝对禁入 characters 数组，Scene 负面补 boy, male 防鬼影与多骨骼分裂。\n⑥【可见性清理与 UC 冲突下放】：\n- 景别裁切：特写只画颈以上，近景只画腰以上，局部特写不写面部，朝向背位不写正面细节（uc 由插件生成，不写 uc 字段）；遮挡闭眼移除瞳色；性质替换束胸换 flat chest；\n- 冲突下放与克制原则：全场不能有进 Scene UC；通用词误伤个别角色时（如混穿）下放进特定角色 Char UC；不堆万能默认词，每个词答得出防什么。\n⑦【自检确认】：确认观察者位姿与机位视角自洽、高差与景别自洽、探入实体受力闭环、服装四要素签名完备、坐标网格清晰后输出合法 JSON。\n\n严格输出包含所有选定 segment 的合法 JSON，禁止输出任何多余标记。",
+            v11: "【9.7 全息空间七步思维链推演 (V11)】\n在输出 JSON 前，必须在思考区（输出到 reason 字段）严格执行 9.7 全息七步推演：\n\n①【正文场景选取与生图数量决策（核心：分析哪里生图、需要生几张）】：\n- 扫描 currentMessage 正文（严禁提取历史）：深入推演【哪里需要生图】（顺着正文时间线地毯式扫描造型服饰、肢体动作演进、体位切换、神态特写、显式图组等关键节点，每一个画面节点均提取独立分镜与 10~40 字逐字 anchor.text，绝不只挑最后一幕）与【需要生几张】（数量由视觉节点自然衍生，只要该生图的地方就必须有图；单一瞬间=1张；长文多阶段推进=自然拆分多张独立分镜入 segments；纯抽象无画面闲聊=0张）。\n②【L0~L2 一致性控制与状态流转】：\n- L0 角色一致性：从 recentMessages 继承固有外貌特征与气质气场；同人角色 OOC 严禁脑补，用基础标签+自然语言覆盖差异，UC 排斥原设特征；原创角色必须细节丰满、辨识度高；\n- L1 场景一致性：同空间时间连续沿用环境与光影，换地点新建；同场景光影随时间推移逻辑渐变；\n- L2 瞬态痕迹：汗水(sweat)、红晕(blush)、战损、体液残留(cumdrip)、湿衣、发型散乱遵循渐进消退法则，禁止自动复原；仅当明确触发擦干/整理/沐浴/换衣/休息/第二天时才清零；\n- 多角色特征强隔离：各角色独立追踪，严禁特征串味；分清动作施受方（source#/target#/mutual#）。\n③【Q1~Q3 独立分级判定】：\n- Q1 有裸体？Q2 有性器官露出？Q3 有性行为？全无→Safe | 有裸无器官无行为→R | 有器官或行为→X；\n- Safe 必含 nude, completely nude 到 uc；R 严禁器官直述，强化 see-through, cleavage, wet clothes 等遮挡暗示，uc 填 nipples, genitals, penetration；X 必须器官与行为实写齐全，uc 填 censored, mosaic；体液/事后痕迹显性呈现强制判 R。\n④【全息分层空间矩阵】：\n- 前景(Foreground) / 中景(Middle ground) / 背景(Background), 主体落层自由；【前景克制】：日常对话/开门/对视场景天然为双层，严禁强行编造入镜断手(reaching hands/pov hands)，无直接接触道具时直接省略 Foreground 降为双层！\n⑤【镜头组合与情境速查】：\n- 视角：第三人称客观（角色均入 characters，面对彼此 facing_another/eye_contact）/ 第一人称 POV（视角主人⛔严禁创建为 Character，非直接接触场景严禁生成入镜手，仅保留出镜角色；Scene 负面补 boy/male 防鬼影）；\n- 景别与机位：按情境意图精准匹配景别（特写 close-up/近景 bust_shot/中景 cowboy_shot/全景 full_body/远景 wide_shot）与水平机位（正位/前侧3/4/侧位/后侧3/4/背位）、垂直机位（平视/俯视/仰视/顶视/虫视）。\n⑥【可见性清理与 UC 冲突下放】：\n- 景别裁切：特写只画颈以上，近景只画腰以上，局部特写不写面部，朝向背位不写正面细节（uc 由插件生成，不写 uc 字段）；遮挡闭眼移除瞳色；性质替换束胸换 flat chest；\n- 冲突下放与克制原则：全场不能有进 Scene UC；通用词误伤个别角色时（如混穿）下放进特定角色 Char UC；不堆万能默认词，每个词答得出防什么。\n⑦【自检确认】：确认字段自洽、服装四要素签名完备（带长度/颜色）、左右手动作独立、坐标网格清晰后输出合法 JSON。\n\n严格输出包含所有选定 segment 的合法 JSON，禁止输出任何多余标记。",
         };
         return ecPrompts[activeEc] || '';
     }
@@ -16932,7 +16932,7 @@ function sdtOutfitRuleNoteLines(probeText) {
 当输入含 characterCardInfo 或 characterCardInfo_base64 时，读取未建档角色的 description 与 characterBookEntries，作为身份、外貌和默认衣着的依据，优先于模型常识；未知不猜，已有不漏，包含已明确的国籍/族裔/面相等特征。
 按普通模式将完整身份外貌写入 panels[].characters[].base，完整当前衣着写入 outfit，不按景别裁剪；${getMangaProtocol().usesStructuredBubbles?.() !== false ? 'positive 只写本格位置、动作、表情与视线，人物对白/心声逐泡写入该人物 bubbles[].text，不写入 positive。' : 'positive 先写本格位置、动作、表情、视线与气泡类型/位置/Layout，末尾唯一 Text: 后只写本人对白/心声；旁白/拟音/真正画外声放所属 non_character，不输出 bubbles。'}开启角色记忆时直接从 base/outfit 建档，character_memory 可省略。`;
         } else if (store.injectCharacterCard && hasCardInfo) {
-            systemPrompt += '\n\n【角色卡信息参考指令】\n当输入数据 payload 中包含 `characterCardInfo` 或 `characterCardInfo_base64` 字段时，请仔细阅读其中未建档角色的描述（description）和世界书条目（characterBookEntries）。在推断这些角色的外貌特征并输出 `base` 或 `outfit` 字段时，必须严格参考这些内容。角色卡和附带世界书的描述是该角色的权威定义，其优先级高于脑中常识。输出 `base` 字段时必须严格包含：性别(girl/boy，禁带数字)、族裔面相(caucasian/japanese/chinese/delicate_face 等，西方角色必须带 caucasian 或 western，日系角色带 japanese 或 delicate_face)、年龄段(adolescent/mature_female/teenager 等)、发型发色、瞳色眼型、胸型体态与肤色，严禁省略族裔与年龄！';
+            systemPrompt += '\n\n【角色卡信息参考指令】\n当输入数据 payload 中包含 `characterCardInfo` 或 `characterCardInfo_base64` 字段时，请仔细阅读其中未建档角色的描述（description）和世界书条目（characterBookEntries）。在推断这些角色的外貌特征并输出 `base` 或 `outfit` 字段时，必须严格参考这些内容。角色卡和附带世界书的描述是该角色的权威定义，其优先级高于脑中常识。输出 `base` 字段时必须严格包含：性别(girl/boy，禁带数字)、年龄段(adolescent/mature_female/teenager 等)、发型发色、瞳色眼型、胸型体态与肤色；族裔面相属条件项——角色卡写明日系才带 japanese 或 delicate_face、写明欧美才带 caucasian 或 western，未写明一律不追加、也不许按画风或姓名猜；严禁省略年龄段（漏了会变脸）！';
         }
         if (store.characterMemoryEnabled) {
             systemPrompt += '\n\n' + buildCharacterMemoryPromptModule(store, messageId);
@@ -18148,7 +18148,7 @@ function sdtRoundInspectLines() {
             lines.push(`  标题：${lb.titles.slice(0, 6).join(' / ')}${lb.titles.length > 6 ? ' …' : ''}`);
         }
         if (Array.isArray(lb.ejsEntries) && lb.ejsEntries.length) {
-            lines.push(`  ✅ ${lb.ejsEntries.length} 条世界书含 EJS，已剥掉脚本只留说明文字（${lb.ejsEntries.map(function (e) { return e.uid + ':' + e.rawLen + '→' + e.keptLen; }).join(' / ')}）`);
+            lines.push(`  ✅ ${lb.ejsEntries.length} 条世界书含 EJS，已剥掉脚本只留说明文字（${lb.ejsEntries.map(function (e) { return e.uid + ':' + (e.len != null ? e.len : e.rawLen) + '→' + e.keptLen; }).join(' / ')}）`);
         }
     } else {
         lines.push('【体位来源】本次会话还没有生成记录');
@@ -18192,8 +18192,11 @@ function sdtRoundInspectLines() {
             const dupSum = cleans.reduce((n, c) => n + (Number(c.dup) || 0), 0);
             lines.push(`【词面清洗】剔除中文 ${zhSum} 字符｜去重 ${dupSum} 个重复词${zhSum ? '（中文进 NAI 等于无效，已丢弃）' : ''}`);
         }
-        const gates = recs.slice(lastIdx + 1).filter(r => r.type === 'pose-gate');
+        // 6.5.97：只有真的往 payload 里写过词才算「补回」，added 为空的闸门记录不再报成「补回 1 张」
+        const gatesAll = recs.slice(lastIdx + 1).filter(r => r.type === 'pose-gate');
+        const gates = gatesAll.filter(r => String(r.added || '').trim());
         if (gates.length) lines.push(`【词法闸门】补回体位词 ${gates.length} 张（${gates.map(g => g.className + ' ' + g.added).join(' / ')}）`);
+        else if (gatesAll.length) lines.push(`【词法闸门】本轮没往 payload 里补任何体位词（闸门跑了 ${gatesAll.length} 次，全部判定为不需要补）`);
     // 6.5.72（F05/F11/F13/F14）：闸门结论文本化——凡发生删/改/跳过/让位，面板上必须有一行看得懂的中文（宁可刷屏）
     try {
         const gl = (SDT_GATE_LAST && typeof SDT_GATE_LAST === 'object') ? SDT_GATE_LAST : null;
