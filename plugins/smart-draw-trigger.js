@@ -18148,7 +18148,7 @@ function sdtRoundInspectLines() {
             lines.push(`  标题：${lb.titles.slice(0, 6).join(' / ')}${lb.titles.length > 6 ? ' …' : ''}`);
         }
         if (Array.isArray(lb.ejsEntries) && lb.ejsEntries.length) {
-            lines.push(`  ⚠️ ${lb.ejsEntries.length} 条含 EJS 源码被塞进 prompt（本该排除）`);
+            lines.push(`  ✅ ${lb.ejsEntries.length} 条世界书含 EJS，已剥掉脚本只留说明文字（${lb.ejsEntries.map(function (e) { return e.uid + ':' + e.rawLen + '→' + e.keptLen; }).join(' / ')}）`);
         }
     } else {
         lines.push('【体位来源】本次会话还没有生成记录');
