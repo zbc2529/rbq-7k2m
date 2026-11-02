@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.94';
+    const PLUGIN_VERSION = '6.5.95';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -3094,6 +3094,10 @@ C18 特殊高杠杆 mating_press,top-down_bottom-up
         poseSegmentHint: true,         // system prompt 里列分镜骨架（只作提示，不锁一组）
         outfitSequence: true,          // 一场戏多套服装序列（D0–D4 逐镜）
         outfitConflictGuard: true,     // 服装冲突时删服装、不删正文体位词
+        // 6.5.95：AI 本轮一个分镜都没判主类（pose.class 全空）时，禁止用引擎主类/历史变量兜底补体位词。
+        // 依据 6.5.94 真机 6 张图：正文只是「趴着被摸被脱内裤」，插件从 chat_metadata 旧变量 P-015/C02 补进 4 张 doggystyle。
+        // false = 回退 6.5.94 行为（照旧兜底）。
+        poseAiSilentNoFill: true,
 
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         systemPromptVersion: DEFAULT_SYSTEM_PROMPT_VERSION,
@@ -9738,6 +9742,8 @@ ${getCharacterMemoryTagSpecification()}
     }
     function normalizeTaggerResultInner(data, matchedLorebooks = [], mangaContext = null) {
         assertMangaRequestContext(mangaContext);
+        // 6.5.95：服装状态机的基线必须抢在下文写档案之前抓（mergeCharacterCaption 会回写 currentOutfit）。
+        const outfitBaselineSnap = sdtSnapshotOutfits();
         // Tool arguments are an exact JSON contract, unlike ordinary text output.
         let toolRaw = null;
         const choice = data?.choices?.[0];
@@ -10033,6 +10039,13 @@ ${getCharacterMemoryTagSpecification()}
                 characters: normalized.characters,
             }];
         }
+
+        // 6.5.95：服装状态机——AI 每镜从零重写 outfit，漏写的部件按「absent ≠ removed」补回上一镜原样写法，
+        // 只有正文出现对应脱/摘动作才允许消失。依据 6.5.94 真机：第 1/2/4 镜漏 panties、第 3 镜褪到膝盖后第 4 镜又「长回去」。
+        try {
+            const outfitCarry = sdtOutfitCarryAcrossSegments(segments, sdtLatestMessageText(), outfitBaselineSnap);
+            if (outfitCarry) normalized.__outfitCarry = outfitCarry;
+        } catch (e) { /* ignore */ }
 
         if (mangaContext && memoryWarnings.length) {
             normalized.memoryWarnings = [...new Set(memoryWarnings)];
@@ -12704,7 +12717,7 @@ SCHEMA:
         if (segmentResult?.mangaPage || (isMangaRequest() && Array.isArray(segmentResult?.characters))) {
             return {
                 manga: true, textCompiled: segmentResult.mangaTextCompiled === true || (typeof segmentResult.mangaPage === 'object' && segmentResult.mangaPage !== null),
-                useCoords: !!segmentResult.mangaUseCoords, negative: getSegmentNegative(segmentResult),
+                useCoords: !!segmentResult.mangaUseCoords, negative: SDT_BASE_NEG,   // 6.5.95：负向由插件给，AI 自写的 negative/uc 一律不用
                 renderSettings: { ...(segmentResult.mangaRenderSettings || RBQ.api.mangaProtocol?.captureRenderSettings?.()) },
                 characters: (segmentResult.characters || []).map(c => {
                     const capBase = sdtCaptionClean(c.caption).text;
@@ -12715,7 +12728,7 @@ SCHEMA:
                         caption: useForm ? (capBase ? capBase + ', ' + useForm : useForm) : capBase,
                         form: useForm,
                         center: typeof c.center === 'object' && c.center ? { ...c.center } : c.center,
-                        uc: c.uc || '',
+                        uc: SDT_BASE_NEG,   // 6.5.95：角色级负向由插件生成（AI 自写的 uc 实测会同时禁掉 face/head/full_body → 无头图）
                     };
                 })
             };
@@ -12726,11 +12739,13 @@ SCHEMA:
         return {
             // 6.5.83：scene 也过同一道中文清洗 —— 11-01 的 42 条 nai-payload 实测无中文（AI 只是 rawOutput 里写中文），
             // 但 10-30 的历史记录里曾有中文动作被拼进 char_caption，这里把 scene 也一起锁进清洗，避免同类回归。
-            scene: sdtCaptionClean(deduplicateQualityTags(segmentResult.scene || '')).text, negative: getSegmentNegative(segmentResult),
+            scene: sdtCaptionClean(deduplicateQualityTags(segmentResult.scene || '')).text, negative: SDT_BASE_NEG,   // 6.5.95：同 E1
             useCoords: !!getStore().multiCharUseCoords,
             enabled: !!getStore().multiCharOutput,
             characters: segmentResult.characters.map(c => {
-                let uc = c.uc || '';
+                // 6.5.95：角色级负向由插件生成，AI 自写的 uc 一律丢弃。
+                // 真机 6.5.94 第 2 镜的 uc 是 `head, face, eyes, hair, full body` + negative 同款，正文只写「手捏圆臀」→ 无头图。
+                let uc = SDT_BASE_NEG;
                 const actionText = [c.caption, c.action, c._rawAction].join(' ');
                 if (/\b(?:headless|decapitat(?:ed|ion)|severed\s+(?:pelvis|torso|legs?|arms?|body|limbs?|buttocks?)|only\s+(?:a\s+)?(?:severed\s+)?(?:female\s+)?(?:pelvis|buttocks|lower\s+body|torso)|neck\s+stump|bloody\s+neck\s+stump|无头|身首异处|断头|斩首|仅剩骨盆|仅留骨盆|被切下的(?:女性)?骨盆)\b/i.test(actionText)) {
                     const headHairUCParts = ['head', 'face', 'hair', 'ponytail', 'eyes', 'mouth', 'facial features'];
@@ -12830,7 +12845,11 @@ SCHEMA:
             cleanZh += baseCaptionRaw.length - baseStripped.length;
             try { payload.input = baseStripped; } catch (e) { /* ignore */ }
         }
-        const baseCaptionFinal = baseStripped;
+        // 6.5.95：分级由插件判。真机 6.5.94 把「手捏圆臀 / bare buttocks」标成 Scene: SFW（第 1/2/4 张），
+        // NAI 把 SFW 当日常图处理。只纠一个方向，没有露骨词时不反向改。
+        const sceneRated = sdtSceneRatingFix(baseStripped);
+        const sceneRatingFixed = sceneRated !== baseStripped;
+        const baseCaptionFinal = sceneRated;
 
         // 【优化】根据官方文档：生成 H 内容时，需从 UC 中移除 nsfw，否则内容会被抑制
         if (/(nsfw|sex|vaginal|penis|pussy|nudity)/i.test(baseCaptionFinal)) {
@@ -12860,6 +12879,7 @@ SCHEMA:
             const dp = payload.parameters || {};
             sdtDiag() && sdtDiag().add('nai-payload', {
                 input: String(baseCaptionFinal || '').slice(0, 12000),
+                sceneRatingFixed: !!sceneRatingFixed,   // 6.5.95：AI 标 Scene: SFW 但正向含露骨词，已由插件改成 NSFW
                 model: payload.model || '',
                 action: payload.action || 'generate',
                 seed: dp.seed,
@@ -13920,6 +13940,229 @@ function sdtWardrobeStrip(outfit, tags) {
         keep.push(raw);
     }
     return changed ? keep.join(', ') : outfit;
+}
+
+// ════════ 6.5.95：负向、服装状态、分级三件事从 AI 手里收回插件 ════════
+// 真机取证（6.5.94 分镜 6 张，sdt-diag-2026-11-02T06-12-25.json）：
+//   ① uc 由 AI 现编，第 2 镜同时禁掉 face/head/full_body/wide_shot，而正文只写「手捏圆臀」→ 出没有头没有脸的臀+手鬼图；
+//   ② outfit 每镜从零重写，第 1/2/4 镜漏写 panties、第 3 镜又想起来了 → 内裤忽有忽无（第 3 镜已褪到膝盖，第 4 镜又「长回去」）；
+//   ③ 分级由 AI 写，第 1/2/4 镜内容是 bare buttocks 却标 Scene: SFW。
+// 结论：AI 只负责「看到什么」（caption 的内容），插件负责「写成哪些 tag」与「不写什么」（uc / 分级）
+//       以及「上一镜穿着的连续性」（outfit 状态机，absent ≠ removed）。
+
+/** 全插件统一的角色级负向。故意不含 artist_name：正向常带画风串（如 wolrero / artist:ronna），禁掉会削画风。 */
+const SDT_BASE_NEG = 'lowres, worst quality, low quality, bad anatomy, bad hands, extra digits, fewer digits, jpeg artifacts, watermark, signature, text, username, logo, blurry';
+
+/**
+ * 衣物部件 → 正文里的中文说法。只收「能唯一指向一个部件」的词，用来判断「本镜没写这件衣服 = 脱了还是漏写」。
+ * 与 SDT_WARDROBE_ZH 的分工：那张表管配饰（可摘可戴），这张表管穿戴主体（脱了就是脱了）。
+ */
+const SDT_OUTFIT_CARRY_ZH = {
+    panties: ['内裤', '小裤', '底裤', '三角裤'],
+    bra: ['胸罩', '内衣', '奶罩', '文胸'],
+    skirt: ['裙子', '短裙', '半身裙', '裙摆', '百褶裙'],
+    dress: ['连衣裙', '长裙', '连身裙', '洋装'],
+    apron: ['围裙'],
+    thighhighs: ['长筒袜', '大腿袜', '白丝', '黑丝', '丝袜'],
+    pantyhose: ['裤袜', '连裤袜'],
+    socks: ['袜子', '短袜', '棉袜'],
+    shoes: ['鞋子', '鞋'],
+    sandals: ['凉鞋', '拖鞋'],
+    boots: ['靴子', '靴'],
+    high_heels: ['高跟鞋', '高跟'],
+    shirt: ['衬衫', '上衣', '衬衣'],
+    blouse: ['衬衫', '上衣'],
+    jacket: ['外套', '夹克'],
+    coat: ['大衣', '外套'],
+    hoodie: ['卫衣', '帽衫'],
+    sweater: ['毛衣'],
+    kimono: ['和服', '浴衣'],
+    serafuku: ['水手服', '校服'],
+    school_uniform: ['校服', '制服'],
+    shorts: ['短裤'],
+    pants: ['长裤', '裤子'],
+    jeans: ['牛仔裤'],
+    gloves: ['手套'],
+    scarf: ['围巾'],
+    hat: ['帽子'],
+    necktie: ['领带', '领结'],
+    ribbon: ['蝴蝶结', '缎带'],
+    swimsuit: ['泳装', '泳衣'],
+    bikini: ['比基尼'],
+};
+
+/** 单个 outfit token 是否属于某部件（tag 名或中文说法任一命中）。 */
+function sdtOutfitTokenIsPart(raw, part) {
+    const plain = String(raw || '').replace(/^[0-9.]+::/, '').replace(/::+$/, '').trim();
+    if (!plain) return false;
+    const low = plain.toLowerCase();
+    const t = String(part || '').toLowerCase();
+    if (t) {
+        // tag 名允许下划线被写成空格（white_kindergarten_dress vs white kindergarten dress），但两侧不许粘连字母
+        const body = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/_/g, '[_ ]?');
+        try { if (new RegExp('(?:^|[^a-z0-9_])' + body + '(?:[^a-z0-9_]|$)').test(low)) return true; } catch (e) { /* ignore */ }
+    }
+    const names = SDT_OUTFIT_CARRY_ZH[part] || [];
+    for (let i = 0; i < names.length; i++) {
+        if (names[i] && plain.indexOf(names[i]) >= 0) return true;
+    }
+    return false;
+}
+
+/** 取出 outfit 串里属于某部件的原始 token（保留权重与完整写法，例如 panties_around_one_leg）。 */
+function sdtOutfitPartTokens(outfit, part) {
+    const parts = String(outfit || '').split(/[,，]/);
+    const out = [];
+    for (let i = 0; i < parts.length; i++) {
+        const raw = String(parts[i]).trim();
+        if (!raw) continue;
+        if (sdtOutfitTokenIsPart(raw, part)) out.push(raw);
+    }
+    return out;
+}
+
+/** 剔除属于这些部件的 token（与 sdtWardrobeStrip 的区别：后者只认全等 tag，剔不掉 panties_around_one_leg）。 */
+function sdtOutfitDropParts(outfit, parts) {
+    const want = Array.isArray(parts) ? parts : [];
+    if (!want.length) return outfit;
+    const segs = String(outfit || '').split(/[,，]/);
+    const keep = [];
+    let changed = false;
+    for (let i = 0; i < segs.length; i++) {
+        const raw = String(segs[i]).trim();
+        if (!raw) continue;
+        let hit = '';
+        for (let k = 0; k < want.length; k++) { if (sdtOutfitTokenIsPart(raw, want[k])) { hit = want[k]; break; } }
+        if (hit) { changed = true; continue; }
+        keep.push(raw);
+    }
+    return changed ? keep.join(', ') : outfit;
+}
+
+/** 正文里这件衣物旁边有没有「脱/摘/褪」类动词。有 = 允许消失，没有 = 视为 AI 漏写。 */
+function sdtOutfitRemovalAllowed(probe, part) {
+    try {
+        const s = String(probe || '');
+        if (!s) return false;
+        const names = SDT_OUTFIT_CARRY_ZH[part] || [];
+        for (let i = 0; i < names.length; i++) {
+            const w = String(names[i] || '');
+            if (!w) continue;
+            let at = s.indexOf(w);
+            while (at >= 0) {
+                if (sdtWardrobeNearVerb(s, at, w.length, SDT_WARDROBE_TAKE_OFF)) return true;
+                at = s.indexOf(w, at + 1);
+            }
+        }
+        const low = s.toLowerCase();
+        const t = String(part || '').toLowerCase();
+        if (t) {
+            let at2 = low.indexOf(t);
+            while (at2 >= 0) {
+                if (sdtWardrobeNearVerb(low, at2, t.length, SDT_WARDROBE_TAKE_OFF)) return true;
+                at2 = low.indexOf(t, at2 + 1);
+            }
+        }
+        return false;
+    } catch (e) { return false; }
+}
+
+/** 本轮解析开始前的服装基线：角色档案里的 currentOutfit（normalize 过程会写档案，所以必须抢在解析前抓）。 */
+function sdtSnapshotOutfits() {
+    try {
+        const out = {};
+        const profiles = (typeof getCharacterProfiles === 'function') ? getCharacterProfiles() : null;
+        const keys = Object.keys(profiles || {});
+        for (let i = 0; i < keys.length; i++) {
+            const p = profiles[keys[i]] || {};
+            const name = String(p.displayName || keys[i] || '').trim().toLowerCase();
+            if (name) out[name] = String(p.currentOutfit || '');
+        }
+        return out;
+    } catch (e) { return {}; }
+}
+
+/**
+ * 服装状态机：AI 每镜从零重写 outfit，漏写的部件按「absent ≠ removed」补回上一镜的原样写法，
+ * 只有正文出现对应脱/摘动作（或整场全裸）才允许消失。
+ * @returns {null | Array<{segIndex:number, refilled:string[], dropped:string[]}>}
+ */
+function sdtOutfitCarryAcrossSegments(segs, body, baseSnap) {
+    try {
+        const list = Array.isArray(segs) ? segs : [];
+        if (!list.length) return null;
+        const snap = (baseSnap && typeof baseSnap === 'object') ? baseSnap : {};
+        const text = String(body || '');
+        const nudeAll = /(?:^|[^a-z0-9_])(?:completely[_ ]nude|fully[_ ]nude|nude|naked|bottomless|topless)(?:[^a-z0-9_]|$)/i.test(text)
+            || /全裸|一丝不挂|脱光|赤裸|光着身子|赤条条|身无寸缕/.test(text);
+        const prev = new Map();
+        const out = [];
+        const keys = Object.keys(SDT_OUTFIT_CARRY_ZH);
+        for (let i = 0; i < list.length; i++) {
+            const seg = list[i] || {};
+            const anchorText = (seg.anchor && typeof seg.anchor === 'object') ? String(seg.anchor.text || '') : String(seg.anchor || '');
+            const probe = text + '\n' + anchorText;
+            const chars = Array.isArray(seg.characters) ? seg.characters : [];
+            const line = { segIndex: i, refilled: [], dropped: [] };
+            for (let ci = 0; ci < chars.length; ci++) {
+                const c = chars[ci] || {};
+                const nameKey = String(c.name || c._rawName || '').trim().toLowerCase();
+                if (!nameKey) continue;
+                const curRaw = String(c._rawOutfit || c.outfit || '');
+                const beforeRaw = prev.has(nameKey) ? prev.get(nameKey) : String(snap[nameKey] || '');
+                const refill = [], drop = [];
+                if (beforeRaw) {
+                    for (let ki = 0; ki < keys.length; ki++) {
+                        const part = keys[ki];
+                        const had = sdtOutfitPartTokens(beforeRaw, part);
+                        if (!had.length) continue;
+                        if (sdtOutfitPartTokens(curRaw, part).length) continue;   // 本镜写明了这件 → 不动
+                        if (nudeAll || sdtOutfitRemovalAllowed(probe, part)) drop.push(part);
+                        else refill.push({ part: part, raw: had[0] });
+                    }
+                }
+                let nextRaw = curRaw;
+                if (refill.length) {
+                    const add = refill.map(function (x) { return x.raw; }).join(', ');
+                    nextRaw = nextRaw ? (nextRaw.replace(/[\s,]+$/, '') + ', ' + add) : add;
+                }
+                if (drop.length) nextRaw = sdtOutfitDropParts(nextRaw, drop);
+                if (nextRaw !== curRaw) {
+                    c._rawOutfit = nextRaw;
+                    c.outfit = nextRaw;
+                    let cap = String(c.caption || '');
+                    if (drop.length) cap = sdtOutfitDropParts(cap, drop);
+                    if (refill.length) {
+                        // 只往 caption 追加增量；整串 nextRaw 会把 caption 里已有的部分重复一遍
+                        const addCap = refill.map(function (x) { return x.raw; }).join(', ');
+                        cap = cap ? (cap.replace(/[\s,]+$/, '') + ', ' + addCap) : addCap;
+                    }
+                    c.caption = cap;
+                    for (let ri = 0; ri < refill.length; ri++) line.refilled.push(refill[ri].part);
+                    for (let di = 0; di < drop.length; di++) line.dropped.push(drop[di]);
+                }
+                prev.set(nameKey, nextRaw);
+            }
+            if (line.refilled.length || line.dropped.length) out.push(line);
+        }
+        return out.length ? out : null;
+    } catch (e) { return null; }
+}
+
+/** 正向 tag 里出现这些词，这张图就是 NSFW（NAI 侧真正决定图能不能露的是 tag 本身，Scene 前缀只是自然语言提示）。 */
+const SDT_SCENE_NSFW_RE = /(?:^|[^a-z0-9_])(?:pussy|penis|nipples?|anus|anal|sex|vaginal|cum|semen|bottomless|topless|nude|naked|breasts?|labia|clitoris|areola|pubic|fellatio|cunnilingus|paizuri|handjob|masturbation|orgasm|penetration|creampie|genital|buttocks|ass|bare_hips)(?:[^a-z0-9_]|$)/i;
+
+/** 只纠一个方向：正向已含露骨词却写着 Scene: SFW → 改 NSFW。没有露骨词时不反向改（插件不发明分级）。 */
+function sdtSceneRatingFix(text) {
+    try {
+        const s = String(text || '');
+        if (!s) return s;
+        const m = s.match(/scene\s*[:：]\s*(sfw|nsfw)/i);
+        if (!m) return s;
+        if (String(m[1]).toLowerCase() === 'nsfw') return s;
+        if (!SDT_SCENE_NSFW_RE.test(s)) return s;
+        return s.slice(0, m.index) + m[0].replace(/sfw/i, 'NSFW') + s.slice(m.index + m[0].length);
+    } catch (e) { return text; }
 }
 
 // 取最近一条聊天正文（拿不到返回空串）。正文是摘除判定的第一权威来源。
@@ -15068,13 +15311,19 @@ function sdtPoseMatrixEntry(className) {
                 if (fromBook.length) return fromBook;
                 return sdtSegmentsFromPayload(payload);
             })() : [];
+            // 6.5.95：AI 本轮一个分镜都没判主类（pose.class 全空）→ 视为「这场戏没有可命名的体位」，
+            // 不再拿引擎主类 / chat_metadata 里的历史姿势变量硬补。依据 6.5.94 真机：6 镜全空，
+            // 插件从旧变量 P-015/C02 给 4 张补上 doggystyle，而正文只是「趴着被摸被脱内裤」。
+            const aiSilent = (poseMode === 'body') && !segs.some(function (s) { return !!(s && s.pose && s.pose.class); });
+            const aiSilentNoFill = (poseStore && poseStore.poseAiSilentNoFill === false) ? false : true;
+            if (aiSilent && aiSilentNoFill) rec.aiSilent = true;
             const segPick = segs.length ? sdtPickSegmentForPayload(payload, segs, engine) : { seg: null, index: -1, why: 'legacy' };
             const seg = segPick.seg;
             // 无剧本（剧本变量缺失）→ 不做正文判定，整段与 6.5.71 一致
             const bodyPose = (poseMode === 'body' && bodyFirstOn && seg) ? sdtResolveSegmentPose(input, seg, segs) : null;
             // F03：判不出主类时的两条退路都要在面板上说得清——沿用同段前镜（变体连续）/ 实在没有才是兜底
             if (bodyPose && bodyPose.source === 'carry') rec.gateWhy = 'segCarry';
-            else if (poseMode === 'body' && seg && !(bodyPose && bodyPose.className)) rec.gateWhy = 'fallback';
+            else if (poseMode === 'body' && seg && !(bodyPose && bodyPose.className)) rec.gateWhy = (aiSilent && aiSilentNoFill) ? 'aiSilent' : 'fallback';
             // 该分镜正文/剧本已声明主类 → 不补、不改写、不跨类补（引擎类不再当渲染指令源）
             // 6.5.72 rev3：只有「正文显式给出主类」才锁；仅段声明（正文无线索）时走引擎兜底补词一次
             // 6.5.73：source='ai' 是 AI 在分镜里判的主类 —— 与正文同权，锁死补词与换类。
@@ -15240,13 +15489,17 @@ function sdtPoseMatrixEntry(className) {
                 }
                 // F05：主类补词因 input 超长被拒也要记账——旧码靠条件里的 input.length <= 1800 静默跳过，
                 // 面板上只看到「没补词」却不知道为什么（体检行必须宁可刷屏也不许沉默）。
-                if (main.length && !hasOwn && entry && input.length > 1800 && !bodyPoseLive && !classMismatch) {
+                if (main.length && !hasOwn && entry && input.length > 1800 && !bodyPoseLive && !classMismatch && !(aiSilent && aiSilentNoFill)) {
                     if (!Array.isArray(rec.skippedLong)) rec.skippedLong = [];
                     rec.skippedLong.push('main:' + (entry.code || '') + '@' + input.length);
                 }
+                // 6.5.95：AI 弃权（一个分镜都没判主类）时明确记账，不再走下面那条「补一次引擎主类」。
+                if (main.length && !hasOwn && entry && !bodyPoseLive && !classMismatch && aiSilent && aiSilentNoFill) {
+                    rec.aiSilentSkipped = 'main:' + (entry.code || '');
+                }
                 // 6.5.73：这里仍是 L2 兜底（规格 docs/22 §2）——只有「正文、分镜、AI 都没给主类」时才补一次引擎主类；
                 // 真机上「抱着」被补成 C17 bondage 的根因不是这条兜底，而是 AI 从未被问过姿势（已由分镜 pose 字段修掉）。
-                if (main.length && !hasOwn && entry && input.length <= 1800 && !bodyPoseLive && !classMismatch) {
+                if (main.length && !hasOwn && entry && input.length <= 1800 && !bodyPoseLive && !classMismatch && !(aiSilent && aiSilentNoFill)) {
                     const all = Array.isArray(M.poses) ? M.poses : [];
                     const others = [];
                     for (let i = 0; i < all.length; i++) {
@@ -17972,7 +18225,7 @@ function sdtRoundInspectLines() {
                 lines.push('  足部守卫 景别限 ' + ((gl.shotGuard.allowShot || []).join('/') || '-') + '｜禁 ' + ((gl.shotGuard.forbidShot || []).join('/') || '-') + '｜uc 禁 ' + ((gl.shotGuard.ucForbid || []).join('/') || '-'));
             }
             if (gl.gateWhy) {
-                const whyMap = { segCarry: '正文没写主类 → 沿用同段前镜（变体连续）', fallback: '正文与前镜都没有主类 → 兜底', 'switch': '正文主类与引擎不同 → 以正文为准', sexish: '正文与引擎都缺 → 补一次引擎主类' };
+                const whyMap = { segCarry: '正文没写主类 → 沿用同段前镜（变体连续）', fallback: '正文与前镜都没有主类 → 兜底', 'switch': '正文主类与引擎不同 → 以正文为准', sexish: '正文与引擎都缺 → 补一次引擎主类', aiSilent: 'AI 本轮一个分镜都没判主类 → 视为这场没有可命名的体位，不再兜底补词' };
                 lines.push('  判定说明 ' + (whyMap[gl.gateWhy] || gl.gateWhy));
             }
             if (gl.aiOverruled) lines.push('  正文压过 AI ' + String(gl.aiOverruled.ai || '-') + ' → ' + String(gl.aiOverruled.body || '-') + '（正文实词「' + String(gl.aiOverruled.word || '') + '」，AI 原词「' + String(gl.aiOverruled.aiWord || '-') + '」' + (gl.aiOverruled.aiWordInBody ? ' 在正文里' : ' 不在正文里') + '）');
@@ -17980,6 +18233,8 @@ function sdtRoundInspectLines() {
             if (gl.added) lines.push('  补词 +' + gl.added + '（只补一次）');
             if (gl.switched) lines.push('  跨类改判 ' + String(gl.switched) + '（正文主类覆盖旧锁定类，旧类锚词一并换掉）');
             if (gl.skippedSfw) lines.push('  补词跳过（SFW 场景：宁可不补，也不给日常镜头硬塞体位词）');
+            // 6.5.95：AI 弃权时必须上屏——否则「这轮怎么没补体位词」在面板上无从解释（旧码会静默补成上一场的体位）
+            if (gl.aiSilent) lines.push('  主类弃权 AI 一个分镜都没判类 → 本轮不补体位词（跳过 ' + String(gl.aiSilentSkipped || '-') + '；开关 poseAiSilentNoFill）');
             if (Array.isArray(gl.dropped) && gl.dropped.length) lines.push('  删词 ' + gl.dropped.join(' / ') + '（机位/肢势/规则互斥）');
             // t31 F06：依据文案只认 bodyHitSrc 的五个取值（caption / body / carry / director / engine）。
             // 旧码拿 mixedFrom 当抽奖箱：它只有 body|caption 二态，所以末位 else 的「引擎锁定类」从 mixedFrom 永远进不去（判据错位）。
