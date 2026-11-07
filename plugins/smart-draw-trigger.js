@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.97';
+    const PLUGIN_VERSION = '6.5.98';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -12847,7 +12847,12 @@ SCHEMA:
         }
         // 6.5.95：分级由插件判。真机 6.5.94 把「手捏圆臀 / bare buttocks」标成 Scene: SFW（第 1/2/4 张），
         // NAI 把 SFW 当日常图处理。只纠一个方向，没有露骨词时不反向改。
-        const sceneRated = sdtSceneRatingFix(baseStripped);
+        // 6.5.98：判级证据 = 基础 caption ∪ 每个角色的 caption ∪ form —— 露骨内容经常只写在角色 caption 里
+        const sceneEvidence = sdtFactText([baseStripped].concat(
+            charCaptions.map(function (cc) { return String((cc && cc.char_caption) || ''); }),
+            charForms
+        ).join('\n'), 4000);
+        const sceneRated = sdtSceneRatingFix(baseStripped, sceneEvidence);
         const sceneRatingFixed = sceneRated !== baseStripped;
         const baseCaptionFinal = sceneRated;
 
@@ -14150,17 +14155,20 @@ function sdtOutfitCarryAcrossSegments(segs, body, baseSnap) {
 }
 
 /** 正向 tag 里出现这些词，这张图就是 NSFW（NAI 侧真正决定图能不能露的是 tag 本身，Scene 前缀只是自然语言提示）。 */
-const SDT_SCENE_NSFW_RE = /(?:^|[^a-z0-9_])(?:pussy|penis|nipples?|anus|anal|sex|vaginal|cum|semen|bottomless|topless|nude|naked|breasts?|labia|clitoris|areola|pubic|fellatio|cunnilingus|paizuri|handjob|masturbation|orgasm|penetration|creampie|genital|buttocks|ass|bare_hips)(?:[^a-z0-9_]|$)/i;
+const SDT_SCENE_NSFW_RE = /(?:^|[^a-z0-9_])(?:pussy|penis|nipples?|anus|anal|sex|vaginal|cum|semen|bottomless|topless|nude|naked|breasts?|labia|clitoris|areola|pubic|fellatio|cunnilingus|paizuri|handjob|masturbation|orgasm|penetration|creampie|genitals?|buttocks?|butts?|ass|bare_hips|bare_butt|pussy_juice|crotch|spread_pussy|spread_pussy_lips)(?:[^a-z0-9_]|$)/i;
 
-/** 只纠一个方向：正向已含露骨词却写着 Scene: SFW → 改 NSFW。没有露骨词时不反向改（插件不发明分级）。 */
-function sdtSceneRatingFix(text) {
+/** 只纠一个方向：正向已含露骨词却写着 Scene: SFW → 改 NSFW。没有露骨词时不反向改（插件不发明分级）。
+ *  6.5.98：判级证据可以外扩（evidence）—— 真机里露臀写在角色 caption 而 Scene 写在基础 caption，
+ *  只看基础 caption 会把「手捏圆臀」判成 SFW。改写位置仍然只在 text 里。 */
+function sdtSceneRatingFix(text, evidence) {
     try {
         const s = String(text || '');
         if (!s) return s;
         const m = s.match(/scene\s*[:：]\s*(sfw|nsfw)/i);
         if (!m) return s;
         if (String(m[1]).toLowerCase() === 'nsfw') return s;
-        if (!SDT_SCENE_NSFW_RE.test(s)) return s;
+        const ev = (evidence && String(evidence).trim()) ? String(evidence) : s;
+        if (!SDT_SCENE_NSFW_RE.test(ev) && !SDT_SCENE_NSFW_RE.test(s)) return s;
         return s.slice(0, m.index) + m[0].replace(/sfw/i, 'NSFW') + s.slice(m.index + m[0].length);
     } catch (e) { return text; }
 }
@@ -14746,7 +14754,13 @@ function sdtPoseMatrixEntry(className) {
 
     /** L0 分镜级裁决：正文实词 > 分镜声明（segment.pose.class）> null（交给引擎兜底）
      *  返回 {className,label,variant,tags,protected,source,segIndex,word} */
-    function sdtResolveSegmentPose(input, seg, segs) {
+    function sdtResolveSegmentPose(input, seg, segs, opts) {
+        // 6.5.98（P0-2 断自证闭环）：真机调用点传 { captionTrusted: false }。
+        // 原因：这里的 input 是插件拼好的 caption（含 AI 上一轮自己写的 tag + 画风串），拿它当「正文证据」
+        // 会形成闭环——AI 写错 → caption 有那个词 → 下一轮判类信它 → 继续错（真机同一镜连改三次 C02→C18→C11→C06）。
+        // 关掉后：命中词只在 caption 出现时 source 落 'caption'，ent 仍然给出（几何上没判错），
+        // 但它不构成 bodyLock、不进 bodyPoseLive，锁不死补词、也不再当「正文优先」的举证。
+        const capTrusted = !(opts && opts.captionTrusted === false);
         try {
             // F18（6.5.72）：bodyText 只含「正文」（分镜 anchor + texts），不含 caption(input)。
             // 换类清洗据此豁免正文点名的性行为细节词（手/口/胸/道具），避免「一镜一姿势」把正文写明的细节一并剪掉。
@@ -14791,9 +14805,23 @@ function sdtPoseMatrixEntry(className) {
             // F03 只加「跨类变体名但正文另有主类实词」的降级条件（useVariant），顺序不变。
             // 6.5.73：分支 0 —— AI 在分镜里亲自判的主类。它读的是整段正文，比约 80 词的中文表强得多；
             // 词表退为交叉校验（aiConflict 只记账上屏，不改判）。判不出（ai=false）才继续走 a/b/c。
+            // 6.5.98（P0-2）：命中词只在 caption 里出现时，这次命中不算「正文判决」。
+            // 真机链条：AI 上一轮自己写的 tag（lying_on_stomach / prone / oral）留在 caption → 下一轮判类拿它当证据
+            // → 同一镜被连改三次 C02→C18→C11→C06，hitSrc 全是 caption。caption 是插件的产物，不是原文。
+            // 处理：仍然认这个类（几何上没判错），但 source 落 'caption' —— 它不构成 bodyLock、不进 bodyPoseLive，
+            // 因此不会再锁死补词、也不会再当正文优先的依据。判类优先权只留给 正文 / AI / 段声明 / 沿用前镜。
+            // 判据用「正文单独求值能判出同一类」——正文是中文，命中词常是英文 tag，不能拿 word 去正文里找子串
+            const hitVarB = bodyText ? sdtVariantHitInText(bodyText) : null;
+            const hitTextB = bodyText ? sdtClassHitInText(bodyText) : null;
+            const hitInBody = function (h, hb) {
+                try {
+                    if (capTrusted) return true;
+                    return !!(h && hb && h.class && hb.class && String(h.class) === String(hb.class));
+                } catch (e) { return false; }
+            };
             if (aiPose) { ent = aiPose; source = 'ai'; }
-            else if (hitVariant && useVariant) { ent = sdtPoseMatrixEntry(hitVariant.class); source = 'body'; }
-            else if (hitText) { ent = sdtPoseMatrixEntry(hitText.class); source = 'body'; }
+            else if (hitVariant && useVariant) { ent = sdtPoseMatrixEntry(hitVariant.class); source = hitInBody(hitVariant, hitVarB) ? 'body' : 'caption'; }
+            else if (hitText) { ent = sdtPoseMatrixEntry(hitText.class); source = hitInBody(hitText, hitTextB) ? 'body' : 'caption'; }
             else if (declared) { ent = declared; source = 'director'; }
             else {
                 // F03：正文没写主类、剧本也没声明 → 沿用同段前镜（变体连续）；实在没有前镜才算兜底
@@ -15320,7 +15348,7 @@ function sdtPoseMatrixEntry(className) {
             const segPick = segs.length ? sdtPickSegmentForPayload(payload, segs, engine) : { seg: null, index: -1, why: 'legacy' };
             const seg = segPick.seg;
             // 无剧本（剧本变量缺失）→ 不做正文判定，整段与 6.5.71 一致
-            const bodyPose = (poseMode === 'body' && bodyFirstOn && seg) ? sdtResolveSegmentPose(input, seg, segs) : null;
+            const bodyPose = (poseMode === 'body' && bodyFirstOn && seg) ? sdtResolveSegmentPose(input, seg, segs, { captionTrusted: false }) : null;
             // F03：判不出主类时的两条退路都要在面板上说得清——沿用同段前镜（变体连续）/ 实在没有才是兜底
             if (bodyPose && bodyPose.source === 'carry') rec.gateWhy = 'segCarry';
             else if (poseMode === 'body' && seg && !(bodyPose && bodyPose.className)) rec.gateWhy = (aiSilent && aiSilentNoFill) ? 'aiSilent' : 'fallback';
@@ -15479,7 +15507,7 @@ function sdtPoseMatrixEntry(className) {
                         // 旧码本行第二分支与 bodyLock 同源（bodyLock 已含 source==='body'），恒假 → caption-only 永远报 'body'，
                         // 面板写「依据 正文」是假话（与 F06 hitSrc 同类问题）。通道细分（正文 / caption / 沿用前镜 / 分镜声明 / 引擎锁定）
                         // 由 rec.bodyHitSrc 承担，并在体检行「换类清洗 … 依据 …」里上屏，所以这里不需要第三个值。
-                        rec.mixedFrom = (bodyPose && bodyPose.source === 'body' && bodyPose.hitSrc === 'caption') ? 'caption' : 'body';
+                        rec.mixedFrom = (bodyPose && bodyPose.hitSrc === 'caption') ? 'caption' : 'body';
                         if (mixedDrop.length) {
                             input = sdtDropAllGuarded(input, mixedDrop, rec, mixedProt);
                             rec.mixedDropped = mixedDrop.slice();          // F02：列全，不再截 8 个
