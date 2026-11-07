@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.98';
+    const PLUGIN_VERSION = '6.5.99';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -10047,6 +10047,12 @@ ${getCharacterMemoryTagSpecification()}
             if (outfitCarry) normalized.__outfitCarry = outfitCarry;
         } catch (e) { /* ignore */ }
 
+        // 6.5.99：POV 落实 + 机位轮换（依据 6.5.98 真机：pov 出现 0 次、8 镜 7 个 from_above、负向堵着 solo）
+        try {
+            const povShot = sdtPovShotPass99(segments, sdtLatestMessageText());
+            if (povShot) normalized.__povShot = povShot;
+        } catch (e) { /* ignore */ }
+
         if (mangaContext && memoryWarnings.length) {
             normalized.memoryWarnings = [...new Set(memoryWarnings)];
             normalized.reason += '\n角色记忆提示：' + normalized.memoryWarnings.join('；');
@@ -15144,6 +15150,166 @@ function sdtPoseMatrixEntry(className) {
             }
             return { view: 'from_side', shot: shot, pov: false, forbid: ['pov'], allow: ['from_side', 'profile', 'from_behind', 'three-quarter_view'], footDetail: guard.footDetail, forbidShot: guard.forbidShot, ucForbid: guard.ucForbid, why: behind ? 'third-person+behind' : 'third-person' };
         } catch (e) { return { view: '', shot: '', pov: false, forbid: [], allow: [], footDetail: false, forbidShot: [], ucForbid: [], why: 'error' }; }
+    }
+
+    /* ── 6.5.99 POV 落实 + 机位轮换：把「AI 说要 POV」变成「payload 真的只有 POV」 ──
+       依据 6.5.98 真机：8 镜 scene 全部写 {1boy, 1girl} + couple + "a boy lying on his back…a small
+       girl kneeling beside his hip"，pov 出现 0 次，负向却写着 solo, solo focus —— 男方被当成画面里
+       第二个角色画成完整人形，solo 负向又把「只有她」这条路堵死。判定权在正文，落实权在这里。 */
+
+    const SDT_CAM_VLIST99 = ['from_above', 'from_below', 'from_side', 'three-quarter_view'];
+    const SDT_CAM_ROT99_TP = ['from_above', 'from_side', 'from_below', 'three-quarter_view'];
+    const SDT_CAM_ROT99_POV = ['from_above', 'from_below'];
+    // 只删「把主体自己裁掉」的词：AI 拿 face/head/full body 去裁男方，而 NAI 的 uc 整图生效 → 主角一起被裁。
+    const SDT_UC_KILL99 = ['face', 'head', 'eyes', 'eye', 'hair', 'upper body', 'full body', 'wide shot', 'female body', 'male body', 'body', 'front view', 'back view'];
+    const SDT_MALE_TOK99 = /(^|[^a-z0-9_])(1boy|boys|boy|males|male|men|man|father|papa|his|him|both)([^a-z0-9_]|$)/i;
+    const SDT_FEM_TOK99 = /(^|[^a-z0-9_])(1girl|girls|girl|female|woman|her|she|loli)([^a-z0-9_]|$)/i;
+
+    function sdtNorm99(tok) {
+        return String(tok || '').toLowerCase().replace(/[\u3000\s]+/g, ' ').trim();
+    }
+    /** 逗号分隔的 tag 串里精确删词（负向 / uc 用；不碰散文） */
+    function sdtTagsDrop99(text, kill) {
+        try {
+            const src = String(text || '');
+            if (!src) return src;
+            const set = {};
+            for (let i = 0; i < kill.length; i++) set[sdtNorm99(kill[i])] = 1;
+            const toks = src.split(/[,，]/);
+            const kept = [];
+            let hit = 0;
+            for (let i = 0; i < toks.length; i++) {
+                const raw = toks[i];
+                const t = sdtNorm99(raw);
+                if (!t) continue;
+                if (set[t]) { hit++; continue; }
+                kept.push(String(raw).trim());
+            }
+            if (!hit) return src;
+            return kept.join(', ');
+        } catch (e) { return text; }
+    }
+    /** 散文里删机位 token（场景文本用；只认整词 tag 形态） */
+    function sdtCamDrop99(scene, tags) {
+        try {
+            let s = String(scene || '');
+            for (let i = 0; i < tags.length; i++) {
+                const t = String(tags[i]);
+                const esc = t.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&').replace(/_/g, '[_ ]');
+                s = s.replace(new RegExp('(^|[,\\s;])' + esc + '(?=[,\\s;.]|$)', 'gi'), ' ');
+            }
+            return s.replace(/\s{2,}/g, ' ').replace(/([,;])\s*(?=[,;])/g, '').replace(/\s+([,;.])/g, '$1').replace(/([,;])\s*$/,'$1').trim();
+        } catch (e) { return String(scene || ''); }
+    }
+    /** 男方角色判定：看 base 前三段，含男方词且不含女方词 */
+    function sdtCharIsMale99(c) {
+        try {
+            const base = String((c && c.base) || '');
+            const head = base.split(/[,，]/).slice(0, 3).join(',');
+            if (!head) return false;
+            if (SDT_FEM_TOK99.test(head)) return false;
+            return SDT_MALE_TOK99.test(head);
+        } catch (e) { return false; }
+    }
+    /** POV 场景重写：删掉描述男方/双人的从句，补 pov。花括号组先遮蔽，避免拆坏 {1boy, 1girl} */
+    function sdtScenePovRewrite99(scene) {
+        try {
+            const raw = String(scene || '');
+            if (!raw) return raw;
+            const vault = [];
+            const masked = raw.replace(/\{[^{}]*\}/g, function (m) { vault.push(m); return '\u0001' + (vault.length - 1) + '\u0002'; });
+            const sentences = masked.split(/[.;。；]/);
+            const outS = [];
+            for (let i = 0; i < sentences.length; i++) {
+                const s = sentences[i];
+                if (!s || !s.trim()) continue;
+                if (!SDT_MALE_TOK99.test(s)) { outS.push(s.trim()); continue; }
+                const clauses = s.split(',');
+                const keep = [];
+                for (let k = 0; k < clauses.length; k++) {
+                    if (SDT_MALE_TOK99.test(clauses[k])) continue;
+                    keep.push(clauses[k]);
+                }
+                const joined = keep.join(',').replace(/\s{2,}/g, ' ').trim();
+                if (joined && joined.replace(/[\s,.;]/g, '').length > 3) outS.push(joined);
+            }
+            let out = outS.join('. ').replace(/\s{2,}/g, ' ').trim();
+            out = out.replace(/\u0001(\d+)\u0002/g, function (m, n) { return vault[Number(n)] || ''; });
+            if (!out) return out;
+            if (!/(^|[^a-z0-9_])pov([^a-z0-9_]|$)/i.test(out)) out = out.replace(/[;；\s]+$/, '') + ', pov';
+            return out;
+        } catch (e) { return String(scene || ''); }
+    }
+    /** 整组机位轮换：3 镜以上且只有一种垂直机位 → 按序重排。不靠 AI 自觉 */
+    function sdtCamPass99(segments, pov) {
+        try {
+            const list = Array.isArray(segments) ? segments : [];
+            if (list.length < 3) return null;
+            const uniq = [];
+            for (let i = 0; i < list.length; i++) {
+                const sc = String((list[i] && list[i].scene) || '');
+                for (let k = 0; k < SDT_CAM_VLIST99.length; k++) {
+                    const t = SDT_CAM_VLIST99[k];
+                    if (sdtTagHas(sc, t)) { if (uniq.indexOf(t) < 0) uniq.push(t); break; }
+                }
+            }
+            if (uniq.length >= 2) return { rotated: false, uniq: uniq };
+            const rot = pov ? SDT_CAM_ROT99_POV : SDT_CAM_ROT99_TP;
+            const applied = [];
+            for (let i = 0; i < list.length; i++) {
+                const want = rot[i % rot.length];
+                let sc = sdtCamDrop99(String((list[i] && list[i].scene) || ''), SDT_CAM_VLIST99);
+                if (!sdtTagHas(sc, want)) sc = sc.replace(/[;；\s]+$/, '') + ', ' + want;
+                if (list[i]) list[i].scene = sc;
+                applied.push(want);
+            }
+            return { rotated: true, uniq: uniq, applied: applied };
+        } catch (e) { return null; }
+    }
+    /** 一组分镜的 POV 落实：uc 洗词 → 男方不入画 → 场景重写 → 负向删 solo → 机位轮换 */
+    function sdtPovShotPass99(segments, latestText) {
+        try {
+            const list = Array.isArray(segments) ? segments : [];
+            if (!list.length) return null;
+            const t = String(latestText || '');
+            const tpMark = /第三人称|客观视角|旁观|侧拍|对镜/.test(t);
+            const fpMark = /第一人称|主观视角/.test(t) || /(^|[^a-z0-9_])pov([^a-z0-9_]|$)/i.test(t);
+            const youN = (t.match(/你(?!们)/g) || []).length;
+            const pov = !tpMark && (fpMark || youN >= 3);
+            const info = { pov: pov, why: pov ? (fpMark ? 'declared' : ('second-person x' + youN)) : (tpMark ? 'third-person' : 'no-mark'), applied: 0, maleDropped: 0, ucScrubbed: 0, svcFixed: 0 };
+            for (let i = 0; i < list.length; i++) {
+                const seg = list[i] || {};
+                const chars = Array.isArray(seg.characters) ? seg.characters : [];
+                for (let k = 0; k < chars.length; k++) {
+                    const c = chars[k] || {};
+                    const b4 = String(c.uc || '');
+                    const af = sdtTagsDrop99(b4, SDT_UC_KILL99);
+                    if (af !== b4) { c.uc = af; info.ucScrubbed++; }
+                }
+                if (!pov) continue;
+                if (chars.length > 1) {
+                    const keepF = chars.filter(function (c) { return !sdtCharIsMale99(c); });
+                    if (keepF.length >= 1 && keepF.length < chars.length) {
+                        info.maleDropped += chars.length - keepF.length;
+                        seg.characters = keepF;
+                    }
+                }
+                const cls = String((seg.pose && seg.pose.class) || '').toUpperCase();
+                const actText = String(seg.scene || '').toLowerCase();
+                const oral = cls === 'C11' || /(fellatio|blowjob|deepthroat|paizuri|mouth on penis)/.test(actText);
+                let sc = sdtScenePovRewrite99(String(seg.scene || ''));
+                sc = sdtCamDrop99(sc, ['from_side', 'from_behind', 'profile']);
+                const wantExtra = oral ? 'penis' : 'pov_crotch';
+                if (sc && !sdtTagHas(sc, wantExtra)) sc = sc.replace(/[;；\s]+$/, '') + ', ' + wantExtra;
+                seg.scene = sc;
+                const nb = String(seg.negative || '');
+                const na = sdtTagsDrop99(nb, ['solo', 'solo focus']);
+                if (na !== nb) { seg.negative = na; info.svcFixed++; }
+                info.applied++;
+            }
+            info.cam = sdtCamPass99(list, pov);
+            return info;
+        } catch (e) { return null; }
     }
 
     function sdtPoseVocabLines(className, opts) {
