@@ -12,7 +12,7 @@
     const sdtPreviousApi = { ...RBQ.api };
 
     const PLUGIN_NAME = '智能生图触发器 (Smart Draw Trigger)';
-    const PLUGIN_VERSION = '6.5.99';
+    const PLUGIN_VERSION = '6.6.0';
     const STORAGE_KEY = '_smartDrawTrigger';
     const ALT_STORAGE_KEY = '_smartDrawTriggerSettings';
     const CARD_CLASS = 'rbq-sdt-card';
@@ -2283,11 +2283,12 @@ Zimage 擅长理解复杂的英文长句和语境。
    探入肢体日常默认单侧（a hand / single hand），仅双手推阻或拥抱时写双手。
 
 4.【实体解耦与多角色同框】
-   - POV 观察者不建 Character，其入镜部位 100% 写入前景，且必须写明性别实体（viewer's male hand / male forearm / male pelvis），严禁只写 hands。
+   - POV 观察者只在两种情形下不建 Character：① 画面里只看得到他的手/腰以下局部、此人没有独立出镜；② 正文明确是贴脸第一人称特写。其余任何「他在场并参与动作」的镜头，他必须作为一个 Character 条目写进去（name 用正文里对他的称呼），外观写进 base、动作写进 action。只写前景部位而不建条目，只允许出现在上面两种情形。
    - POV 且观察者肢体入镜时，人数标签只写被观察角色本体（{1girl} 或 {1boy}），严禁 solo / solo focus（会把观察者肢体一起抹掉）；负面严禁写观察者的性别词（男方观察者禁 boy / male / male body，女方观察者禁 girl / female）。仅双方同性别或画面无观察者肢体时，才允许在负面补另一方性别。
    - 第三人称双人：Char1/Char2 各自独立坐标 + facing_another, eye_contact 互视 + source#action / target#action 标注归属。
-   - 同框配额铁律：判据不看台词，只看画面能否出现第二个人。只要 {{user}} 在场并发生动作或接触，即必须建两人 Character（BL 用 {2boys}、GL 用 {2girls}、异性用 {1boy, 1girl}），且 segments 内至少 1/2 分镜 characters.length ≥ 2，其中至少 1 个为双方完整出镜（full_body / cowboy_shot）。全部单人 ＝ 违规，重写。
+   - 同框配额铁律：判据不看台词，只看画面能否出现第二个人。所谓「视角主人」= 你以为在代入的那个人，正文里可能写成「我 / 你 / 他」，也可能直接用名字（例如 {{user}}）——三种写法都算在场，不要因为没看到字面 {{user}} 就判定他不在。只要视角主人与画面里任何人发生肢体接触，即必须为他建 Character（全男用 {2boys}，全女用 {2girls}，异性用 {1boy, 1girl}），且 segments 内至少 1/2 分镜 characters.length ≥ 2，其中至少 1 个为双方完整出镜（full_body / cowboy_shot）。
    - 三人：Char1/2/3，坐标左 0.2 / 中 0.5 / 右 0.8，人数标签写精确计数（{1girl, 2boys}）。
+   - 人数标签必须等于 characters 条数：scene 的 {Nboy, Ngirl} 计数 = 本镜 characters 数组的实际条目数，一个不多一个不少。严禁凭空补一个不存在的性别：characters 全为 boy 时只能写 {2boys} / {1boy, 2boys} / {3boys}，写 1girl 就是让模型凭空多画一个人（黑操白、莫名亲吻都来自这一条）；只画一人写 {1boy}, solo focus。
    - POV 配额：scene 含 pov 的分镜不得超过总数 40%；第 1 个分镜禁止 POV。
 
 5.【机位轮转 · 强制随机】
@@ -10043,13 +10044,13 @@ ${getCharacterMemoryTagSpecification()}
         // 6.5.95：服装状态机——AI 每镜从零重写 outfit，漏写的部件按「absent ≠ removed」补回上一镜原样写法，
         // 只有正文出现对应脱/摘动作才允许消失。依据 6.5.94 真机：第 1/2/4 镜漏 panties、第 3 镜褪到膝盖后第 4 镜又「长回去」。
         try {
-            const outfitCarry = sdtOutfitCarryAcrossSegments(segments, sdtLatestMessageText(), outfitBaselineSnap);
+            const outfitCarry = SDT_AI_TAG_ONLY ? null : sdtOutfitCarryAcrossSegments(segments, sdtLatestMessageText(), outfitBaselineSnap);
             if (outfitCarry) normalized.__outfitCarry = outfitCarry;
         } catch (e) { /* ignore */ }
 
         // 6.5.99：POV 落实 + 机位轮换（依据 6.5.98 真机：pov 出现 0 次、8 镜 7 个 from_above、负向堵着 solo）
         try {
-            const povShot = sdtPovShotPass99(segments, sdtLatestMessageText());
+            const povShot = SDT_AI_TAG_ONLY ? null : sdtPovShotPass99(segments, sdtLatestMessageText());
             if (povShot) normalized.__povShot = povShot;
         } catch (e) { /* ignore */ }
 
@@ -12602,6 +12603,12 @@ SCHEMA:
     }
 
     /* ── Quality tag deduplication ── */
+    /* 6.5.100 只留 AI 决定 tag：插件停止对 AI 写出的 tag 做任何增删改。
+       停用清单：姿势闸门（补位/换类/景别/机位/肢势/服装规则）、分级改判、caption 同义去重、
+       服装状态机补漏、POV 改写（移人/洗 uc/删 solo/机位重排）、uc 覆盖。
+       保留：解析 JSON、剥中文（NAI 不认）、坐标兜底、拼装 NAI 结构、AI 没写 uc 时的基础负向。 */
+    const SDT_AI_TAG_ONLY = true;
+
     const QUALITY_TAGS_SET = new Set([
         'best quality', 'masterpiece', 'absurdres', 'highres', 'very aesthetic',
         'amazing quality', 'good quality', 'high quality', 'ultra detailed',
@@ -12638,6 +12645,7 @@ SCHEMA:
             if (comma < 0) break;
             i = comma + 1;
         }
+        if (SDT_AI_TAG_ONLY) return { text: groups.map(g => g.text).join(', '), zh: zh, dup: 0 };
         const seen = Object.create(null);
         const out = [];
         let dup = 0;
@@ -12723,7 +12731,7 @@ SCHEMA:
         if (segmentResult?.mangaPage || (isMangaRequest() && Array.isArray(segmentResult?.characters))) {
             return {
                 manga: true, textCompiled: segmentResult.mangaTextCompiled === true || (typeof segmentResult.mangaPage === 'object' && segmentResult.mangaPage !== null),
-                useCoords: !!segmentResult.mangaUseCoords, negative: SDT_BASE_NEG,   // 6.5.95：负向由插件给，AI 自写的 negative/uc 一律不用
+                useCoords: !!segmentResult.mangaUseCoords, negative: (SDT_AI_TAG_ONLY ? (String(segmentResult.negative || segmentResult.negativePrompt || '').trim() || SDT_BASE_NEG) : SDT_BASE_NEG),   // 6.5.95：负向由插件给，AI 自写的 negative/uc 一律不用
                 renderSettings: { ...(segmentResult.mangaRenderSettings || RBQ.api.mangaProtocol?.captureRenderSettings?.()) },
                 characters: (segmentResult.characters || []).map(c => {
                     const capBase = sdtCaptionClean(c.caption).text;
@@ -12745,13 +12753,13 @@ SCHEMA:
         return {
             // 6.5.83：scene 也过同一道中文清洗 —— 11-01 的 42 条 nai-payload 实测无中文（AI 只是 rawOutput 里写中文），
             // 但 10-30 的历史记录里曾有中文动作被拼进 char_caption，这里把 scene 也一起锁进清洗，避免同类回归。
-            scene: sdtCaptionClean(deduplicateQualityTags(segmentResult.scene || '')).text, negative: SDT_BASE_NEG,   // 6.5.95：同 E1
+            scene: sdtCaptionClean(SDT_AI_TAG_ONLY ? (segmentResult.scene || '') : deduplicateQualityTags(segmentResult.scene || '')).text, negative: (SDT_AI_TAG_ONLY ? (String(segmentResult.negative || segmentResult.negativePrompt || '').trim() || SDT_BASE_NEG) : SDT_BASE_NEG),   // 6.5.95：同 E1
             useCoords: !!getStore().multiCharUseCoords,
             enabled: !!getStore().multiCharOutput,
             characters: segmentResult.characters.map(c => {
                 // 6.5.95：角色级负向由插件生成，AI 自写的 uc 一律丢弃。
                 // 真机 6.5.94 第 2 镜的 uc 是 `head, face, eyes, hair, full body` + negative 同款，正文只写「手捏圆臀」→ 无头图。
-                let uc = SDT_BASE_NEG;
+                let uc = SDT_AI_TAG_ONLY ? (String(c.uc || '').trim() || SDT_BASE_NEG) : SDT_BASE_NEG;
                 const actionText = [c.caption, c.action, c._rawAction].join(' ');
                 if (/\b(?:headless|decapitat(?:ed|ion)|severed\s+(?:pelvis|torso|legs?|arms?|body|limbs?|buttocks?)|only\s+(?:a\s+)?(?:severed\s+)?(?:female\s+)?(?:pelvis|buttocks|lower\s+body|torso)|neck\s+stump|bloody\s+neck\s+stump|无头|身首异处|断头|斩首|仅剩骨盆|仅留骨盆|被切下的(?:女性)?骨盆)\b/i.test(actionText)) {
                     const headHairUCParts = ['head', 'face', 'hair', 'ponytail', 'eyes', 'mouth', 'facial features'];
@@ -12841,7 +12849,7 @@ SCHEMA:
         if (negative !== undefined) payload.parameters.negative_prompt = negative;
 
         // 6.5.61 词法闸门：锁定主类一个都没落、却出现别的主类 main tag → 补回锁定主类（拦「体位进得去、画不出来」）
-        try { sdtPoseGateApply(payload); } catch (e) { /* ignore */ }
+        if (!SDT_AI_TAG_ONLY) { try { sdtPoseGateApply(payload); } catch (e) { /* ignore */ } }
 
         // Retain the host prompt and any prefixes assembled by earlier hooks.
         // 6.5.67：中文不进 NAI —— 基础 caption 里的中文段落同样剥掉
@@ -12858,7 +12866,7 @@ SCHEMA:
             charCaptions.map(function (cc) { return String((cc && cc.char_caption) || ''); }),
             charForms
         ).join('\n'), 4000);
-        const sceneRated = sdtSceneRatingFix(baseStripped, sceneEvidence);
+        const sceneRated = SDT_AI_TAG_ONLY ? baseStripped : sdtSceneRatingFix(baseStripped, sceneEvidence);
         const sceneRatingFixed = sceneRated !== baseStripped;
         const baseCaptionFinal = sceneRated;
 
@@ -12884,7 +12892,7 @@ SCHEMA:
         // 6.5.63 闸门负向相位：服装 uc 类必须双写 negative_prompt 与 v4_negative_prompt.caption.base_caption。
         // 必须在 v4 负向重建之后补写——早写会被 :12476 的 base_caption 覆盖丢弃（只写 negative_prompt 等于没写）。
         // 调用时带第二参数，因此不会被 harness S17 那条「严格单参调用只许出现一次」的正则抓到。
-        try { sdtPoseGateApply(payload, 'neg'); } catch (e) { /* ignore */ }
+        if (!SDT_AI_TAG_ONLY) { try { sdtPoseGateApply(payload, 'neg'); } catch (e) { /* ignore */ } }
 
         try {
             const dp = payload.parameters || {};
@@ -17777,6 +17785,22 @@ function sdtOutfitRuleNoteLines(probeText) {
         return DRAW_SPEC_TOOL_INPUT_MESSAGE;
     }
 
+    /** 6.6.0：tagger 这条链是插件自己拼 messages 直连模型，酒馆的宏替换不会经过它，
+     *  所以 V41 里的 {{user}} 到了模型眼里只是死文字 →「同框铁律」永不触发。此处统一换成真实用户名。 */
+    function sdtSubUser(text) {
+        const s = (typeof text === 'string') ? text : String(text == null ? '' : text);
+        if (!s || s.indexOf('{{user}}') < 0) return s;
+        let name = '';
+        try {
+            let ctx = null;
+            if (typeof RBQ !== 'undefined' && RBQ && RBQ.api && typeof RBQ.api.getContext === 'function') ctx = RBQ.api.getContext();
+            if (!ctx && typeof globalThis !== 'undefined' && globalThis.SillyTavern && typeof globalThis.SillyTavern.getContext === 'function') ctx = globalThis.SillyTavern.getContext();
+            if (ctx && typeof ctx.name1 === 'string' && ctx.name1.trim()) name = ctx.name1.trim();
+        } catch (e) { /* ignore */ }
+        if (!name) name = '用户';
+        return s.split('{{user}}').join(name);
+    }
+
     function assembleDrawRequestMessagesAndTool(fullSystemPrompt, payload, store, promptBundle = null) {
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, payload, store, promptBundle);
         if (standardRequest) return standardRequest;
@@ -18752,7 +18776,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
         // 6.5.78：工具路径已把硬规则拼进 toolRule，文本路径必须在这里补，否则规则 3~9 一条都到不了 AI。
         const hardRule = (!promptBundle && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), payload.storyFacts || null);
+        const fullSystemPrompt = sdtSubUser(applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), payload.storyFacts || null));
 
         // [6.5.59 诊断自证] 把「桥接是否真的生效 / 世界书是否真的进了 prompt」落进诊断包：
         // 之前的 dump 只有模型回包，无法回答「姿势变量读到了吗」「世界书命中几条」「是不是把 EJS 源码塞进了 prompt」。
@@ -23839,7 +23863,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
             const hardRule = (!promptBundle && store.provider !== 'custom' && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
             // [阶段1·桥接] 手动补画通道同样带体位锁定段落
             SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
+        const fullSystemPrompt = sdtSubUser(applyPoseDirective([systemPrompt, ecSysPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null));
             const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
             let messages = standardRequest?.messages;
             let requestTool = standardRequest?.tool;
@@ -25429,7 +25453,7 @@ async function callOpenAiCompatibleOnce(messageId, trigger, { signal, retryWitho
         const hardRule = (!promptBundle && store.provider !== 'custom' && store.toolCallMode) ? '' : DRAW_SPEC_HARD_RULES.trim();
         // [阶段1·桥接] 生图测试通道同样带体位锁定段落
         SDT_APPLY_BODY_MODE = sdtApplyBodyModeNow(store);   // 6.5.76：判定权直读，修「正文主导+无剧本」退回锁定语
-        const fullSystemPrompt = applyPoseDirective([systemPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null);
+        const fullSystemPrompt = sdtSubUser(applyPoseDirective([systemPrompt, toolRule, hardRule].filter(Boolean).join('\n\n'), manualPayload.storyFacts || null));
         const standardRequest = buildStandardDrawRequest(fullSystemPrompt, manualPayload, store, promptBundle);
         let messages = standardRequest?.messages;
         let requestTool = standardRequest?.tool;
